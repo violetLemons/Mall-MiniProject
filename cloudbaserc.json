@@ -7,6 +7,7 @@
     { "name": "adminAuth", "timeout": 20, "handler": "index.main", "memorySize": 256 },
     { "name": "adminBanners", "timeout": 20, "handler": "index.main", "memorySize": 256 },
     { "name": "adminCategories", "timeout": 20, "handler": "index.main", "memorySize": 256 },
+    { "name": "adminGateway", "timeout": 20, "handler": "index.main", "memorySize": 256 },
     { "name": "auth", "timeout": 20, "handler": "index.main", "memorySize": 256 },
     { "name": "paymentCallback", "timeout": 20, "handler": "index.main", "memorySize": 256 },
     { "name": "products", "timeout": 20, "handler": "index.main", "memorySize": 256 },

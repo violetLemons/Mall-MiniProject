@@ -1,4 +1,4 @@
-const { verifyToken, permissionVersion } = require('./crypto');
+const { verifyToken, permissionVersion, maskSecret } = require('./crypto');
 const { error, get } = require('./commerce');
 function parseEvent(event = {}) {
   if (!event.body) return event;
@@ -17,7 +17,7 @@ async function requireAdmin(event, db) {
   const admin = await get(db, 'admins', payload.adminId);
   if (!admin || admin.status !== 'ACTIVE') throw error('ADMIN_REQUIRED', '管理员账号不存在或已停用');
   if (payload.version !== permissionVersion(admin)) throw error('AUTH_REQUIRED', '权限或会话已变更，请重新登录');
-  return { adminId: admin._id, username: admin.username, role: admin.role, permissions: admin.permissions || [], merchantId: admin.merchantId || null };
+  return { adminId: admin._id, username: admin.username, role: admin.role, permissions: admin.permissions || [], merchantId: admin.merchantId || null, subMchIdMask: admin.subMchIdEnc ? maskSecret(admin.subMchIdEnc) : '' };
 }
 function requirePermission(admin, permission) {
   if (admin.role === 'SUPER_ADMIN' || admin.permissions?.includes('*') || admin.permissions?.includes(permission)) return true;
