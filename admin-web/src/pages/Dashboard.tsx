@@ -51,7 +51,7 @@ export const Dashboard: React.FC = () => {
             运营数据大盘 · Overview
           </h1>
           <p style={{ fontSize: '14px', color: '#64748B', marginTop: '4px' }}>
-            实时监控小程序端成交金额、出货履约、规格库存与热销动销。
+            实时监控小程序端成交金额、出货履约、库存与热销动销。
           </p>
         </div>
 
@@ -180,7 +180,7 @@ export const Dashboard: React.FC = () => {
             {lowStockCount} <span style={{ fontSize: '14px', fontWeight: 500, color: '#94A3B8' }}>件</span>
           </div>
           <div style={{ marginTop: '8px', fontSize: '12px', color: '#EF4444', fontWeight: 600 }}>
-            {lowStockCount > 0 ? '部分热门规格亟需补货' : '目前库存健康充裕'}
+            {lowStockCount > 0 ? '部分热门商品亟需补货' : '目前库存健康充裕'}
           </div>
         </div>
       </div>
@@ -222,7 +222,7 @@ export const Dashboard: React.FC = () => {
             <thead>
               <tr style={{ borderBottom: '1px solid #E2E8F0', color: '#64748B' }}>
                 <th style={{ padding: '12px 8px' }}>单号 / 买家</th>
-                <th style={{ padding: '12px 8px' }}>购买商品与规格</th>
+                <th style={{ padding: '12px 8px' }}>购买商品</th>
                 <th style={{ padding: '12px 8px' }}>配送方式</th>
                 <th style={{ padding: '12px 8px' }}>金额</th>
                 <th style={{ padding: '12px 8px' }}>状态</th>
@@ -247,7 +247,7 @@ export const Dashboard: React.FC = () => {
                           {o.items[0]?.productName.slice(0, 16)}...
                         </div>
                         <div style={{ fontSize: '11px', color: '#64748B' }}>
-                          {o.items[0]?.colorName} / {o.items[0]?.size} x {o.items[0]?.count}
+                          x {o.items[0]?.count}
                         </div>
                       </div>
                     </div>

@@ -140,6 +140,22 @@
 .logistics-val.val-pending {
   color: #FF9900;
 }
+.logistics-shipment {
+  margin-top: 16rpx;
+  padding-top: 16rpx;
+  border-top: 1rpx solid #F1F5F9;
+}
+.logistics-shipment:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+.shipment-title {
+  margin-top: 0;
+}
+.shipment-title .logistics-label {
+  color: #FF5500;
+  font-weight: 600;
+}
 
 /* 配送信息 (自提) */
 .pickup-box {

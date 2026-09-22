@@ -3,7 +3,7 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const c = require('./common/commerce');
 const { success, fail } = require('./common/response');
-const { verifyPassword, hashPassword, createToken, permissionVersion } = require('./common/crypto');
+const { verifyPassword, hashPassword, createToken, permissionVersion, maskSecret } = require('./common/crypto');
 const { requireAdmin } = require('./common/authMiddleware');
 exports.main = async event => {
   try {
@@ -41,7 +41,7 @@ exports.main = async event => {
       }
       await db.collection('admins').doc(admin._id).update({ data: { lastLoginAt: new Date() } });
       const token = createToken({ adminId: admin._id, version: permissionVersion(admin) }, 12 * 3600);
-      return success({ token, adminId: admin._id, username, role: admin.role, permissions: admin.permissions || [], merchantId: admin.merchantId || null, expiresIn: 12 * 3600 });
+      return success({ token, adminId: admin._id, username, role: admin.role, permissions: admin.permissions || [], merchantId: admin.merchantId || null, subMchIdMask: admin.subMchIdEnc ? maskSecret(admin.subMchIdEnc) : '', expiresIn: 12 * 3600 });
     }
     const admin = await requireAdmin(event, db);
     if (action === 'getProfile') return success(admin);

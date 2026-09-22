@@ -47,6 +47,16 @@ const COLLECTIONS_CONFIG = [
     ]
   },
   {
+    name: 'product_audit_tickets',
+    desc: '商品审核工单表（商户新增/修改商品需平台审核）',
+    indexes: [
+      { name: 'idx_merchant', key: { merchantId: 1 } },
+      { name: 'idx_status', key: { status: 1 } },
+      { name: 'idx_product', key: { productId: 1 } },
+      { name: 'idx_created_at', key: { createdAt: -1 } }
+    ]
+  },
+  {
     name: 'product_skus',
     desc: '商品SKU规格独立表',
     indexes: [

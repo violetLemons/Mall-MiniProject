@@ -369,9 +369,7 @@ export const Orders: React.FC = () => {
                         />
                         <div>
                           <div style={{ fontWeight: 600, color: '#1E293B' }}>{item.productName.slice(0, 18)}</div>
-                          <div style={{ fontSize: '11px', color: '#64748B' }}>
-                            {item.colorName} / <strong style={{ color: '#FF5500' }}>{item.size}码</strong> x {item.count}
-                          </div>
+                          <div style={{ fontSize: '11px', color: '#64748B' }}>x {item.count}</div>
                         </div>
                       </div>
                     ))}
@@ -843,14 +841,13 @@ export const Orders: React.FC = () => {
               </div>
             </div>
 
-            <h4 style={{ fontSize: '14px', fontWeight: 700 }}>商品规格清单</h4>
+            <h4 style={{ fontSize: '14px', fontWeight: 700 }}>商品清单</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {activeOrderDetail.items.map((it, idx) => (
                 <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid #F1F5F9', paddingBottom: '10px' }}>
                   <img src={it.image} alt="" style={{ width: '44px', height: '44px', borderRadius: '6px', objectFit: 'cover' }} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600 }}>{it.productName}</div>
-                    <div style={{ fontSize: '12px', color: '#64748B' }}>{it.colorName} / {it.size}码</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div>¥{formatCents(it.unitPrice)} x {it.count}</div>

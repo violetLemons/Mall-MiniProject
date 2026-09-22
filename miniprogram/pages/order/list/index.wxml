@@ -10,7 +10,7 @@
       <view class="order-head"><text>订单 {{item.orderNo}}</text><text class="status">{{item.statusLabel}}</text></view>
       <view wx:for="{{item.items}}" wx:for-item="line" wx:key="skuId" class="order-item">
         <image src="{{line.image}}" mode="aspectFill" class="order-image" />
-        <view class="order-item-info"><text class="order-name">{{line.productName}}</text><text class="order-meta">{{line.colorName}} · {{line.size}} × {{line.count}}</text></view>
+        <view class="order-item-info"><text class="order-name">{{line.productName}}</text><text class="order-meta">× {{line.count}}</text></view>
         <text class="order-price">¥{{line.unitPriceYuan}}</text>
       </view>
       <view class="order-foot"><text>共 {{item.items.length}} 件 · ¥{{item.payAmountYuan}}</text><view class="order-actions"><button wx:if="{{item.status === 'PENDING_PAYMENT'}}" catchtap="onPay" data-id="{{item._id || item.id}}">去支付</button><button wx:if="{{item.status === 'PENDING_PAYMENT'}}" catchtap="onCancel" data-id="{{item._id || item.id}}">取消</button></view></view>

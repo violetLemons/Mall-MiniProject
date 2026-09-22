@@ -6,7 +6,7 @@
       <image src="{{item.image}}" mode="aspectFill" class="checkout-image" />
       <view class="checkout-item-info">
         <text class="checkout-item-title">{{item.title}}</text>
-        <text class="checkout-item-sku">{{item.skuText}} × {{item.count}}</text>
+        <text class="checkout-item-sku">× {{item.count}}</text>
         <c-price price="{{item.price * item.count}}" size="md" accent="{{true}}" />
       </view>
     </view>

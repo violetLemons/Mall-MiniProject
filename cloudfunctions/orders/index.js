@@ -157,7 +157,8 @@ exports.main = async (event, context) => {
           const availableStock = sku.stock - currentLocked;
           if (availableStock < input.count) throw err('OUT_OF_STOCK', `商品【${p.name}】规格库存不足`);
 
-          const unitPrice = integer(sku.price, '商品单价', 1);
+          const platformFee = integer(p.platformFee || 0, '平台抽成', 0);
+          const unitPrice = integer(sku.price, '商品单价', 1) + platformFee;
           const totalAmount = unitPrice * input.count;
           snapshots.push({
             productId: sku.productId,
@@ -166,6 +167,8 @@ exports.main = async (event, context) => {
             colorName: sku.colorName || '',
             size: sku.size,
             image: sku.colorImage || p.cover || '',
+            basePrice: integer(sku.price, '商品单价', 1),
+            platformFee,
             unitPrice,
             count: input.count,
             totalAmount,

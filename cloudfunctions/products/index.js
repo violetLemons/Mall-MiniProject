@@ -52,8 +52,11 @@ function escapeRegex(str) {
 function formatProductDTO(p) {
   const id = p._id || p.id;
   const title = p.title || p.name || '通用商品';
-  const price = typeof p.price === 'number' ? p.price : (typeof p.minPrice === 'number' ? p.minPrice : 0);
-  const originalPrice = p.originalPrice || p.maxPrice || price;
+  const platformFee = Number(p.platformFee) || 0;
+  const baseMin = typeof p.minPrice === 'number' ? p.minPrice : (typeof p.price === 'number' ? p.price : 0);
+  const baseMax = typeof p.maxPrice === 'number' ? p.maxPrice : baseMin;
+  const price = baseMin + platformFee; // 买家实付最低价 = 商家基础价 + 平台抽成
+  const originalPrice = (p.originalPrice || baseMax) + platformFee;
 
   return {
     id,
@@ -67,9 +70,11 @@ function formatProductDTO(p) {
     cover: p.cover || '',
     images: p.images || (p.cover ? [p.cover] : []),
     detailImages: p.detailImages || [],
+    platformFee,
+    basePrice: baseMin,
     price,
     minPrice: price,
-    maxPrice: p.maxPrice || price,
+    maxPrice: baseMax + platformFee,
     originalPrice,
     sales: Number(p.sales) || 0,
     totalStock: Number(p.totalStock) || 0,
@@ -210,6 +215,7 @@ exports.main = async (event, context) => {
 
         const product = prodRes.data;
         const skus = skusRes.data || [];
+        const platformFee = Number(product.platformFee) || 0;
 
         // 提取颜色列表与规格列表，计算 2D 矩阵与可用库存
         const colorMap = new Map();
@@ -243,8 +249,10 @@ exports.main = async (event, context) => {
             colorImage: sku.colorImage || product.cover,
             image: sku.colorImage || product.cover,
             size: sizeNum,
-            price: sku.price,
-            originalPrice: sku.originalPrice || product.originalPrice || sku.price,
+            basePrice: sku.price,
+            platformFee,
+            price: sku.price + platformFee,
+            originalPrice: (sku.originalPrice || product.originalPrice || sku.price) + platformFee,
             stock: sku.stock,
             lockedStock: sku.lockedStock || 0,
             availableStock,
