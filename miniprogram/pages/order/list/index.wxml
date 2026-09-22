@@ -1,5 +1,5 @@
 <view class="order-list-page">
-  <custom-navbar title="我的订单" />
+  <custom-navbar title="我的订单" showBack="{{true}}" />
   <scroll-view scroll-x class="order-tabs">
     <view wx:for="{{tabs}}" wx:key="key" class="order-tab {{activeTab === item.key ? 'active' : ''}}" data-key="{{item.key}}" bindtap="onTabChange">{{item.label}}</view>
   </scroll-view>

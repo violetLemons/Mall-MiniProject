@@ -147,7 +147,7 @@
     </view>
 
     <!-- 6. 底部操作栏 -->
-    <view wx:if="{{order.status === 'PENDING_PAYMENT' || order.status === 'SHIPPED'}}" class="detail-actions">
+    <view wx:if="{{order.status === 'PENDING_PAYMENT' || order.status === 'SHIPPED' || (order.status === 'COMPLETED' && !order.reviewed)}}" class="detail-actions">
       <block wx:if="{{order.status === 'PENDING_PAYMENT'}}">
         <button class="pay-btn" bindtap="onPay" loading="{{submitting}}">立即支付</button>
         <button class="secondary cancel-btn" bindtap="onCancel">取消订单</button>
@@ -155,7 +155,37 @@
       <block wx:elif="{{order.status === 'SHIPPED'}}">
         <button class="confirm-btn" bindtap="onConfirmReceive">确认收货</button>
       </block>
+      <block wx:elif="{{order.status === 'COMPLETED' && !order.reviewed}}">
+        <button class="review-btn" bindtap="onOpenReview">去评价</button>
+      </block>
     </view>
   </block>
+
+  <!-- 7. 评价弹窗 -->
+  <view wx:if="{{reviewVisible}}" class="review-mask" bindtap="onCloseReview"></view>
+  <view wx:if="{{reviewVisible}}" class="review-sheet">
+    <view class="review-sheet-header">
+      <text class="review-sheet-title">评价订单</text>
+      <view class="review-close press-active" bindtap="onCloseReview">✕</view>
+    </view>
+    <view class="review-stars">
+      <text
+        wx:for="{{[1,2,3,4,5]}}"
+        wx:key="*this"
+        class="review-star {{item <= reviewRating ? 'is-active' : ''}}"
+        data-rating="{{item}}"
+        bindtap="onSelectRating"
+      >★</text>
+    </view>
+    <textarea
+      class="review-textarea"
+      placeholder="说说你的使用体验吧（选填）"
+      placeholder-class="review-placeholder"
+      value="{{reviewComment}}"
+      bindinput="onCommentInput"
+      maxlength="200"
+    />
+    <button class="review-submit press-active" bindtap="onSubmitReview" loading="{{submitting}}">提交评价</button>
+  </view>
 </view>
 

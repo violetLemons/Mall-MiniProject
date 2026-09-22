@@ -1,0 +1,102 @@
+.service-page {
+  min-height: 100vh;
+  background-color: var(--background, #F5F6F8);
+  padding-bottom: calc(120rpx + constant(safe-area-inset-bottom));
+  padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+.service-banner-card {
+  margin: 24rpx;
+  padding: 32rpx 28rpx;
+  background: linear-gradient(135deg, #111111 0%, #2A2B2E 100%);
+  border-radius: var(--radius-md, 20rpx);
+  color: #FFFFFF;
+  display: flex;
+  flex-direction: column;
+}
+
+.sbc-title {
+  font-size: 32rpx;
+  font-weight: 800;
+  margin-bottom: 12rpx;
+}
+
+.sbc-sub {
+  font-size: 24rpx;
+  opacity: 0.85;
+  margin-bottom: 8rpx;
+}
+
+.sbc-tip {
+  font-size: 22rpx;
+  opacity: 0.65;
+}
+
+.btn-contact {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 16rpx 24rpx;
+  height: 88rpx;
+  line-height: normal;
+  border-radius: 999rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  box-sizing: border-box;
+}
+
+.btn-contact::after {
+  border: none;
+}
+
+.btn-wechat {
+  background-color: #07C160;
+  color: #FFFFFF;
+}
+
+.btn-phone {
+  background-color: var(--surface, #FFFFFF);
+  color: var(--brand-accent, #FF5500);
+  border: 2rpx solid var(--brand-accent, #FF5500);
+}
+
+.bpc-text {
+  font-size: 26rpx;
+}
+
+.service-faq-box {
+  margin: 8rpx 24rpx 24rpx;
+  padding: 28rpx 24rpx;
+  background-color: var(--surface, #FFFFFF);
+  border-radius: var(--radius-md, 20rpx);
+}
+
+.faq-head {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--text-primary, #18191B);
+  margin-bottom: 20rpx;
+}
+
+.faq-item {
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid var(--border-color-light, #F2F3F5);
+}
+
+.faq-item:last-child {
+  border-bottom: none;
+}
+
+.faq-q {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: var(--text-primary, #18191B);
+  margin-bottom: 8rpx;
+}
+
+.faq-a {
+  font-size: 22rpx;
+  color: var(--text-secondary, #8A8D93);
+  line-height: 1.6;
+}

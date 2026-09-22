@@ -40,6 +40,18 @@
     </view>
   </view>
 
+  <!-- 激活卡密入口 -->
+  <view class="profile-card activation-card press-active" bindtap="onTapActivation">
+    <view class="activation-entry-icon">🎁</view>
+    <view class="activation-entry-meta">
+      <text class="activation-entry-title">激活卡密</text>
+      <text class="activation-entry-desc">输入卡密兑换专属权益</text>
+    </view>
+    <view class="menu-right">
+      <view class="arrow-right"></view>
+    </view>
+  </view>
+
   <!-- 常用功能列表 -->
   <view class="profile-card menu-card">
     <view
@@ -408,6 +420,50 @@
 
           <view class="logout-btn-wrap">
             <button class="btn-logout press-active" bindtap="onLogout">退出登录 / 切换账号</button>
+          </view>
+        </view>
+      </block>
+
+      <!-- 8. 激活卡密抽屉 -->
+      <block wx:elif="{{activeDrawer === 'activation'}}">
+        <view class="act-sheet-wrap">
+          <view class="act-sheet-banner">
+            <text class="act-sheet-banner-title">卡密兑换</text>
+            <text class="act-sheet-banner-sub">输入卡密，兑换专属权益</text>
+          </view>
+
+          <view class="act-sheet-form">
+            <view class="act-sheet-input-row">
+              <text class="act-sheet-label">卡密</text>
+              <input
+                class="act-sheet-input"
+                placeholder="请输入卡密"
+                placeholder-class="act-sheet-placeholder"
+                value="{{actCode}}"
+                bindinput="onActCodeInput"
+              />
+            </view>
+            <button class="act-sheet-redeem-btn press-active" loading="{{actLoading}}" disabled="{{actLoading}}" bindtap="onActRedeem">
+              立即兑换
+            </button>
+          </view>
+
+          <view wx:if="{{actResult && actResult.success}}" class="act-sheet-result success">
+            <text class="act-sheet-result-icon">🎉</text>
+            <text class="act-sheet-result-title">{{actResult.message}}</text>
+            <text wx:if="{{actResult.benefit}}" class="act-sheet-result-benefit">已发放权益：{{actResult.benefit}}</text>
+            <text wx:else class="act-sheet-result-benefit">权益已发放至账户，请注意查收</text>
+          </view>
+          <view wx:elif="{{actResult && !actResult.success}}" class="act-sheet-result fail">
+            <text class="act-sheet-result-icon">⚠️</text>
+            <text class="act-sheet-result-title">{{actResult.message}}</text>
+          </view>
+
+          <view class="act-sheet-tips">
+            <text class="act-sheet-tips-title">兑换须知</text>
+            <text class="act-sheet-tips-line">· 每张卡密仅可兑换一次，兑换后立即生效</text>
+            <text class="act-sheet-tips-line">· 卡密不区分大小写，输入时请勿包含空格</text>
+            <text class="act-sheet-tips-line">· 如有疑问，请前往「客服」页联系在线客服</text>
           </view>
         </view>
       </block>

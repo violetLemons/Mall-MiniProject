@@ -1,0 +1,145 @@
+.activation-page {
+  min-height: 100vh;
+  background-color: var(--background, #F5F6F8);
+  box-sizing: border-box;
+}
+
+.act-banner-card {
+  margin: 24rpx;
+  padding: 40rpx 32rpx;
+  background: linear-gradient(135deg, #FF5500 0%, #FF7A2E 100%);
+  border-radius: var(--radius-md, 20rpx);
+  color: #FFFFFF;
+  display: flex;
+  flex-direction: column;
+}
+
+.act-banner-title {
+  font-size: 36rpx;
+  font-weight: 800;
+  margin-bottom: 10rpx;
+}
+
+.act-banner-sub {
+  font-size: 24rpx;
+  opacity: 0.9;
+}
+
+.act-form-card {
+  margin: 0 24rpx;
+  padding: 28rpx 24rpx;
+  background-color: var(--surface, #FFFFFF);
+  border-radius: var(--radius-md, 20rpx);
+}
+
+.act-input-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1rpx solid var(--border-color-light, #F2F3F5);
+  padding-bottom: 20rpx;
+  margin-bottom: 28rpx;
+}
+
+.act-label {
+  width: 100rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--text-primary, #18191B);
+  flex-shrink: 0;
+}
+
+.act-input {
+  flex: 1;
+  font-size: 30rpx;
+  color: var(--text-primary, #18191B);
+  letter-spacing: 2rpx;
+}
+
+.act-placeholder {
+  color: var(--text-secondary, #8A8D93);
+}
+
+.act-redeem-btn {
+  width: 100%;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #FF5500 0%, #FF7A2E 100%);
+  color: #FFFFFF;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.act-redeem-btn::after {
+  border: none;
+}
+
+.act-redeem-btn[disabled] {
+  opacity: 0.6;
+  color: #FFFFFF;
+}
+
+.act-result {
+  margin: 24rpx;
+  padding: 32rpx 24rpx;
+  border-radius: var(--radius-md, 20rpx);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.act-result.success {
+  background-color: #F0FBF2;
+}
+
+.act-result.fail {
+  background-color: #FFF5F0;
+}
+
+.act-result-icon {
+  font-size: 48rpx;
+  margin-bottom: 12rpx;
+}
+
+.act-result-title {
+  font-size: 28rpx;
+  font-weight: 700;
+  margin-bottom: 8rpx;
+}
+
+.act-result.success .act-result-title {
+  color: #0E8A3C;
+}
+
+.act-result.fail .act-result-title {
+  color: #B43B00;
+}
+
+.act-result-benefit {
+  font-size: 24rpx;
+  color: var(--text-secondary, #8A8D93);
+  line-height: 1.6;
+}
+
+.act-tips {
+  margin: 8rpx 24rpx 24rpx;
+  padding: 28rpx 24rpx;
+  background-color: var(--surface, #FFFFFF);
+  border-radius: var(--radius-md, 20rpx);
+  display: flex;
+  flex-direction: column;
+}
+
+.act-tips-title {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--text-primary, #18191B);
+  margin-bottom: 16rpx;
+}
+
+.act-tips-line {
+  font-size: 22rpx;
+  color: var(--text-secondary, #8A8D93);
+  line-height: 1.8;
+}

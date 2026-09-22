@@ -69,6 +69,44 @@
   padding: 8rpx 24rpx;
 }
 
+.activation-card {
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 30rpx 24rpx;
+}
+
+.activation-entry-icon {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 20rpx;
+  background: linear-gradient(135deg, #FFF0E8 0%, #FFE0D0 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40rpx;
+  flex-shrink: 0;
+}
+
+.activation-entry-meta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.activation-entry-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--text-primary, #18191B);
+  margin-bottom: 4rpx;
+}
+
+.activation-entry-desc {
+  font-size: 22rpx;
+  color: var(--text-secondary, #8A8D93);
+}
+
 .card-title-row {
   display: flex;
   align-items: baseline;
@@ -122,6 +160,17 @@
 
 .stat-shipped {
   border-radius: 50%;
+}
+
+.stat-all {
+  background-color: var(--brand-accent, #FF5500);
+  border-color: var(--brand-accent, #FF5500);
+}
+
+.stat-refund {
+  border-style: dotted;
+  border-color: var(--brand-accent, #FF5500);
+  transform: rotate(45deg);
 }
 
 .stat-badge {
@@ -1162,5 +1211,156 @@
   justify-content: center;
   text-align: center;
   width: 100% !important;
+}
+
+/* ================================================= */
+/* 8. 激活卡密抽屉样式                                */
+/* ================================================= */
+.act-sheet-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.act-sheet-banner {
+  background: linear-gradient(135deg, #FF5500 0%, #FF7A2E 100%);
+  color: #FFFFFF;
+  border-radius: 20rpx;
+  padding: 32rpx 28rpx;
+}
+
+.act-sheet-banner-title {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 800;
+  margin-bottom: 8rpx;
+}
+
+.act-sheet-banner-sub {
+  display: block;
+  font-size: 24rpx;
+  opacity: 0.9;
+}
+
+.act-sheet-form {
+  background-color: #FFFFFF;
+  border-radius: 20rpx;
+  padding: 28rpx 24rpx;
+}
+
+.act-sheet-input-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1rpx solid #F2F3F5;
+  padding-bottom: 20rpx;
+  margin-bottom: 28rpx;
+}
+
+.act-sheet-label {
+  width: 100rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #18191B;
+  flex-shrink: 0;
+}
+
+.act-sheet-input {
+  flex: 1;
+  font-size: 30rpx;
+  color: #18191B;
+  letter-spacing: 2rpx;
+}
+
+.act-sheet-placeholder {
+  color: #8A8D93;
+}
+
+.act-sheet-redeem-btn {
+  width: 100% !important;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #FF5500 0%, #FF7A2E 100%);
+  color: #FFFFFF;
+  font-size: 30rpx;
+  font-weight: 700;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.act-sheet-redeem-btn::after {
+  border: none;
+}
+
+.act-sheet-redeem-btn[disabled] {
+  opacity: 0.6;
+  color: #FFFFFF;
+}
+
+.act-sheet-result {
+  border-radius: 20rpx;
+  padding: 28rpx 24rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.act-sheet-result.success {
+  background-color: #F0FBF2;
+}
+
+.act-sheet-result.fail {
+  background-color: #FFF5F0;
+}
+
+.act-sheet-result-icon {
+  font-size: 44rpx;
+  margin-bottom: 10rpx;
+}
+
+.act-sheet-result-title {
+  font-size: 28rpx;
+  font-weight: 700;
+  margin-bottom: 8rpx;
+}
+
+.act-sheet-result.success .act-sheet-result-title {
+  color: #0E8A3C;
+}
+
+.act-sheet-result.fail .act-sheet-result-title {
+  color: #B43B00;
+}
+
+.act-sheet-result-benefit {
+  font-size: 24rpx;
+  color: #8A8D93;
+  line-height: 1.6;
+}
+
+.act-sheet-tips {
+  background-color: #FAFAFC;
+  border-radius: 20rpx;
+  padding: 24rpx;
+  display: flex;
+  flex-direction: column;
+}
+
+.act-sheet-tips-title {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #18191B;
+  margin-bottom: 12rpx;
+}
+
+.act-sheet-tips-line {
+  font-size: 22rpx;
+  color: #8A8D93;
+  line-height: 1.8;
 }
 
