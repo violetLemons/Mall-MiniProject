@@ -9,8 +9,9 @@
 | 集合名称 (Collection) | 业务说明 | 权限推荐策略 | 读写主要入口 |
 | :--- | :--- | :--- | :--- |
 | **`users`** | 买家微信用户资料与手机号 | 仅创建者可读写 | `auth` 云函数 |
-| **`admins`** | PC 后台管理员账号及权限 (scrypt 加密) | 所有用户不可访问 (私有) | `adminAuth` 云函数 |
+| **`admins`** | PC 后台管理员账号及权限 (scrypt 加密；商户号 `subMchIdEnc` AES-256-GCM 加密) | 所有用户不可访问 (私有) | `adminAuth` 云函数 |
 | **`products`** | 商品 SPU 基础信息与销售状态 | 所有用户可读，仅管理端可写 | `products`, `adminProducts` |
+| **`product_audit_tickets`** | 商品审核工单（商户新增/修改商品需平台审核） | 所有用户不可访问 (私有) | `adminProducts` |
 | **`product_skus`** | 商品 SKU 规格、多规格与独立库存表 | 所有用户可读，仅事务云函数可写 | `products`, `adminInventory` |
 | **`categories`** | 商品分类层级与排序（一级/二级两级词条） | 所有用户可读，仅管理端可写 | `products`, `adminCategories` |
 | **`banners`** | 首页顶部轮播大图与活动专区卡片 | 所有用户可读，仅管理端可写 | `products`, `adminBanners` |
@@ -81,8 +82,9 @@
   "images": [
     "https://images.unsplash.com/photo-1552346154-21d32810aba3?w=800"
   ],
-  "minPrice": 19900, // 分
+  "minPrice": 19900, // 分（商家基础价）
   "maxPrice": 19900,
+  "platformFee": 0, // 平台抽成（分，固定金额/件），买家价 = 商家基础价 + platformFee
   "sales": 128,
   "totalStock": 50,
   "status": "ON_SALE", // ON_SALE | OFF_SALE
@@ -125,7 +127,8 @@
       "colorName": "经典黑",
       "size": 42,
       "image": "https://images.unsplash.com/photo-1552346154-21d32810aba3?w=400",
-      "unitPrice": 19900,
+      "unitPrice": 19900, // 买家实付单价 = 商家基础价 + platformFee
+      "platformFee": 0, // 该商品单件平台抽成（分）
       "count": 2,
       "totalAmount": 39800,
       "merchantId": "m_001"
@@ -144,7 +147,25 @@
 }
 ```
 
-### 5. 分类表 (`categories`)
+### 5. 商品审核工单表 (`product_audit_tickets`)
+```json
+{
+  "_id": "ticket_xxx",
+  "merchantId": "m_001",
+  "type": "CREATE", // CREATE: 新增 | UPDATE: 修改已有商品
+  "productId": null, // UPDATE 时指向原商品 _id；CREATE 为 null
+  "payload": { "name": "...", "cover": "...", "skus": [ ... ] }, // 商户提交的完整商品+SKU 数据
+  "status": "PENDING", // PENDING | APPROVED | REJECTED
+  "platformFee": 0, // 平台审核通过时填写的抽成（分）
+  "rejectReason": "",
+  "reviewedBy": "admin_xxx",
+  "reviewedAt": "2026-09-23T10:00:00.000Z",
+  "createdAt": "2026-09-23T09:00:00.000Z",
+  "updatedAt": "2026-09-23T10:00:00.000Z"
+}
+```
+
+### 6. 分类表 (`categories`)
 
 > 分类支持「一级 / 二级」两级词条：左侧菜单显示一级（主要词条），右侧显示二级（次要词条），点击二级后才展示对应商品。
 
@@ -160,7 +181,7 @@
 }
 ```
 
-### 6. 卡密兑换码表 (`activation_codes`)
+### 7. 卡密兑换码表 (`activation_codes`)
 
 ```json
 {
@@ -171,13 +192,11 @@
   "benefit": "满100减10优惠券", // 权益描述
   "value": 1000,             // 权益数值（优惠券为分，积分为分/个，视 type 而定）
   "redeemedBy": "oUpF8u_demo_user_openid", // 兑换用户 openid
-  "redeemedAt": "2026-09-23T10:00:00.000Z",
-  "createdAt": "2026-09-23T09:00:00.000Z",
-  "updatedAt": "2026-09-23T10:00:00.000Z"
+  "redeemedAt": "2026-09-23T10:00:00.000Z"
 }
 ```
 
-### 7. 卡密兑换流水表 (`activation_records`)
+### 8. 卡密兑换流水表 (`activation_records`)
 
 ```json
 {
@@ -190,7 +209,6 @@
   "createdAt": "2026-09-23T10:00:00.000Z"
 }
 ```
-
 ---
 
 ## 三、推荐索引清单 (Database Indexes)
@@ -222,12 +240,17 @@
    - `idx_parent_order`: `{ "parentOrderId": 1 }`
    - `idx_sub_order_no`: `{ "subOrderNo": 1 }` (唯一索引)
    - `idx_user_status`: `{ "userId": 1, "status": 1 }`
-6. **`refund_records`**:
+6. **`product_audit_tickets`**:
+   - `idx_merchant`: `{ "merchantId": 1 }`
+   - `idx_status`: `{ "status": 1 }`
+   - `idx_product`: `{ "productId": 1 }`
+   - `idx_created_at`: `{ "createdAt": -1 }`
+7. **`refund_records`**:
    - `idx_out_refund_no`: `{ "outRefundNo": 1 }` (唯一索引)
    - `idx_order_id`: `{ "orderId": 1 }`
    - `idx_merchant`: `{ "merchantId": 1 }`
    - `idx_parent_order`: `{ "parentOrderId": 1 }`
-7. **`payment_transactions`**:
+8. **`payment_transactions`**:
    - `idx_out_trade_no`: `{ "outTradeNo": 1 }` (唯一索引)
    - `idx_order_id`: `{ "orderId": 1 }`
 8. **`activation_codes`**:

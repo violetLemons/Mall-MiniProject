@@ -36,6 +36,8 @@ type OrderViewModel = OrderModel & {
   shippedAtFormatted?: string;
   isExpress?: boolean;
   isPickup?: boolean;
+  hasShipment?: boolean;
+  shipments: { trackingNo?: string; logisticsCompany?: string; expressCompany?: string; shippedAt?: string; shippedAtFormatted?: string }[];
   items: (OrderModel['items'][number] & { totalAmountYuan?: string; unitPriceYuan?: string })[];
 };
 
@@ -73,6 +75,17 @@ Page({
         else pickupStatusLabel = '门店备货中';
       }
 
+      // 物流信息：优先取子订单 shipments[] 数组；兼容旧版单一 trackingNo 数据
+      const rawShipments = (order.shipments && order.shipments.length > 0)
+        ? order.shipments
+        : (order.trackingNo
+          ? [{ trackingNo: order.trackingNo, logisticsCompany: (order as any).logisticsCompany, expressCompany: (order as any).expressCompany, shippedAt: (order as any).shippedAt || (order as any).shippingTime }]
+          : []);
+      const shipments = rawShipments.map(s => ({
+        ...s,
+        shippedAtFormatted: formatDateTime(s.shippedAt)
+      }));
+
       this.setData({
         order: {
           ...order,
@@ -81,6 +94,8 @@ Page({
           pickupStatusLabel,
           isExpress,
           isPickup,
+          hasShipment: shipments.length > 0,
+          shipments,
           payAmountYuan: (Number(order.payAmount || 0) / 100).toFixed(2),
           totalAmountYuan: (Number(order.totalAmount || order.payAmount || 0) / 100).toFixed(2),
           createdAtFormatted: formatDateTime(order.createdAt || (order as any).createTime),

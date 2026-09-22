@@ -60,18 +60,6 @@
       <view class="product-subtitle">{{product.subtitle}}</view>
     </view>
 
-    <!-- 规格选择预览触发条 (点击唤起 SKU Popup) -->
-    <view class="detail-card spec-trigger-card press-active" data-type="both" bindtap="onOpenSku">
-      <view class="trigger-left">
-        <text class="trigger-label">选择</text>
-        <text class="trigger-val ellipsis-1">{{selectedSkuText}}</text>
-      </view>
-      <view class="trigger-right">
-        <text class="trigger-tip">规格表</text>
-        <view class="arrow-right"></view>
-      </view>
-    </view>
-
     <!-- 配送服务卡片 (支持快递配送/到店自提) -->
     <view class="detail-card delivery-card">
       <view class="delivery-title">配送方式</view>
@@ -159,10 +147,6 @@
           <text class="param-value">{{product.category}}</text>
         </view>
         <view class="param-row">
-          <text class="param-name">规格区间</text>
-          <text class="param-value">多规格可选</text>
-        </view>
-        <view class="param-row">
           <text class="param-name">防伪服务</text>
           <text class="param-value">配备独立吊牌与溯源码</text>
         </view>
@@ -215,15 +199,6 @@
       </view>
     </view>
 
-    <!-- SKU 底部抽屉弹层 -->
-    <sku-popup
-      visible="{{skuPopupVisible}}"
-      product="{{product}}"
-      actionType="{{skuActionType}}"
-      bind:close="onCloseSku"
-      bind:confirm="onSkuConfirm"
-    />
-
     <!-- 购物车快捷预览小卡片 (点击底部购物车图标唤起小卡片，不直接弹到主页购物车) -->
     <view wx:if="{{cartPreviewVisible}}" class="cart-preview-mask" bindtap="onCloseCartPreview">
       <view class="cart-preview-card" catchtap="onStopProp">
@@ -242,7 +217,6 @@
             <image class="cp-thumb" src="{{item.image}}" mode="aspectFill" />
             <view class="cp-info">
               <text class="cp-name ellipsis-1">{{item.title}}</text>
-              <text class="cp-sku">{{item.skuText}}</text>
               <view class="cp-price-row">
                 <text class="cp-price">¥{{item.price / 100}}</text>
                 <text class="cp-qty">x {{item.count}}</text>

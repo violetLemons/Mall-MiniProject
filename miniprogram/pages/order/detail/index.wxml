@@ -38,20 +38,25 @@
       <view class="logistics-box">
         <view class="logistics-row">
           <text class="logistics-label">物流状态：</text>
-          <text class="logistics-val {{order.trackingNo ? 'val-shipped' : 'val-pending'}}">{{order.trackingNo ? '已发货' : '待发货'}}</text>
+          <text class="logistics-val {{order.hasShipment ? 'val-shipped' : 'val-pending'}}">{{order.hasShipment ? '已发货' : '待发货'}}</text>
         </view>
-        <block wx:if="{{order.trackingNo}}">
-          <view class="logistics-row">
-            <text class="logistics-label">快递公司：</text>
-            <text class="logistics-val">{{order.logisticsCompany || order.expressCompany || '极速快递'}}</text>
-          </view>
-          <view class="logistics-row">
-            <text class="logistics-label">运单编号：</text>
-            <text class="logistics-val">{{order.trackingNo}}</text>
-          </view>
-          <view wx:if="{{order.shippedAtFormatted}}" class="logistics-row">
-            <text class="logistics-label">发货时间：</text>
-            <text class="logistics-val">{{order.shippedAtFormatted}}</text>
+        <block wx:if="{{order.hasShipment}}">
+          <view wx:for="{{order.shipments}}" wx:for-item="ship" wx:key="trackingNo" class="logistics-shipment">
+            <view wx:if="{{order.shipments.length > 1}}" class="logistics-row shipment-title">
+              <text class="logistics-label">包裹 {{index + 1}}</text>
+            </view>
+            <view class="logistics-row">
+              <text class="logistics-label">快递公司：</text>
+              <text class="logistics-val">{{ship.logisticsCompany || ship.expressCompany || '极速快递'}}</text>
+            </view>
+            <view class="logistics-row">
+              <text class="logistics-label">运单编号：</text>
+              <text class="logistics-val">{{ship.trackingNo}}</text>
+            </view>
+            <view wx:if="{{ship.shippedAtFormatted}}" class="logistics-row">
+              <text class="logistics-label">发货时间：</text>
+              <text class="logistics-val">{{ship.shippedAtFormatted}}</text>
+            </view>
           </view>
         </block>
       </view>
@@ -91,7 +96,6 @@
         <image src="{{line.image}}" mode="aspectFill" class="detail-image" />
         <view class="detail-item-info">
           <text class="detail-name">{{line.productName}}</text>
-          <text class="detail-meta">{{line.colorName ? line.colorName + ' · ' : ''}}{{line.size}}</text>
           <view class="detail-price-row">
             <text class="unit-price">¥{{line.unitPriceYuan}}</text>
             <text class="unit-count">× {{line.count}}</text>

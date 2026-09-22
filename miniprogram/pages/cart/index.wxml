@@ -43,7 +43,6 @@
             <text class="item-title ellipsis-1">{{item.title}}</text>
             <view class="item-delete press-active" data-index="{{index}}" bindtap="deleteItem">×</view>
           </view>
-          <text class="item-sku ellipsis-1">{{item.skuText}}</text>
 
           <view class="item-bottom">
             <c-price price="{{item.price}}" size="md" accent="{{true}}" />

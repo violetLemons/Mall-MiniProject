@@ -1,4 +1,4 @@
-import { AdminUser, Product, Order, Category, Banner, InventoryLog, OperationLog, SkuItem } from '../types';
+import { AdminUser, Product, Order, Category, Banner, InventoryLog, OperationLog, SkuItem, ProductAuditTicket } from '../types';
 
 const TOKEN_KEY = 'sneaker_admin_token';
 const USER_KEY = 'sneaker_admin_user';
@@ -55,6 +55,7 @@ export const AdminApi = {
       role: any;
       permissions: string[];
       merchantId?: string | null;
+      subMchIdMask?: string;
     }>('adminAuth', 'login', { username, password });
 
     const user: AdminUser = {
@@ -64,6 +65,7 @@ export const AdminApi = {
       role: data.role || 'OPERATOR',
       permissions: data.permissions || [],
       merchantId: data.merchantId || null,
+      subMchIdMask: data.subMchIdMask || '',
       status: 'ACTIVE',
       lastLoginAt: new Date().toLocaleString(),
       createdAt: new Date().toLocaleString()
@@ -106,6 +108,9 @@ export const AdminApi = {
       images: p.images || [p.cover || ''],
       minPrice: Number(p.minPrice) || 0,
       maxPrice: Number(p.maxPrice) || Number(p.minPrice) || 0,
+      platformFee: Number(p.platformFee) || 0,
+      basePrice: Number(p.basePrice) || Number(p.minPrice) || 0,
+      merchantId: p.merchantId || null,
       sales: Number(p.sales) || 0,
       totalStock: Number(p.totalStock) || 0,
       status: p.status,
@@ -134,6 +139,9 @@ export const AdminApi = {
       images: p.images || [p.cover || ''],
       minPrice: Number(p.minPrice) || 0,
       maxPrice: Number(p.maxPrice) || Number(p.minPrice) || 0,
+      platformFee: Number(p.platformFee) || 0,
+      basePrice: Number(p.basePrice) || Number(p.minPrice) || 0,
+      merchantId: p.merchantId || null,
       sales: Number(p.sales) || 0,
       totalStock: Number(p.totalStock) || 0,
       status: p.status,
@@ -157,6 +165,33 @@ export const AdminApi = {
     };
   },
 
+  // ---------------- 商品审核工单 ----------------
+  getAuditTickets: async (status?: string): Promise<ProductAuditTicket[]> => {
+    const res = await requestCloud<{ list: any[]; total: number }>('adminProducts', 'listTickets', {
+      status,
+      page: 1,
+      pageSize: 50
+    });
+    return (res.list || []).map(t => ({
+      id: t._id || t.id,
+      merchantId: t.merchantId,
+      type: t.type,
+      productId: t.productId || null,
+      payload: t.payload || {},
+      status: t.status,
+      platformFee: Number(t.platformFee) || 0,
+      rejectReason: t.rejectReason || '',
+      reviewedBy: t.reviewedBy || null,
+      reviewedAt: t.reviewedAt ? new Date(t.reviewedAt).toLocaleString() : null,
+      createdAt: t.createdAt ? new Date(t.createdAt).toLocaleString() : '',
+      updatedAt: t.updatedAt ? new Date(t.updatedAt).toLocaleString() : ''
+    }));
+  },
+
+  reviewTicket: async (ticketId: string, decision: 'approve' | 'reject', platformFee?: number, rejectReason?: string): Promise<void> => {
+    await requestCloud('adminProducts', 'reviewTicket', { ticketId, decision, platformFee, rejectReason });
+  },
+
   // ---------------- 健康与环境检查 ----------------
   checkHealth: async (): Promise<{ env: string; status?: string; appEnv?: string }> => {
     const baseUrl = getCloudBaseUrl();
@@ -171,18 +206,22 @@ export const AdminApi = {
     }
   },
 
-  saveProduct: async (productData: Partial<Product>): Promise<any> => {
+  saveProduct: async (productData: Partial<Product>): Promise<{ id?: string; ticketId?: string; pending?: boolean }> => {
     if (productData.id) {
-      await requestCloud('adminProducts', 'update', productData);
-      return productData;
+      const res = await requestCloud<any>('adminProducts', 'update', productData);
+      if (res && res.ticketId) return { ticketId: res.ticketId, pending: true };
+      return { id: productData.id };
     } else {
-      const res = await requestCloud<{ productId: string }>('adminProducts', 'create', productData);
-      return { ...productData, id: res.productId };
+      const res = await requestCloud<{ productId?: string; ticketId?: string }>('adminProducts', 'create', productData);
+      if (res.ticketId) return { ticketId: res.ticketId, pending: true };
+      return { id: res.productId };
     }
   },
 
-  updateSkus: async (productId: string, skus: SkuItem[]): Promise<void> => {
-    await requestCloud('adminProducts', 'updateSkus', { id: productId, skus });
+  updateSkus: async (productId: string, skus: SkuItem[]): Promise<{ ticketId?: string; pending?: boolean }> => {
+    const res = await requestCloud<any>('adminProducts', 'updateSkus', { id: productId, skus });
+    if (res && res.ticketId) return { ticketId: res.ticketId, pending: true };
+    return {};
   },
 
   updateProductStatus: async (id: string, status: 'ON_SALE' | 'OFF_SALE'): Promise<void> => {
@@ -475,6 +514,7 @@ export const AdminApi = {
       role: a.role,
       permissions: a.permissions || [],
       merchantId: a.merchantId || null,
+      subMchIdMask: a.subMchIdMask || '',
       status: a.status || 'ACTIVE',
       lastLoginAt: a.lastLoginAt ? new Date(a.lastLoginAt).toLocaleString() : '',
       createdAt: a.createdAt ? new Date(a.createdAt).toLocaleString() : ''
@@ -484,6 +524,10 @@ export const AdminApi = {
   saveAdmin: async (admin: Partial<AdminUser>): Promise<any> => {
     const res = await requestCloud<{ adminId: string }>('adminUsers', 'create', admin);
     return { ...admin, id: res.adminId };
+  },
+
+  setSubMchId: async (subMchId: string, adminId?: string): Promise<{ subMchIdMask: string }> => {
+    return requestCloud<{ subMchIdMask: string }>('adminUsers', 'setSubMchId', { subMchId, adminId });
   },
 
   toggleAdminStatus: async (adminId: string, status: 'ACTIVE' | 'DISABLED'): Promise<void> => {

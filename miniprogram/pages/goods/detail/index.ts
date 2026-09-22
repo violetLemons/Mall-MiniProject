@@ -122,10 +122,53 @@ Page({
 
   onOpenSku(e: any) {
     const type = e.currentTarget.dataset.type || 'both';
-    this.setData({
-      skuActionType: type,
-      skuPopupVisible: true
-    });
+    this.directAction(type);
+  },
+
+  // 单隐藏默认 SKU：不弹规格面板，直接用商品默认 SKU 加购/下单
+  directAction(actionType: string) {
+    const product: any = this.data.product;
+    const sku = (product.skus && product.skus[0]) || null;
+    const finalSkuId = sku?.skuId || sku?._id || sku?.id || '';
+    if (!finalSkuId) {
+      wx.showToast({ title: '商品信息已失效，请刷新', icon: 'none' });
+      return;
+    }
+    const quantity = this.data.selectedQuantity || 1;
+
+    if (actionType === 'cart') {
+      CartService.addToCart(finalSkuId, quantity, {
+        productId: product.id || product._id,
+        title: product.title || product.name,
+        skuText: '',
+        price: product.price,
+        image: product.cover
+      }).then(() => {
+        this.setData({ cartCount: this.data.cartCount + quantity });
+        wx.showToast({ title: '已加入购物车', icon: 'success', duration: 1500 });
+      }).catch((err) => {
+        wx.showToast({ title: err.message || '加购失败', icon: 'none' });
+      });
+    } else {
+      const checkoutItem = {
+        id: `buy_${Date.now()}`,
+        cartId: '',
+        skuId: finalSkuId,
+        productId: product.id || product._id,
+        title: product.title || product.name || '商品',
+        skuText: '',
+        price: product.price,
+        image: product.cover,
+        count: quantity,
+        selected: true
+      };
+      wx.setStorageSync('sneaker_checkout_items', [checkoutItem]);
+      const deliveryParam = this.data.deliveryType === 'store_pickup' ? 'PICKUP' : 'DELIVERY';
+      const pointParam = this.data.selectedPickupPoint ? (this.data.selectedPickupPoint.id || this.data.selectedPickupPoint._id) : '';
+      wx.navigateTo({
+        url: `/pages/checkout/index?deliveryType=${deliveryParam}&pickupPointId=${pointParam || ''}`
+      });
+    }
   },
 
   onCloseSku() {

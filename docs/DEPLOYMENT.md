@@ -109,7 +109,7 @@ powershell -File scripts/deploy-cloud.ps1 -EnvId <环境ID>
 powershell -File scripts/deploy-cloud.ps1 -EnvId <环境ID> -IncludeTestPayment
 ```
 1. `adminAuth`：后台管理员账号登录、scrypt 加盐哈希鉴权与 JWT 签发
-2. `adminProducts`：商品库维护、35~45 码 SKU 规格矩阵调控、上架/下架与软删除
+2. `adminProducts`：商品库维护、SKU 规格矩阵调控、上架/下架与软删除
 3. `adminInventory`：库存精确手动调账与出入库变动流水审计
 4. `adminOrders`：订单履约发货（顺丰/中通）、物流单号录入与自提核销
 5. `adminCategories`：商品潮流类目管理

@@ -107,7 +107,7 @@ exports.main = async (event) => {
           productId: p?._id || row.productId,
           skuId: row.skuId,
           title: p?.name || '商品已失效',
-          skuText: sku ? `${sku.colorName || ''} / ${sku.size}码` : '规格已失效',
+          skuText: sku ? `${sku.colorName || ''} / ${sku.size}` : '规格已失效',
           image: sku?.colorImage || p?.cover || '',
           price: sku?.price || 0,
           count: row.count,

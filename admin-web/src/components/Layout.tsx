@@ -9,6 +9,8 @@ import {
   Image as ImageIcon,
   ShieldCheck,
   FileText,
+  ClipboardCheck,
+  Store,
   LogOut,
   ExternalLink,
   Flame
@@ -48,12 +50,17 @@ export const Layout: React.FC = () => {
     ? [
         { label: '运营大盘', path: '/', icon: LayoutDashboard },
         { label: '商品管理', path: '/products', icon: ShoppingBag },
+        { label: '商品审核工单', path: '/audit', icon: ClipboardCheck },
         { label: '库存流水', path: '/inventory', icon: Boxes },
-        { label: '订单管理', path: '/orders', icon: ClipboardList }
+        { label: '订单管理', path: '/orders', icon: ClipboardList },
+        { label: '商户设置', path: '/merchant-settings', icon: Store }
       ]
     : [
         { label: '运营大盘', path: '/', icon: LayoutDashboard },
         { label: '商品管理', path: '/products', icon: ShoppingBag },
+        ...(user?.role === 'SUPER_ADMIN'
+          ? [{ label: '商品审核工单', path: '/audit', icon: ClipboardCheck }]
+          : []),
         { label: '库存流水', path: '/inventory', icon: Boxes },
         { label: '订单管理', path: '/orders', icon: ClipboardList },
         { label: '类目中心', path: '/categories', icon: Layers },

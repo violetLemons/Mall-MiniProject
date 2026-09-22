@@ -129,7 +129,6 @@
               <image class="soc-prod-img" src="{{prod.image}}" mode="aspectFill" />
               <view class="soc-prod-info">
                 <text class="soc-prod-title ellipsis-1">{{prod.productName}}</text>
-                <text class="soc-prod-sku">{{prod.colorName}} / {{prod.size}}</text>
                 <view class="soc-prod-bottom">
                   <text class="soc-prod-price">¥{{prod.unitPriceYuan || (prod.unitPrice / 100)}}</text>
                   <text class="soc-prod-count">x{{prod.count}}</text>
@@ -353,7 +352,7 @@
           <view class="service-banner-card">
             <view class="sbc-title">通用商城服务顾问</view>
             <view class="sbc-sub">服务时间：每日 09:00 - 22:00 全年无休</view>
-            <view class="sbc-tip">正品防伪 · 规格咨询 · 物流时效 · 售后退换</view>
+            <view class="sbc-tip">正品防伪 · 商品咨询 · 物流时效 · 售后退换</view>
           </view>
 
           <!-- 客服电话接入按钮 (居中，点击弹出客服电话) -->
@@ -370,7 +369,7 @@
           <view class="service-faq-box">
             <view class="faq-head">常见咨询 FAQ</view>
             <view class="faq-item">
-              <view class="faq-q">Q: 规格不合适支持 7 天退换吗？</view>
+              <view class="faq-q">Q: 商品不合适支持 7 天退换吗？</view>
               <view class="faq-a">A: 保持商品完好未使用、吊牌完好且包装齐全的情况下，支持 7 天无理由退换货。</view>
             </view>
           </view>

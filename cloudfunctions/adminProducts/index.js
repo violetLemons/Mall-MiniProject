@@ -129,11 +129,19 @@ function fields(p) {
   return out;
 }
 
+// 无规格时用商品的基准价/总库存自动生成单一隐藏默认 SKU（颜色=默认、规格=1）
+function buildDefaultSkuInput(product) {
+  const price = Number(product.minPrice) > 0 ? Number(product.minPrice) : 1;
+  const stock = Number(product.totalStock) >= 0 ? Number(product.totalStock) : 0;
+  return { colorName: '默认', size: 1, price, stock };
+}
+
 async function saveSkus(tx, product, inputs, old, admin) {
-  if (!Array.isArray(inputs) || inputs.length < 1 || inputs.length > 30 || old.length > 30) throw error('INVALID_PARAMS', '规格矩阵须为1~30项');
+  if (!Array.isArray(inputs) || inputs.length === 0) inputs = [buildDefaultSkuInput(product)];
+  if (inputs.length > 30 || old.length > 30) throw error('INVALID_PARAMS', '规格矩阵须为1~30项');
   const pairs = new Set(), ids = new Set(), all = [];
   for (const s of inputs) {
-    const colorName = text(s.colorName, '颜色', 1, 40), size = integer(s.size, '规格', 35, 45);
+    const colorName = text(s.colorName, '颜色', 1, 40), size = integer(s.size, '规格', 1, 100000);
     const pair = `${colorName}:${size}`;
     if (pairs.has(pair)) throw error('DUPLICATE_SKU', '颜色规格重复'); pairs.add(pair);
     const id = s.id || s.skuId || old.find(x => x.colorName === colorName && x.size === size)?._id || key(product._id, colorName, size);
@@ -170,10 +178,58 @@ async function saveSkus(tx, product, inputs, old, admin) {
   return aggregate;
 }
 
+// 商家新增/修改商品 → 提交审核工单（不直接写 products）
+async function submitTicket(db, admin, action, params, id) {
+  const data = fields(params);
+  if (action === 'create' && (!data.name || !data.cover)) throw error('INVALID_PARAMS', '请填写商品名称和封面');
+  if (action === 'update' || action === 'updateSkus') {
+    const existing = await getDoc(db, 'products', id);
+    if (!existing) throw error('PRODUCT_NOT_FOUND', '商品不存在');
+    if ((existing.merchantId || null) !== admin.merchantId) throw error('PERMISSION_DENIED', '无权修改其他商家的商品');
+  }
+  if (Array.isArray(params.skus) && (params.skus.length < 1 || params.skus.length > 30)) throw error('INVALID_PARAMS', '规格矩阵须为1~30项');
+
+  // 合并：同一商品同一时刻至多一个 PENDING UPDATE 工单，避免乱序通过时旧数据覆盖
+  if (action === 'update' || action === 'updateSkus') {
+    const pending = (await db.collection('product_audit_tickets')
+      .where({ merchantId: admin.merchantId, productId: id, status: 'PENDING' })
+      .limit(1)
+      .get()).data[0];
+    if (pending) {
+      const oldPayload = pending.payload || {};
+      const mergedPayload = {
+        product: action === 'update' ? { ...(oldPayload.product || {}), ...data } : (oldPayload.product || {}),
+        skus: Array.isArray(params.skus) ? params.skus : (oldPayload.skus || null)
+      };
+      await db.collection('product_audit_tickets').doc(pending._id).update({
+        data: { payload: mergedPayload, updatedAt: new Date() }
+      });
+      return { ticketId: pending._id, status: 'PENDING' };
+    }
+  }
+
+  const ticketId = key(crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
+  const ticket = {
+    merchantId: admin.merchantId,
+    type: action === 'create' ? 'CREATE' : 'UPDATE',
+    productId: action === 'create' ? null : id,
+    payload: { product: data, skus: Array.isArray(params.skus) ? params.skus : null },
+    status: 'PENDING',
+    platformFee: 0,
+    rejectReason: '',
+    reviewedBy: null,
+    reviewedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  };
+  await db.collection('product_audit_tickets').doc(ticketId).set({ data: ticket });
+  return { ticketId, status: 'PENDING' };
+}
+
 exports.main = async event => {
   try {
     const admin = await requireAdmin(event, db), { action, params = {} } = event;
-    const supportedActions = new Set(['list', 'get', 'create', 'update', 'updateSkus', 'updateStatus', 'delete', 'softDelete', 'restore', 'uploadImage']);
+    const supportedActions = new Set(['list', 'get', 'create', 'update', 'updateSkus', 'updateStatus', 'delete', 'softDelete', 'restore', 'uploadImage', 'listTickets', 'reviewTicket', 'reseedDefaultSkus']);
     if (!supportedActions.has(action)) throw error('ACTION_NOT_FOUND', `未知指令: ${action}`);
 
     // 上传图片（封面/详情大图）
@@ -218,6 +274,101 @@ exports.main = async event => {
       return success({ list: listRes.data, total: countRes.total, page, pageSize });
     }
 
+    // 商品审核工单列表（商家看自己的，平台看全部）
+    if (action === 'listTickets') {
+      requirePermission(admin, 'product.view');
+      const page = integer(params.page || 1, '页码', 1, 10000);
+      const pageSize = integer(params.pageSize || 20, '每页数量', 1, 100);
+      const query = {};
+      if (admin.merchantId) query.merchantId = admin.merchantId;
+      if (params.status && ['PENDING', 'APPROVED', 'REJECTED'].includes(params.status)) query.status = params.status;
+      const [listRes, countRes] = await Promise.all([
+        db.collection('product_audit_tickets').where(query).orderBy('createdAt', 'desc').skip((page - 1) * pageSize).limit(pageSize).get(),
+        db.collection('product_audit_tickets').where(query).count()
+      ]);
+      return success({ list: listRes.data, total: countRes.total, page, pageSize });
+    }
+
+    // 平台审核商品工单（通过并填抽成 / 驳回）
+    if (action === 'reviewTicket') {
+      if (admin.role !== 'SUPER_ADMIN') throw error('PERMISSION_DENIED', '仅平台超级管理员可审核商品');
+      const ticketId = text(params.ticketId, '工单ID');
+      const decision = text(params.decision, '审核结果');
+      if (!['approve', 'reject'].includes(decision)) throw error('INVALID_PARAMS', '审核结果无效');
+      const platformFee = decision === 'approve' ? integer(params.platformFee || 0, '平台抽成', 0, 100000000) : 0;
+      const rejectReason = decision === 'reject' ? text(params.rejectReason || '', '驳回原因', 1, 500) : '';
+      const txResult = await db.runTransaction(async tx => {
+        const ticket = await getDoc(tx, 'product_audit_tickets', ticketId);
+        if (!ticket) throw error('TICKET_NOT_FOUND', '工单不存在');
+        if (ticket.status !== 'PENDING') throw error('TICKET_ALREADY_REVIEWED', '工单已处理，请勿重复审核');
+        const now = new Date();
+        if (decision === 'reject') {
+          await tx.collection('product_audit_tickets').doc(ticketId).update({ data: { status: 'REJECTED', rejectReason, reviewedBy: admin.adminId, reviewedAt: now, updatedAt: now } });
+          return { ticketId, status: 'REJECTED' };
+        }
+        const payload = ticket.payload || {};
+        const prodData = payload.product || {};
+        if (prodData.categoryId) {
+          const category = await getDoc(tx, 'categories', prodData.categoryId);
+          if (!category || category.status !== 'ACTIVE') throw error('INVALID_CATEGORY', '请选择有效分类');
+        }
+        if (ticket.type === 'CREATE') {
+          if (!prodData.name || !prodData.cover) throw error('INVALID_PARAMS', '工单缺少商品名称或封面');
+          const newId = key(crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
+          const docData = {
+            ...prodData,
+            merchantId: ticket.merchantId || null,
+            platformFee,
+            status: 'ON_SALE',
+            deletedAt: null,
+            sales: 0,
+            totalStock: prodData.totalStock || 0,
+            minPrice: prodData.minPrice || 0,
+            maxPrice: prodData.maxPrice || prodData.minPrice || 0,
+            sort: prodData.sort || 0,
+            createdAt: now,
+            updatedAt: now
+          };
+          delete docData._id; delete docData.id;
+          await tx.collection('products').doc(newId).set({ data: docData });
+          const p = { ...docData, _id: newId };
+          await saveSkus(tx, p, payload.skus, [], admin);
+        } else {
+          const existing = await getDoc(tx, 'products', ticket.productId);
+          if (!existing) throw error('PRODUCT_NOT_FOUND', '商品不存在或已被删除');
+          const updateData = { ...prodData, platformFee, updatedAt: now };
+          delete updateData._id; delete updateData.id;
+          await tx.collection('products').doc(existing._id).update({ data: updateData });
+          const merged = { ...existing, ...updateData };
+          const oldSkus = (await tx.collection('product_skus').where({ productId: existing._id }).limit(100).get()).data;
+          await saveSkus(tx, merged, payload.skus, oldSkus, admin);
+        }
+        await tx.collection('product_audit_tickets').doc(ticketId).update({ data: { status: 'APPROVED', platformFee, reviewedBy: admin.adminId, reviewedAt: now, updatedAt: now } });
+        return { ticketId, status: 'APPROVED' };
+      });
+      return success(txResult);
+    }
+
+    // 重置所有商品的 SKU：删除现有全部 SKU，并按每个商品的基准价/总库存重建单一隐藏默认 SKU
+    if (action === 'reseedDefaultSkus') {
+      if (admin.role !== 'SUPER_ADMIN') throw error('PERMISSION_DENIED', '仅平台超级管理员可重置 SKU');
+      let total = 0, created = 0, skip = 0;
+      for (;;) {
+        const batch = await db.collection('products').skip(skip).limit(100).get();
+        const list = batch.data || [];
+        if (list.length === 0) break;
+        for (const p of list) {
+          total++;
+          const oldSkus = (await db.collection('product_skus').where({ productId: p._id }).limit(100).get()).data;
+          for (const s of oldSkus) await db.collection('product_skus').doc(s._id).remove().catch(() => {});
+          await saveSkus(db, p, [], [], admin);
+          created++;
+        }
+        skip += list.length;
+      }
+      return success({ total, created });
+    }
+
     const id = action === 'create' ? key(crypto.randomUUID ? crypto.randomUUID() : String(Date.now())) : text(params.id, '商品ID');
 
     // 商品详情与SKU列表
@@ -233,6 +384,11 @@ exports.main = async event => {
 
     requirePermission(admin, action === 'create' ? 'product.create' : ['delete', 'softDelete', 'purge'].includes(action) ? 'product.delete' : action === 'updateStatus' ? 'product.status' : 'product.update');
     if (action === 'purge') throw error('OPERATION_FORBIDDEN', '请使用软删除保留业务引用');
+
+    // 商家（merchantId 非空）新增/修改商品 → 提交审核工单，不直接写商品
+    if (admin.merchantId && ['create', 'update', 'updateSkus'].includes(action)) {
+      return success(await submitTicket(db, admin, action, params, id));
+    }
 
     const oldSkus = action === 'updateSkus' ? (await db.collection('product_skus').where({ productId: id }).limit(100).get()).data : [];
     const before = action === 'updateSkus' ? await getDoc(db, 'products', id) : null;
@@ -266,13 +422,16 @@ exports.main = async event => {
           delete docData.id;
           await tx.collection('products').doc(id).set({ data: docData });
           p = { ...docData, _id: id };
-          if (Array.isArray(params.skus) && params.skus.length) await saveSkus(tx, p, params.skus, [], admin);
+          await saveSkus(tx, p, params.skus, [], admin);
           result = { productId: id };
         } else {
           const updateData = { ...data, updatedAt: new Date() };
           delete updateData._id;
           delete updateData.id;
           await tx.collection('products').doc(id).update({ data: updateData });
+          const merged = { ...p, ...updateData };
+          const oldSkus = (await tx.collection('product_skus').where({ productId: id }).limit(100).get()).data;
+          await saveSkus(tx, merged, params.skus, oldSkus, admin);
         }
       } else if (action === 'updateSkus') {
         if ((p.skuVersion || 0) !== (before?.skuVersion || 0)) throw error('CONFLICT', '规格已被其他管理员更新，请刷新');

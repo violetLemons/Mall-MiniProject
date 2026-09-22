@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { AdminApi } from '../api/client';
-import { Product, SkuItem, Category } from '../types';
+import { Product, Category } from '../types';
 import { Badge } from '../components/Badge';
 import { Modal } from '../components/Modal';
-import { SkuMatrixModal } from '../components/SkuMatrixModal';
 import { useToast } from '../components/Toast';
 import { formatCents } from '../utils/format';
 import {
   Search,
   Plus,
   Edit2,
-  Boxes,
   Trash2,
   RefreshCw,
   ArchiveRestore,
@@ -40,10 +38,6 @@ export const Products: React.FC = () => {
   const [searchKeyword, setSearchKeyword] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'ON_SALE' | 'OFF_SALE' | 'DELETED'
-
-  // SKU Modal State
-  const [skuModalOpen, setSkuModalOpen] = useState(false);
-  const [activeProductForSku, setActiveProductForSku] = useState<Product | null>(null);
 
   // Edit/Create Modal State
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -151,27 +145,6 @@ export const Products: React.FC = () => {
       await loadProducts();
     } catch (e: any) {
       toast(e.message || '物理删除失败', 'error');
-    }
-  };
-
-  const handleOpenSkuModal = async (product: Product) => {
-    try {
-      const full = await AdminApi.getProductById(product.id);
-      setActiveProductForSku(full || product);
-    } catch {
-      setActiveProductForSku(product);
-    }
-    setSkuModalOpen(true);
-  };
-
-  const handleSaveSkuMatrix = async (newSkus: SkuItem[]) => {
-    if (!activeProductForSku) return;
-    try {
-      await AdminApi.updateSkus(activeProductForSku.id, newSkus);
-      toast(`已更新 [${activeProductForSku.name}] 的 SKU 规格矩阵`, 'success');
-      await loadProducts();
-    } catch (e: any) {
-      toast(e.message || '更新规格矩阵失败', 'error');
     }
   };
 
@@ -343,7 +316,6 @@ export const Products: React.FC = () => {
       return;
     }
 
-    const isCreating = !formData.id;
     const priceInCents = Math.round(Number(formData.minPrice) * 100);
     try {
       const saved = await AdminApi.saveProduct({
@@ -359,21 +331,18 @@ export const Products: React.FC = () => {
         images: formData.detailImages && formData.detailImages.length > 0 ? formData.detailImages : [formData.cover || ''],
         detailImages: formData.detailImages || []
       });
+
+      // 商家提交 → 生成审核工单，不直接上架
+      if (saved?.pending) {
+        toast(`商品 [${formData.name}] 已提交审核工单，等待平台审核后上架`, 'success');
+        setEditModalOpen(false);
+        await loadProducts();
+        return;
+      }
+
       toast(`商品 [${formData.name}] 保存成功`, 'success');
       setEditModalOpen(false);
       await loadProducts();
-
-      // 如果是新增商品，自动无缝进入步骤二：配置 SKU 规格矩阵
-      if (isCreating && saved?.id) {
-        try {
-          const full = await AdminApi.getProductById(saved.id);
-          setActiveProductForSku(full || saved);
-        } catch {
-          setActiveProductForSku(saved);
-        }
-        setSkuModalOpen(true);
-        toast('基础信息已保存，请配置 SKU 规格矩阵', 'info');
-      }
     } catch (err: any) {
       toast(err.message || '保存失败', 'error');
     }
@@ -388,7 +357,7 @@ export const Products: React.FC = () => {
             商品库 · Products
           </h1>
           <p style={{ fontSize: '14px', color: '#64748B', marginTop: '4px' }}>
-            支持 SKU 规格矩阵调控、上架/下架、软删除及高危物理清除。
+            支持上架/下架、软删除及高危物理清除。
           </p>
         </div>
 
@@ -413,6 +382,26 @@ export const Products: React.FC = () => {
           <span>新增商品</span>
         </button>
       </div>
+
+      {/* 商家审核提示 */}
+      {currentUser?.role === 'MERCHANT' && (
+        <div
+          style={{
+            backgroundColor: '#EFF6FF',
+            border: '1px solid #BFDBFE',
+            borderRadius: '12px',
+            padding: '12px 16px',
+            fontSize: '13px',
+            color: '#1E40AF',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <ShieldCheck size={18} color="#2563EB" />
+          <span>新增或修改商品需提交审核工单，平台审核通过后自动上架。可在「商品审核工单」查看进度。</span>
+        </div>
+      )}
 
       {/* Filter Toolbar */}
       <div
@@ -583,6 +572,11 @@ export const Products: React.FC = () => {
                   {/* Price */}
                   <td style={{ padding: '14px 18px', fontWeight: 700, color: '#FF5500' }}>
                     {formatCents(p.minPrice)} {p.maxPrice > p.minPrice && `~ ${formatCents(p.maxPrice)}`}
+                    {currentUser?.role === 'SUPER_ADMIN' && (p.platformFee || 0) > 0 && (
+                      <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 500, marginTop: '2px' }}>
+                        抽成 {formatCents(p.platformFee)}/件 · 买家实付 {formatCents((p.minPrice || 0) + (p.platformFee || 0))}
+                      </div>
+                    )}
                   </td>
 
                   {/* Stock */}
@@ -607,27 +601,6 @@ export const Products: React.FC = () => {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
                       {p.status !== 'DELETED' ? (
                         <>
-                          <button
-                            onClick={() => handleOpenSkuModal(p)}
-                            title="SKU 规格矩阵"
-                            style={{
-                              padding: '6px 10px',
-                              borderRadius: '6px',
-                              border: '1px solid #CBD5E1',
-                              backgroundColor: '#FFF',
-                              color: '#334155',
-                              fontSize: '12px',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                          >
-                            <Boxes size={14} color="#FF5500" />
-                            <span>SKU矩阵</span>
-                          </button>
-
                           <button
                             onClick={() => handleOpenEditModal(p)}
                             title="编辑商品"
@@ -730,17 +703,6 @@ export const Products: React.FC = () => {
           </tbody>
         </table>
       </div>
-
-      {/* SKU Matrix Generator Modal */}
-      {activeProductForSku && (
-        <SkuMatrixModal
-          isOpen={skuModalOpen}
-          onClose={() => setSkuModalOpen(false)}
-          productName={activeProductForSku.name}
-          skus={activeProductForSku.skus || []}
-          onSave={handleSaveSkuMatrix}
-        />
-      )}
 
       {/* Edit / Create Product Modal */}
       <Modal
@@ -981,7 +943,7 @@ export const Products: React.FC = () => {
                 }}
               />
               <p style={{ fontSize: '11px', color: '#64748B', marginTop: '4px' }}>
-                支持完全清空；后续可通过 SKU 矩阵为各规格精细配置独立库存
+                支持完全清空
               </p>
             </div>
           </div>

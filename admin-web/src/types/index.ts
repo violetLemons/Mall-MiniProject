@@ -7,9 +7,28 @@ export interface AdminUser {
   role: AdminRole;
   permissions: string[];
   merchantId?: string | null;
+  subMchIdMask?: string;
   status: 'ACTIVE' | 'DISABLED';
   lastLoginAt?: string;
   createdAt: string;
+}
+
+export interface ProductAuditTicket {
+  id: string;
+  merchantId: string;
+  type: 'CREATE' | 'UPDATE';
+  productId?: string | null;
+  payload: {
+    product?: any;
+    skus?: SkuItem[] | null;
+  };
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  platformFee?: number;
+  rejectReason?: string;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface SkuItem {
@@ -41,6 +60,9 @@ export interface Product {
   maxPrice: number;
   price?: number;
   originalPrice?: number;
+  platformFee?: number;
+  basePrice?: number;
+  merchantId?: string | null;
   sales: number;
   totalStock: number;
   status: 'ON_SALE' | 'OFF_SALE' | 'DELETED';

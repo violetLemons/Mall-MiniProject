@@ -72,10 +72,17 @@ Page({
                     else
                         pickupStatusLabel = '门店备货中';
                 }
+                // 物流信息：优先取子订单 shipments[] 数组；兼容旧版单一 trackingNo 数据
+                const rawShipments = (order.shipments && order.shipments.length > 0)
+                    ? order.shipments
+                    : (order.trackingNo
+                        ? [{ trackingNo: order.trackingNo, logisticsCompany: order.logisticsCompany, expressCompany: order.expressCompany, shippedAt: order.shippedAt || order.shippingTime }]
+                        : []);
+                const shipments = rawShipments.map(s => (Object.assign(Object.assign({}, s), { shippedAtFormatted: formatDateTime(s.shippedAt) })));
                 this.setData({
                     order: Object.assign(Object.assign({}, order), { statusLabel: STATUS_LABEL[order.status] || order.status, paymentStatusLabel: isPaid ? '已支付' : '待付款', pickupStatusLabel,
                         isExpress,
-                        isPickup, payAmountYuan: (Number(order.payAmount || 0) / 100).toFixed(2), totalAmountYuan: (Number(order.totalAmount || order.payAmount || 0) / 100).toFixed(2), createdAtFormatted: formatDateTime(order.createdAt || order.createTime), paidAtFormatted: formatDateTime(order.paidAt || order.payTime), shippedAtFormatted: formatDateTime(order.shippedAt || order.shippingTime), items: (order.items || []).map(item => (Object.assign(Object.assign({}, item), { unitPriceYuan: (Number(item.unitPrice || 0) / 100).toFixed(2), totalAmountYuan: (Number(item.totalAmount || 0) / 100).toFixed(2) }))) }),
+                        isPickup, hasShipment: shipments.length > 0, shipments, payAmountYuan: (Number(order.payAmount || 0) / 100).toFixed(2), totalAmountYuan: (Number(order.totalAmount || order.payAmount || 0) / 100).toFixed(2), createdAtFormatted: formatDateTime(order.createdAt || order.createTime), paidAtFormatted: formatDateTime(order.paidAt || order.payTime), shippedAtFormatted: formatDateTime(order.shippedAt || order.shippingTime), items: (order.items || []).map(item => (Object.assign(Object.assign({}, item), { unitPriceYuan: (Number(item.unitPrice || 0) / 100).toFixed(2), totalAmountYuan: (Number(item.totalAmount || 0) / 100).toFixed(2) }))) }),
                     loading: false,
                     errorMessage: ''
                 });

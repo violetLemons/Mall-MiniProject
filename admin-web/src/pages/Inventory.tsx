@@ -18,6 +18,24 @@ export const Inventory: React.FC = () => {
   const [newStock, setNewStock] = useState<number>(50);
   const [adjustReason, setAdjustReason] = useState('仓库到货入库');
 
+  // 每个商品仅一个隐藏默认 SKU，按商品解析出该 SKU 用于库存调账
+  const resolveDefaultSku = async (pid: string) => {
+    try {
+      const detail = await AdminApi.getProductById(pid);
+      const sku = detail?.skus?.[0];
+      if (sku) {
+        setSelectedSkuId(sku.skuId || sku.id || '');
+        setNewStock(sku.stock ?? 0);
+      } else {
+        setSelectedSkuId('');
+        setNewStock(0);
+      }
+    } catch {
+      setSelectedSkuId('');
+      setNewStock(0);
+    }
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -29,9 +47,7 @@ export const Inventory: React.FC = () => {
       setProducts(pList);
       if (pList.length > 0 && !selectedProductId) {
         setSelectedProductId(pList[0].id);
-        if (pList[0].skus && pList[0].skus.length > 0) {
-          setSelectedSkuId(pList[0].skus[0].skuId || pList[0].skus[0].id || '');
-        }
+        await resolveDefaultSku(pList[0].id);
       }
     } finally {
       setLoading(false);
@@ -42,30 +58,20 @@ export const Inventory: React.FC = () => {
     loadData();
   }, []);
 
-  const activeProduct = products.find(p => p.id === selectedProductId);
-
   const handleProductSelectChange = (pid: string) => {
     setSelectedProductId(pid);
-    const prod = products.find(p => p.id === pid);
-    if (prod && prod.skus && prod.skus.length > 0) {
-      const firstSku = prod.skus[0];
-      setSelectedSkuId(firstSku.skuId || firstSku.id || '');
-      setNewStock(firstSku.stock ?? 0);
-    }
+    resolveDefaultSku(pid);
   };
 
-  const handleOpenAdjustModal = () => {
-    if (activeProduct && activeProduct.skus && activeProduct.skus.length > 0) {
-      const currentSku = activeProduct.skus.find(s => (s.skuId || s.id) === selectedSkuId) || activeProduct.skus[0];
-      setNewStock(currentSku.stock ?? 0);
-    }
+  const handleOpenAdjustModal = async () => {
+    if (selectedProductId) await resolveDefaultSku(selectedProductId);
     setAdjustModalOpen(true);
   };
 
   const handleCommitAdjust = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProductId || !selectedSkuId) {
-      toast('请选择需要调账的商品和规格', 'error');
+      toast('请选择需要调账的商品', 'error');
       return;
     }
     try {
@@ -160,7 +166,7 @@ export const Inventory: React.FC = () => {
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
           <thead style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
             <tr style={{ color: '#64748B' }}>
-              <th style={{ padding: '12px 18px' }}>变动商品与规格</th>
+              <th style={{ padding: '12px 18px' }}>变动商品</th>
               <th style={{ padding: '12px 18px' }}>增减数量 (Delta)</th>
               <th style={{ padding: '12px 18px' }}>变动原因 / 类型</th>
               <th style={{ padding: '12px 18px' }}>操作人 / 触发来源</th>
@@ -175,9 +181,6 @@ export const Inventory: React.FC = () => {
                 <tr key={log.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
                   <td style={{ padding: '12px 18px' }}>
                     <div style={{ fontWeight: 600, color: '#0F172A' }}>{log.productName}</div>
-                    <div style={{ fontSize: '11px', color: '#64748B' }}>
-                      {log.colorName} / <strong style={{ color: '#FF5500' }}>{log.size}</strong>
-                    </div>
                   </td>
 
                   <td style={{ padding: '12px 18px' }}>
@@ -263,33 +266,6 @@ export const Inventory: React.FC = () => {
             >
               {products.map(p => (
                 <option key={p.id} value={p.id}>{p.name} (当前总库存: {p.totalStock})</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-              选择规格 (SKU)
-            </label>
-            <select
-              value={selectedSkuId}
-              onChange={(e) => {
-                setSelectedSkuId(e.target.value);
-                const s = activeProduct?.skus.find(item => (item.skuId || item.id) === e.target.value);
-                if (s) setNewStock(s.stock);
-              }}
-              style={{
-                width: '100%',
-                padding: '9px 12px',
-                borderRadius: '8px',
-                border: '1px solid #CBD5E1',
-                fontSize: '14px'
-              }}
-            >
-              {activeProduct?.skus.map(s => (
-                <option key={s.skuId || s.id} value={s.skuId || s.id}>
-                  {s.colorName} - {s.size} (当前库存: {s.stock} 件)
-                </option>
               ))}
             </select>
           </div>

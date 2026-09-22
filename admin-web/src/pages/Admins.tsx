@@ -33,6 +33,7 @@ export const Admins: React.FC = () => {
   });
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [subMchId, setSubMchId] = useState('');
 
   const loadData = async () => {
     setLoading(true);
@@ -57,6 +58,7 @@ export const Admins: React.FC = () => {
     });
     setPassword('');
     setConfirmPassword('');
+    setSubMchId('');
     setModalOpen(true);
   };
 
@@ -80,11 +82,16 @@ export const Admins: React.FC = () => {
       toast('创建商家账号必须填写商家 ID (merchantId)', 'error');
       return;
     }
+    if (role === 'MERCHANT' && subMchId.trim() && !/^\d{8,32}$/.test(subMchId.trim())) {
+      toast('商户号格式不正确（需为 8-32 位数字）', 'error');
+      return;
+    }
 
     try {
       await AdminApi.saveAdmin({
         ...formData,
         merchantId: role === 'MERCHANT' ? (formData.merchantId || '').trim() : null,
+        subMchId: role === 'MERCHANT' ? subMchId.trim() : '',
         password,
         permissions: ROLE_PERMISSIONS[role]
       } as any);
@@ -172,6 +179,7 @@ export const Admins: React.FC = () => {
                   {adm.role === 'MERCHANT' && (
                     <div style={{ fontSize: '11px', color: '#64748B', marginTop: '4px' }}>
                       商家ID: {adm.merchantId || '—'}
+                      {adm.subMchIdMask && <span style={{ marginLeft: '8px' }}>商户号: {adm.subMchIdMask}</span>}
                     </div>
                   )}
                 </td>
@@ -255,6 +263,25 @@ export const Admins: React.FC = () => {
               />
               <p style={{ fontSize: '12px', color: '#64748B', marginTop: '6px' }}>
                 该商家账号登录后仅能查看与操作 merchantId 对应的商品、订单与库存。
+              </p>
+            </div>
+          )}
+
+          {formData.role === 'MERCHANT' && (
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                微信支付商户号 (sub_mch_id，可选)
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={subMchId}
+                onChange={(e) => setSubMchId(e.target.value)}
+                placeholder="8-32 位数字，用于后续分账结算"
+                style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px' }}
+              />
+              <p style={{ fontSize: '12px', color: '#64748B', marginTop: '6px' }}>
+                数据库仅存 AES-256-GCM 密文，商家也可在「商户设置」中自行填写。
               </p>
             </div>
           )}

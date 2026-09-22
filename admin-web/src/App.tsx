@@ -11,6 +11,8 @@ import { Categories } from './pages/Categories';
 import { Banners } from './pages/Banners';
 import { Admins } from './pages/Admins';
 import { Logs } from './pages/Logs';
+import { AuditTickets } from './pages/AuditTickets';
+import { MerchantSettings } from './pages/MerchantSettings';
 
 // 登录守卫 (Route Guard)
 const RequireAuth: React.FC<{ children: React.ReactElement }> = ({ children }) => {
@@ -58,6 +60,8 @@ export const App: React.FC = () => {
           >
             <Route index element={<Dashboard />} />
             <Route path="products" element={<Products />} />
+            <Route path="audit" element={<AuditTickets />} />
+            <Route path="merchant-settings" element={<MerchantSettings />} />
             <Route path="inventory" element={<Inventory />} />
             <Route path="orders" element={<Orders />} />
             <Route
