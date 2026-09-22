@@ -1,0 +1,28 @@
+<view class="promo-section">
+  <!-- 标题栏 -->
+  <view class="section-header">
+    <view class="header-left">
+      <text class="title-bold">ZONE</text>
+      <text class="title-text">潮流活动专区</text>
+    </view>
+    <text class="header-tip">配送服务 · 商品资讯</text>
+  </view>
+
+  <!-- 4 格专区卡片 (展示型无跳转卡片) -->
+  <view class="promo-grid">
+    <view
+      wx:for="{{sections}}"
+      wx:key="id"
+      wx:if="{{item.id !== 'pickup'}}"
+      class="promo-box"
+      style="background: {{item.bgColor}};"
+    >
+      <view class="box-info">
+        <view class="box-tag" style="background: {{item.color}};">{{item.tag}}</view>
+        <text class="box-title">{{item.title}}</text>
+        <text class="box-desc">{{item.desc}}</text>
+      </view>
+      <image class="box-thumb" src="{{item.imageUrl}}" mode="aspectFill" />
+    </view>
+  </view>
+</view>

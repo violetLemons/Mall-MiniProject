@@ -1,0 +1,9 @@
+{
+  "usingComponents": {
+    "custom-navbar": "../../../components/custom-navbar/index",
+    "c-price": "../../../components/price/index",
+    "sku-popup": "../../../components/sku-popup/index",
+    "loading-skeleton": "../../../components/loading-skeleton/index"
+  },
+  "navigationStyle": "custom"
+}

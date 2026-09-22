@@ -1,0 +1,168 @@
+.category-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--surface, #FFFFFF);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.cloud-error-box { margin: 20rpx; padding: 26rpx 16rpx; border-radius: 16rpx; background: #FFF5F0; text-align: center; }
+.cloud-error-text { display: block; color: #B43B00; font-size: 22rpx; }
+.cloud-retry-btn { display: inline-block; margin-top: 14rpx; padding: 8rpx 28rpx; line-height: 1.6; border-radius: 999rpx; background: #FF5500; color: #FFF; font-size: 22rpx; }
+
+.cat-search-box {
+  border-bottom: 1rpx solid var(--border-color-light, #F2F3F5);
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.cat-split-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 0;
+}
+
+/* 左侧品类侧边栏：固定 180rpx，绝对禁止被右侧网格压缩 */
+.sidebar-scroll {
+  width: 180rpx;
+  min-width: 180rpx;
+  max-width: 180rpx;
+  flex: 0 0 180rpx;
+  height: 100%;
+  background-color: var(--surface-subtle, #F8F9FA);
+  box-sizing: border-box;
+}
+
+.sidebar-item {
+  height: 96rpx;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.sidebar-text {
+  font-size: 26rpx;
+  color: var(--text-secondary, #8A8D93);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 12rpx;
+}
+
+.sidebar-item.is-active {
+  background-color: #FFFFFF;
+}
+
+.sidebar-item.is-active .sidebar-text {
+  color: var(--brand-color, #111111);
+  font-weight: 800;
+}
+
+.active-indicator {
+  position: absolute;
+  left: 0;
+  top: 30rpx;
+  bottom: 30rpx;
+  width: 8rpx;
+  border-radius: 0 4rpx 4rpx 0;
+  background-color: transparent;
+}
+
+.sidebar-item.is-active .active-indicator {
+  background-color: var(--brand-accent, #FF5500);
+}
+
+/* 右侧内容区：必须设置 min-width: 0 允许伸缩，防止内部网格撑大导致挤压左侧侧边栏 */
+.content-scroll {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 20rpx;
+  box-sizing: border-box;
+}
+
+.category-banner-card {
+  background: linear-gradient(135deg, #111111 0%, #2A2B2E 100%);
+  border-radius: var(--radius-sm, 12rpx);
+  padding: 24rpx;
+  display: flex;
+  flex-direction: column;
+  color: #FFFFFF;
+  margin-bottom: 24rpx;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.banner-hint {
+  font-size: 18rpx;
+  letter-spacing: 2rpx;
+  opacity: 0.7;
+  margin-bottom: 4rpx;
+}
+
+.banner-title {
+  font-size: 30rpx;
+  font-weight: 800;
+}
+
+/* 商品双列网格：使用 minmax(0, 1fr) 防止子项固有宽度溢出 */
+.cat-products-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16rpx;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cat-product-item {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--surface-subtle, #F8F9FA);
+  border-radius: var(--radius-sm, 12rpx);
+  padding: 12rpx;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.cat-product-thumb {
+  width: 100%;
+  height: 180rpx;
+  border-radius: 8rpx;
+  object-fit: cover;
+  margin-bottom: 10rpx;
+  display: block;
+  background-color: #FFFFFF;
+}
+
+.cat-product-title {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: var(--text-primary, #18191B);
+  margin-bottom: 6rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.cat-product-price {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--brand-accent, #FF5500);
+}
+
+.cat-empty-hint {
+  padding: 60rpx 0;
+  text-align: center;
+  font-size: 24rpx;
+  color: var(--text-secondary, #8A8D93);
+}

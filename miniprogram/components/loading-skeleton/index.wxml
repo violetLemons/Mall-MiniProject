@@ -1,0 +1,28 @@
+<view class="skeleton-wrapper">
+  <!-- 双列商品网格骨架 -->
+  <view wx:if="{{type === 'grid'}}" class="skeleton-grid">
+    <view wx:for="{{items}}" wx:key="*this" class="skeleton-card">
+      <view class="skeleton-box skeleton-shimmer sk-image"></view>
+      <view class="skeleton-content">
+        <view class="skeleton-box skeleton-shimmer sk-tag"></view>
+        <view class="skeleton-box skeleton-shimmer sk-title"></view>
+        <view class="skeleton-box skeleton-shimmer sk-title-sub"></view>
+        <view class="skeleton-footer">
+          <view class="skeleton-box skeleton-shimmer sk-price"></view>
+          <view class="skeleton-box skeleton-shimmer sk-sales"></view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 详情页骨架 -->
+  <view wx:elif="{{type === 'detail'}}" class="skeleton-detail">
+    <view class="skeleton-box skeleton-shimmer sk-banner"></view>
+    <view class="skeleton-detail-body">
+      <view class="skeleton-box skeleton-shimmer sk-detail-price"></view>
+      <view class="skeleton-box skeleton-shimmer sk-detail-title"></view>
+      <view class="skeleton-box skeleton-shimmer sk-detail-desc"></view>
+      <view class="skeleton-box skeleton-shimmer sk-detail-sku"></view>
+    </view>
+  </view>
+</view>

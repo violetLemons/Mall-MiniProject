@@ -1,0 +1,6 @@
+/**
+ * app.wxss - 小程序全局样式主入口
+ */
+@import 'styles/tokens.wxss';
+@import 'styles/reset.wxss';
+@import 'styles/common.wxss';

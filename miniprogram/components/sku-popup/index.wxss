@@ -1,0 +1,311 @@
+.sku-popup-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.sku-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.45);
+  animation: maskFadeIn 200ms ease-out forwards;
+}
+
+@keyframes maskFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.sku-panel {
+  position: relative;
+  width: 100%;
+  max-height: 80vh;
+  background-color: var(--surface, #FFFFFF);
+  border-radius: 32rpx 32rpx 0 0;
+  display: flex;
+  flex-direction: column;
+  animation: panelSlideUp 200ms ease-out forwards;
+  z-index: 2;
+}
+
+@keyframes panelSlideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.sku-header {
+  display: flex;
+  padding: 32rpx 28rpx 24rpx;
+  position: relative;
+  border-bottom: 1rpx solid var(--border-color-light, #F2F3F5);
+}
+
+.sku-thumb {
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: var(--radius-sm, 12rpx);
+  background-color: var(--surface-subtle, #F8F9FA);
+  border: 1rpx solid var(--border-color, #EBEDF0);
+  object-fit: cover;
+  flex-shrink: 0;
+  margin-top: -60rpx; /* 经典电商微露出悬浮视觉 */
+  box-shadow: var(--shadow-md, 0 8rpx 24rpx rgba(0, 0, 0, 0.05));
+}
+
+.header-info {
+  flex: 1;
+  margin-left: 24rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.stock-tip {
+  font-size: 22rpx;
+  color: var(--text-secondary, #8A8D93);
+  margin-top: 6rpx;
+}
+
+.selected-summary {
+  font-size: 24rpx;
+  color: var(--text-primary, #18191B);
+  font-weight: 500;
+  margin-top: 6rpx;
+}
+
+.close-btn {
+  position: absolute;
+  top: 24rpx;
+  right: 28rpx;
+  width: 48rpx;
+  height: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-line {
+  position: absolute;
+  width: 28rpx;
+  height: 3rpx;
+  background-color: var(--text-secondary, #8A8D93);
+}
+
+.c-1 { transform: rotate(45deg); }
+.c-2 { transform: rotate(-45deg); }
+
+.sku-scroll-body {
+  max-height: 52vh;
+  padding: 24rpx 28rpx;
+}
+
+.spec-section {
+  margin-bottom: 32rpx;
+}
+
+.spec-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+}
+
+.spec-title {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--text-primary, #18191B);
+  margin-bottom: 16rpx;
+}
+
+.spec-guide {
+  font-size: 22rpx;
+  color: var(--text-secondary, #8A8D93);
+}
+
+/* 颜色选择项 */
+.color-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.color-chip {
+  display: flex;
+  align-items: center;
+  padding: 8rpx 16rpx 8rpx 8rpx;
+  background-color: var(--surface-subtle, #F8F9FA);
+  border: 2rpx solid transparent;
+  border-radius: var(--radius-sm, 12rpx);
+}
+
+.color-chip.is-selected {
+  background-color: #FFF5F0;
+  border-color: var(--brand-accent, #FF5500);
+}
+
+.chip-image {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 8rpx;
+  margin-right: 12rpx;
+  object-fit: cover;
+}
+
+.chip-name {
+  font-size: 24rpx;
+  color: var(--text-primary, #18191B);
+  font-weight: 500;
+}
+
+/* 规格阵列 */
+.size-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16rpx;
+}
+
+.size-box {
+  height: 72rpx;
+  background-color: var(--surface-subtle, #F8F9FA);
+  border-radius: var(--radius-sm, 12rpx);
+  border: 2rpx solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.size-num {
+  font-size: 28rpx;
+  font-weight: 700;
+  font-family: -apple-system, BlinkMacSystemFont, 'DIN Alternate', sans-serif;
+  color: var(--text-primary, #18191B);
+}
+
+.size-box.is-selected {
+  background-color: var(--brand-color, #111111);
+  border-color: var(--brand-color, #111111);
+}
+
+.size-box.is-selected .size-num {
+  color: #FFFFFF;
+}
+
+/* 缺货置灰并禁止点击 */
+.size-box.is-disabled {
+  background-color: #F0F1F3;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.size-box.is-disabled .size-num {
+  color: var(--text-placeholder, #BCBFC4);
+  text-decoration: line-through;
+}
+
+.oos-tag {
+  position: absolute;
+  top: 2rpx;
+  right: 6rpx;
+  font-size: 16rpx;
+  color: var(--text-placeholder, #BCBFC4);
+}
+
+/* 数量步进器 */
+.stepper-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16rpx 0 32rpx;
+}
+
+.stepper-title-box {
+  display: flex;
+  flex-direction: column;
+}
+
+.stepper-sub {
+  font-size: 20rpx;
+  color: var(--text-secondary, #8A8D93);
+  margin-top: -8rpx;
+}
+
+.stepper-wrap {
+  display: flex;
+  align-items: center;
+  background-color: var(--surface-subtle, #F8F9FA);
+  border-radius: var(--radius-sm, 12rpx);
+  border: 1rpx solid var(--border-color, #EBEDF0);
+}
+
+.stepper-btn {
+  width: 64rpx;
+  height: 60rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--text-primary, #18191B);
+}
+
+.stepper-btn.disabled {
+  color: var(--text-placeholder, #BCBFC4);
+  pointer-events: none;
+}
+
+.stepper-val {
+  min-width: 64rpx;
+  text-align: center;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+/* 底部操作栏 */
+.sku-footer {
+  padding: 20rpx 28rpx calc(20rpx + constant(safe-area-inset-bottom));
+  padding: 20rpx 28rpx calc(20rpx + env(safe-area-inset-bottom));
+  border-top: 1rpx solid var(--border-color-light, #F2F3F5);
+  display: flex;
+  gap: 20rpx;
+  background-color: #FFFFFF;
+}
+
+.footer-btn {
+  flex: 1 1 0% !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  height: 84rpx;
+  line-height: 84rpx;
+  text-align: center;
+  border-radius: var(--radius-full, 9999rpx);
+  font-size: 28rpx;
+  font-weight: 700;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-sizing: border-box;
+}
+
+.btn-cart {
+  background-color: #F4F5F7;
+  color: var(--brand-color, #111111);
+}
+
+.btn-buy {
+  background-color: var(--brand-accent, #FF5500);
+  color: #FFFFFF;
+}
+
+.btn-single-primary {
+  background-color: var(--brand-color, #111111);
+  color: #FFFFFF;
+}

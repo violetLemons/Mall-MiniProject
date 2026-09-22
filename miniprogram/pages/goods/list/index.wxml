@@ -1,0 +1,87 @@
+<view class="list-page">
+  <!-- 自定义导航栏 (带返回键) -->
+  <custom-navbar title="{{title}}" showBack="{{true}}" borderBottom="{{false}}" />
+
+  <!-- 搜索框区域 -->
+  <view class="search-box-sticky">
+    <search-bar
+      value="{{keyword}}"
+      placeholder="搜索商品 / 品牌 / 系列"
+      showMessage="{{false}}"
+      bind:confirm="onSearchConfirm"
+      bind:clear="onSearchClear"
+    />
+  </view>
+
+  <!-- 快捷品类横滑滚动条 -->
+  <scroll-view class="category-tabs-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
+    <view class="category-tabs-wrapper">
+      <view
+        wx:for="{{categoryTabs}}"
+        wx:key="id"
+        class="cat-chip press-active {{categoryId === item.id ? 'is-active' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onCategorySelect"
+      >
+        {{item.name}}
+      </view>
+    </view>
+  </scroll-view>
+
+  <!-- 多维度排序栏 -->
+  <view class="sort-bar">
+    <view
+      wx:for="{{sortTabs}}"
+      wx:key="key"
+      class="sort-tab-item press-active {{currentSort.indexOf(item.key) === 0 ? 'is-active' : ''}}"
+      data-key="{{item.key}}"
+      bindtap="onSortTab"
+    >
+      <text class="tab-label">{{item.label}}</text>
+
+      <!-- 价格升降序指示箭头 -->
+      <view wx:if="{{item.key === 'price'}}" class="price-arrows">
+        <view class="arrow-up {{priceOrder === 'asc' ? 'arrow-active' : ''}}"></view>
+        <view class="arrow-down {{priceOrder === 'desc' ? 'arrow-active' : ''}}"></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 内容呈现区 -->
+  <view class="list-content">
+    <view wx:if="{{errorMessage}}" class="cloud-error-box">
+      <text class="cloud-error-text">{{errorMessage}}</text>
+      <button class="cloud-retry-btn" bindtap="onRetry">重试</button>
+    </view>
+    <!-- 骨架屏首次加载 -->
+    <view wx:elif="{{initialLoading}}" class="skeleton-wrap">
+      <loading-skeleton type="grid" count="{{6}}" />
+    </view>
+
+    <!-- 空状态缺省 -->
+    <view wx:elif="{{productList.length === 0}}" class="empty-wrap">
+      <empty-state
+        title="没有找到相关商品"
+        description="试试其他关键词，或清空筛选条件重新查看"
+        showAction="{{true}}"
+        actionText="重置筛选"
+        bind:action="onResetSearch"
+      />
+    </view>
+
+    <!-- 正常商品瀑布流网格 -->
+    <block wx:else>
+      <product-grid list="{{productList}}" />
+
+      <!-- 加载提示与触底 -->
+      <view class="list-footer-status">
+        <text wx:if="{{loadingMore}}" class="footer-loading">努力加载中...</text>
+        <view wx:elif="{{!hasMore}}" class="footer-end">
+          <view class="dash-line"></view>
+          <text class="dash-text">已为您呈现全部精选商品</text>
+          <view class="dash-line"></view>
+        </view>
+      </view>
+    </block>
+  </view>
+</view>

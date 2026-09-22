@@ -1,0 +1,43 @@
+.price-container {
+  display: inline-flex;
+  align-items: baseline;
+  color: var(--brand-color, #111111);
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'DIN Alternate', sans-serif;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.price-container.is-accent {
+  color: var(--brand-accent, #FF5500);
+}
+
+.currency {
+  font-weight: 600;
+  margin-right: 2rpx;
+}
+
+/* 尺寸规范 */
+.size-sm .currency { font-size: 20rpx; }
+.size-sm .integer { font-size: 26rpx; }
+.size-sm .decimal { font-size: 20rpx; }
+
+.size-md .currency { font-size: 24rpx; }
+.size-md .integer { font-size: 34rpx; }
+.size-md .decimal { font-size: 24rpx; }
+
+.size-lg .currency { font-size: 28rpx; }
+.size-lg .integer { font-size: 44rpx; }
+.size-lg .decimal { font-size: 28rpx; }
+
+.size-xl .currency { font-size: 34rpx; }
+.size-xl .integer { font-size: 56rpx; }
+.size-xl .decimal { font-size: 34rpx; }
+
+/* 划线原价 */
+.original-price {
+  margin-left: 12rpx;
+  font-size: 22rpx;
+  color: var(--text-placeholder, #BCBFC4);
+  text-decoration: line-through;
+  font-weight: 400;
+}

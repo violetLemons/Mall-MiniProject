@@ -1,0 +1,19 @@
+<view class="order-list-page">
+  <custom-navbar title="我的订单" />
+  <scroll-view scroll-x class="order-tabs">
+    <view wx:for="{{tabs}}" wx:key="key" class="order-tab {{activeTab === item.key ? 'active' : ''}}" data-key="{{item.key}}" bindtap="onTabChange">{{item.label}}</view>
+  </scroll-view>
+  <view wx:if="{{loading}}" class="order-empty">加载中…</view>
+  <view wx:elif="{{orders.length === 0}}" class="order-empty">暂无订单</view>
+  <view wx:else class="order-list">
+    <view wx:for="{{orders}}" wx:key="_id" class="order-card" data-id="{{item._id || item.id}}" bindtap="onOpenDetail">
+      <view class="order-head"><text>订单 {{item.orderNo}}</text><text class="status">{{item.statusLabel}}</text></view>
+      <view wx:for="{{item.items}}" wx:for-item="line" wx:key="skuId" class="order-item">
+        <image src="{{line.image}}" mode="aspectFill" class="order-image" />
+        <view class="order-item-info"><text class="order-name">{{line.productName}}</text><text class="order-meta">{{line.colorName}} · {{line.size}} × {{line.count}}</text></view>
+        <text class="order-price">¥{{line.unitPriceYuan}}</text>
+      </view>
+      <view class="order-foot"><text>共 {{item.items.length}} 件 · ¥{{item.payAmountYuan}}</text><view class="order-actions"><button wx:if="{{item.status === 'PENDING_PAYMENT'}}" catchtap="onPay" data-id="{{item._id || item.id}}">去支付</button><button wx:if="{{item.status === 'PENDING_PAYMENT'}}" catchtap="onCancel" data-id="{{item._id || item.id}}">取消</button></view></view>
+    </view>
+  </view>
+</view>

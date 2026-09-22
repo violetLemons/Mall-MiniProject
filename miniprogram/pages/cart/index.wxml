@@ -1,0 +1,126 @@
+<view class="cart-page">
+  <custom-navbar title="购物车" />
+
+  <!-- 购物车为空时 -->
+  <view wx:if="{{cartItems.length === 0}}" class="cart-empty-box">
+    <empty-state
+      title="购物车空空如也"
+      description="去选几件心仪的商品装进购物车吧"
+      showAction="{{true}}"
+      actionText="去逛逛"
+      bind:action="onGoShopping"
+    />
+  </view>
+
+  <!-- 购物车列表 -->
+  <view wx:else class="cart-content">
+    <view class="cart-tips-bar">
+      <text class="tip-badge">全场包邮</text>
+      <text class="tip-text">全场极速快递包邮 · 支持正品防伪双验</text>
+    </view>
+
+    <view class="cart-list">
+      <view
+        wx:for="{{cartItems}}"
+        wx:key="id"
+        class="cart-card"
+      >
+        <!-- 复选框 -->
+        <view
+          class="checkbox-wrap press-active"
+          data-index="{{index}}"
+          bindtap="toggleItemSelect"
+        >
+          <view class="cart-checkbox {{item.selected ? 'is-checked' : ''}}"></view>
+        </view>
+
+        <!-- 商品图 -->
+        <image class="item-thumb" src="{{item.image}}" mode="aspectFill" />
+
+        <!-- 商品信息 -->
+        <view class="item-info">
+          <view class="item-header">
+            <text class="item-title ellipsis-1">{{item.title}}</text>
+            <view class="item-delete press-active" data-index="{{index}}" bindtap="deleteItem">×</view>
+          </view>
+          <text class="item-sku ellipsis-1">{{item.skuText}}</text>
+
+          <view class="item-bottom">
+            <c-price price="{{item.price}}" size="md" accent="{{true}}" />
+
+            <!-- 数量步进器 -->
+            <view class="stepper">
+              <view
+                class="step-btn {{item.count <= 1 ? 'disabled' : 'press-active'}}"
+                data-index="{{index}}"
+                bindtap="onCountMinus"
+              >-</view>
+              <text class="step-num">{{item.count}}</text>
+              <view
+                class="step-btn press-active"
+                data-index="{{index}}"
+                bindtap="onCountPlus"
+              >+</view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="checkout-options">
+      <view class="checkout-option-title">配送方式</view>
+      <view class="checkout-type-row">
+        <view class="checkout-type {{deliveryType === 'DELIVERY' ? 'is-active' : ''}}" data-type="DELIVERY" bindtap="onSelectDelivery">
+          <text>极速快递包邮</text>
+        </view>
+        <view wx:if="{{false}}" class="checkout-type {{deliveryType === 'PICKUP' ? 'is-active' : ''}}" data-type="PICKUP" bindtap="onSelectDelivery">
+          <text>校园自提</text>
+        </view>
+      </view>
+
+      <view wx:if="{{deliveryType === 'DELIVERY'}}" class="checkout-address" bindtap="onOpenAddress">
+        <view wx:if="{{selectedAddress}}">
+          <text class="checkout-address-main">{{selectedAddress.name}} {{selectedAddress.phone}}</text>
+          <text class="checkout-address-sub">{{selectedAddress.province}}{{selectedAddress.city}}{{selectedAddress.district}}{{selectedAddress.detail}}</text>
+        </view>
+        <text wx:else class="checkout-address-empty">未设置收货地址，点击去添加</text>
+        <text class="checkout-arrow">›</text>
+      </view>
+
+      <view wx:else class="checkout-pickup-list">
+        <view
+          wx:for="{{pickupPoints}}"
+          wx:key="id"
+          class="checkout-pickup-item {{selectedPickupPoint.id === item.id ? 'is-selected' : ''}}"
+          data-index="{{index}}"
+          bindtap="onSelectPickupPoint"
+        >
+          <view class="checkout-pickup-radio {{selectedPickupPoint.id === item.id ? 'radio-checked' : ''}}"></view>
+          <view>
+            <text class="checkout-address-main">{{item.name}}</text>
+            <text class="checkout-address-sub">{{item.address}} · {{item.hours}}</text>
+          </view>
+        </view>
+        <text wx:if="{{pickupPoints.length === 0}}" class="checkout-address-empty">暂无可用自提点</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部吸底结算栏 -->
+  <view wx:if="{{cartItems.length > 0}}" class="settle-bar safe-bottom">
+    <view class="select-all-box press-active" bindtap="toggleSelectAll">
+      <view class="cart-checkbox {{allSelected ? 'is-checked' : ''}}"></view>
+      <text class="all-text">全选</text>
+    </view>
+
+    <view class="settle-right">
+      <view class="total-info">
+        <text class="total-label">合计:</text>
+        <c-price price="{{totalPrice}}" size="lg" accent="{{true}}" />
+      </view>
+      <button class="checkout-btn press-active" bindtap="onCheckout">
+        结算({{selectedCount}})
+      </button>
+    </view>
+  </view>
+</view>

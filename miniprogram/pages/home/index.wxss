@@ -1,0 +1,176 @@
+.home-page {
+  min-height: 100vh;
+  background-color: var(--background, #F5F6F8);
+  padding-bottom: calc(120rpx + constant(safe-area-inset-bottom));
+  padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
+}
+
+.cloud-error-box {
+  margin: 24rpx 0;
+  padding: 28rpx 20rpx;
+  border-radius: 16rpx;
+  background: #FFF5F0;
+  text-align: center;
+}
+
+.cloud-error-text { display: block; color: #B43B00; font-size: 22rpx; }
+.cloud-retry-btn { display: inline-block; margin-top: 16rpx; padding: 8rpx 28rpx; line-height: 1.6; border-radius: 999rpx; background: #FF5500; color: #FFF; font-size: 22rpx; }
+
+.sticky-search {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background-color: #FFFFFF;
+}
+
+/* Banner 750:320 比例 */
+.banner-section {
+  position: relative;
+  width: 100%;
+  padding: 16rpx 24rpx 20rpx;
+}
+
+.banner-swiper {
+  width: 100%;
+  height: 320rpx;
+  border-radius: var(--radius-md, 20rpx);
+  overflow: hidden;
+}
+
+.banner-card {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  border-radius: var(--radius-md, 20rpx);
+  overflow: hidden;
+}
+
+.banner-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.banner-overlay {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  padding: 32rpx 24rpx 20rpx;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0.3) 60%, transparent 100%);
+  display: flex;
+  flex-direction: column;
+  color: #FFFFFF;
+}
+
+.banner-badge {
+  display: inline-block;
+  align-self: flex-start;
+  background-color: var(--brand-accent, #FF5500);
+  font-size: 18rpx;
+  font-weight: 700;
+  padding: 2rpx 12rpx;
+  border-radius: var(--radius-xs, 8rpx);
+  margin-bottom: 6rpx;
+}
+
+.banner-title {
+  font-size: 32rpx;
+  font-weight: 800;
+  line-height: 1.3;
+  margin-bottom: 4rpx;
+  text-shadow: 0 2rpx 4rpx rgba(0, 0, 0, 0.4);
+}
+
+.banner-subtitle {
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.banner-dots {
+  position: absolute;
+  bottom: 32rpx;
+  right: 48rpx;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.banner-dot {
+  width: 10rpx;
+  height: 6rpx;
+  border-radius: 3rpx;
+  background-color: rgba(255, 255, 255, 0.45);
+  transition: all 0.2s ease;
+}
+
+.banner-dot.is-active {
+  width: 24rpx;
+  background-color: #FFFFFF;
+}
+
+/* 推荐区域 */
+.recommend-section {
+  padding-top: 12rpx;
+}
+
+.section-title-wrap {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 28rpx 20rpx;
+}
+
+.title-left {
+  display: flex;
+  align-items: baseline;
+}
+
+.title-accent {
+  font-family: 'Arial Black', sans-serif;
+  font-size: 26rpx;
+  color: var(--brand-accent, #FF5500);
+  margin-right: 10rpx;
+  font-weight: 900;
+}
+
+.title-main {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: var(--text-primary, #18191B);
+}
+
+.title-desc {
+  font-size: 22rpx;
+  color: var(--text-secondary, #8A8D93);
+}
+
+/* 加载状态与触底状态 */
+.load-more-status {
+  padding: 40rpx 0 20rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-text {
+  font-size: 24rpx;
+  color: var(--text-secondary, #8A8D93);
+}
+
+.no-more-wrap {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.line {
+  width: 80rpx;
+  height: 1rpx;
+  background-color: var(--border-color, #EBEDF0);
+}
+
+.no-more-text {
+  font-size: 22rpx;
+  color: var(--text-placeholder, #BCBFC4);
+}

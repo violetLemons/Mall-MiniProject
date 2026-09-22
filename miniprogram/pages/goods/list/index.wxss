@@ -1,0 +1,152 @@
+.list-page {
+  min-height: 100vh;
+  background-color: var(--background, #F5F6F8);
+  padding-bottom: calc(40rpx + constant(safe-area-inset-bottom));
+  padding-bottom: calc(40rpx + env(safe-area-inset-bottom));
+}
+
+.search-box-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 99;
+  background-color: #FFFFFF;
+}
+
+/* 横向品类滑条 */
+.category-tabs-scroll {
+  width: 100%;
+  white-space: nowrap;
+  background-color: #FFFFFF;
+  padding: 12rpx 0 16rpx;
+  border-bottom: 1rpx solid var(--border-color-light, #F2F3F5);
+}
+
+.category-tabs-wrapper {
+  display: inline-flex;
+  padding: 0 24rpx;
+  gap: 16rpx;
+}
+
+.cat-chip {
+  padding: 10rpx 28rpx;
+  font-size: 24rpx;
+  font-weight: 500;
+  color: var(--text-secondary, #8A8D93);
+  background-color: var(--surface-subtle, #F8F9FA);
+  border-radius: var(--radius-full, 9999rpx);
+  border: 1rpx solid transparent;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.cat-chip.is-active {
+  color: #FFFFFF;
+  background-color: var(--brand-color, #111111);
+  font-weight: 700;
+}
+
+/* 排序工具条 */
+.sort-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  height: 80rpx;
+  background-color: #FFFFFF;
+  border-bottom: 1rpx solid var(--border-color-light, #F2F3F5);
+  margin-bottom: 20rpx;
+}
+
+.sort-tab-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 0 24rpx;
+  position: relative;
+}
+
+.tab-label {
+  font-size: 26rpx;
+  color: var(--text-secondary, #8A8D93);
+  transition: color 0.15s ease;
+}
+
+.sort-tab-item.is-active .tab-label {
+  color: var(--brand-color, #111111);
+  font-weight: 700;
+}
+
+/* 价格三角指示器 */
+.price-arrows {
+  display: flex;
+  flex-direction: column;
+  margin-left: 8rpx;
+  gap: 4rpx;
+}
+
+.arrow-up {
+  width: 0;
+  height: 0;
+  border-left: 6rpx solid transparent;
+  border-right: 6rpx solid transparent;
+  border-bottom: 7rpx solid var(--text-placeholder, #BCBFC4);
+}
+
+.arrow-down {
+  width: 0;
+  height: 0;
+  border-left: 6rpx solid transparent;
+  border-right: 6rpx solid transparent;
+  border-top: 7rpx solid var(--text-placeholder, #BCBFC4);
+}
+
+.arrow-up.arrow-active {
+  border-bottom-color: var(--brand-accent, #FF5500);
+}
+
+.arrow-down.arrow-active {
+  border-top-color: var(--brand-accent, #FF5500);
+}
+
+/* 列表区 */
+.list-content {
+  width: 100%;
+}
+
+.cloud-error-box { margin: 20rpx 0; padding: 28rpx 20rpx; border-radius: 16rpx; background: #FFF5F0; text-align: center; }
+.cloud-error-text { display: block; color: #B43B00; font-size: 22rpx; }
+.cloud-retry-btn { display: inline-block; margin-top: 16rpx; padding: 8rpx 28rpx; line-height: 1.6; border-radius: 999rpx; background: #FF5500; color: #FFF; font-size: 22rpx; }
+
+.skeleton-wrap,
+.empty-wrap {
+  margin-top: 40rpx;
+}
+
+.list-footer-status {
+  padding: 40rpx 0 20rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.footer-loading {
+  font-size: 24rpx;
+  color: var(--text-secondary, #8A8D93);
+}
+
+.footer-end {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.dash-line {
+  width: 60rpx;
+  height: 1rpx;
+  background-color: var(--border-color, #EBEDF0);
+}
+
+.dash-text {
+  font-size: 22rpx;
+  color: var(--text-placeholder, #BCBFC4);
+}

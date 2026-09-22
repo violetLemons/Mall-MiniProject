@@ -1,0 +1,134 @@
+.search-bar-wrap {
+  display: flex;
+  align-items: center;
+  padding: 12rpx 28rpx;
+  background-color: var(--surface, #FFFFFF);
+  width: 100%;
+}
+
+.search-capsule {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  height: 72rpx;
+  background-color: var(--surface-subtle, #F8F9FA);
+  border: 1rpx solid var(--border-color, #EBEDF0);
+  border-radius: var(--radius-full, 9999rpx);
+  padding: 0 24rpx;
+  transition: all 0.2s ease;
+}
+
+.search-icon {
+  width: 32rpx;
+  height: 32rpx;
+  position: relative;
+  margin-right: 14rpx;
+  flex-shrink: 0;
+}
+
+.search-glass {
+  width: 20rpx;
+  height: 20rpx;
+  border: 3rpx solid var(--text-secondary, #8A8D93);
+  border-radius: 50%;
+  position: absolute;
+  top: 2rpx;
+  left: 2rpx;
+}
+
+.search-handle {
+  width: 10rpx;
+  height: 3rpx;
+  background-color: var(--text-secondary, #8A8D93);
+  position: absolute;
+  bottom: 4rpx;
+  right: 2rpx;
+  transform: rotate(45deg);
+}
+
+.input-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.search-input {
+  width: 100%;
+  height: 100%;
+  font-size: 26rpx;
+  color: var(--text-primary, #18191B);
+}
+
+.input-placeholder,
+.search-fake-placeholder {
+  font-size: 26rpx;
+  color: var(--text-placeholder, #BCBFC4);
+}
+
+.clear-btn {
+  width: 32rpx;
+  height: 32rpx;
+  background-color: #DDE0E5;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin-left: 12rpx;
+}
+
+.cross-line {
+  width: 16rpx;
+  height: 2rpx;
+  background-color: #FFFFFF;
+  position: absolute;
+}
+
+.cross-1 { transform: rotate(45deg); }
+.cross-2 { transform: rotate(-45deg); }
+
+.message-btn {
+  margin-left: 24rpx;
+  position: relative;
+  width: 48rpx;
+  height: 48rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bell-icon {
+  width: 36rpx;
+  height: 36rpx;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.bell-top {
+  width: 24rpx;
+  height: 24rpx;
+  border: 3rpx solid var(--text-primary, #18191B);
+  border-bottom: none;
+  border-radius: 12rpx 12rpx 0 0;
+}
+
+.bell-bottom {
+  width: 32rpx;
+  height: 4rpx;
+  background-color: var(--text-primary, #18191B);
+  border-radius: 2rpx;
+}
+
+.unread-dot {
+  position: absolute;
+  top: 2rpx;
+  right: 2rpx;
+  width: 14rpx;
+  height: 14rpx;
+  background-color: var(--brand-accent, #FF5500);
+  border-radius: 50%;
+  border: 2rpx solid #FFFFFF;
+}

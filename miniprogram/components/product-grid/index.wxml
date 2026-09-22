@@ -1,0 +1,5 @@
+<view class="product-grid-container">
+  <view wx:for="{{list}}" wx:key="id" class="grid-col-item">
+    <product-card product="{{item}}" />
+  </view>
+</view>

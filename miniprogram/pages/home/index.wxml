@@ -1,0 +1,90 @@
+<view class="home-page">
+  <!-- 自定义导航栏 -->
+  <custom-navbar showLogo="{{true}}" borderBottom="{{false}}" />
+
+  <!-- 顶部吸顶搜索栏 (只读，点击跳转商品列表页) -->
+  <view class="sticky-search">
+    <search-bar readonly="{{true}}" showMessage="{{true}}" hasUnread="{{true}}" />
+  </view>
+
+  <!-- Banner 轮播 (750 : 320 比例) -->
+  <view class="banner-section">
+    <swiper
+      class="banner-swiper"
+      autoplay
+      circular
+      interval="{{4000}}"
+      duration="{{350}}"
+      bindchange="onBannerChange"
+    >
+      <swiper-item
+        wx:for="{{banners}}"
+        wx:key="id"
+        class="banner-item"
+        data-url="{{item.targetUrl}}"
+        bindtap="onTapBanner"
+      >
+        <view class="banner-card">
+          <image class="banner-image" src="{{item.imageUrl}}" mode="aspectFill" />
+          <!-- 渐变暗角与文字信息 -->
+          <view class="banner-overlay">
+            <text wx:if="{{item.badge}}" class="banner-badge">{{item.badge}}</text>
+            <text class="banner-title">{{item.title}}</text>
+            <text class="banner-subtitle">{{item.subtitle}}</text>
+          </view>
+        </view>
+      </swiper-item>
+    </swiper>
+
+    <!-- 自定义轻量胶囊指示点 -->
+    <view class="banner-dots">
+      <view
+        wx:for="{{banners}}"
+        wx:key="id"
+        class="banner-dot {{index === bannerCurrent ? 'is-active' : ''}}"
+      ></view>
+    </view>
+  </view>
+
+  <!-- 快捷分类 (金刚区) -->
+  <category-nav list="{{categories}}" />
+
+  <!-- [隐藏] 潮流活动专区 (展示卡片) 已下线，保留代码便于恢复 -->
+  <!-- <promo-card list="{{promoCards}}" /> -->
+
+  <!-- 猜你喜欢推荐专区 -->
+  <view class="recommend-section">
+    <view class="section-title-wrap">
+      <view class="title-left">
+        <text class="title-accent">RECOMMEND</text>
+        <text class="title-main">猜你喜欢</text>
+      </view>
+      <text class="title-desc">精选商品 · 个性化推荐</text>
+    </view>
+
+    <view wx:if="{{errorMessage}}" class="cloud-error-box">
+      <text class="cloud-error-text">{{errorMessage}}</text>
+      <button class="cloud-retry-btn" bindtap="onRetry">重试</button>
+    </view>
+
+    <!-- 首屏骨架屏 -->
+    <view wx:elif="{{initialLoading}}">
+      <loading-skeleton type="grid" count="{{4}}" />
+    </view>
+
+    <!-- 双列瀑布流推荐列表 -->
+    <block wx:else>
+      <product-grid list="{{productList}}" />
+
+      <!-- 底部加载状态 -->
+      <view class="load-more-status">
+        <text wx:if="{{loadingMore}}" class="loading-text">正在加载更多商品...</text>
+        <view wx:elif="{{!hasMore}}" class="no-more-wrap">
+          <view class="line"></view>
+          <text class="no-more-text">到底啦 · 没有更多商品了</text>
+          <view class="line"></view>
+        </view>
+      </view>
+    </block>
+  </view>
+</view>

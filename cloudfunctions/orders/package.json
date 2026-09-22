@@ -1,0 +1,9 @@
+{
+  "name": "orders",
+  "version": "1.0.0",
+  "description": "通用商城 Cloud Function - orders",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

@@ -1,0 +1,55 @@
+<view class="category-page">
+  <custom-navbar title="商品分类" />
+
+  <!-- 搜索入口 -->
+  <view class="cat-search-box">
+    <search-bar readonly="{{true}}" />
+  </view>
+
+  <!-- 左右双栏联动布局 -->
+  <view class="cat-split-body">
+    <!-- 左侧品类侧边栏 -->
+    <scroll-view class="sidebar-scroll" scroll-y>
+      <view
+        wx:for="{{categories}}"
+        wx:key="id"
+        class="sidebar-item press-active {{activeCategoryIndex === index ? 'is-active' : ''}}"
+        data-index="{{index}}"
+        bindtap="onSelectCategory"
+      >
+        <view class="active-indicator"></view>
+        <text class="sidebar-text">{{item.name}}</text>
+      </view>
+    </scroll-view>
+
+    <!-- 右侧商品/子类网格 -->
+    <scroll-view class="content-scroll" scroll-y scroll-top="{{scrollTop}}">
+      <view wx:if="{{errorMessage}}" class="cloud-error-box">
+        <text class="cloud-error-text">{{errorMessage}}</text>
+        <button class="cloud-retry-btn" bindtap="onRetry">重试</button>
+      </view>
+      <view class="category-banner-card">
+        <text class="banner-hint">通用商城 · 精选</text>
+        <text class="banner-title">{{categories[activeCategoryIndex].name}}系列</text>
+      </view>
+
+      <view wx:if="{{categoryProducts.length > 0}}" class="cat-products-grid">
+        <view
+          wx:for="{{categoryProducts}}"
+          wx:key="id"
+          class="cat-product-item press-active"
+          data-id="{{item.id}}"
+          bindtap="onTapProduct"
+        >
+          <image class="cat-product-thumb" src="{{item.cover}}" mode="aspectFill" />
+          <text class="cat-product-title ellipsis-1">{{item.title}}</text>
+          <text class="cat-product-price">¥{{item.priceYuan || (item.price / 100)}}</text>
+        </view>
+      </view>
+
+      <view wx:elif="{{!loading}}" class="cat-empty-hint">
+        <text>该分类暂无更多在售商品，敬请期待</text>
+      </view>
+    </scroll-view>
+  </view>
+</view>

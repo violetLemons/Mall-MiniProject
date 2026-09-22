@@ -1,0 +1,6 @@
+<view class="price-container size-{{size}} {{accent ? 'is-accent' : ''}}" style="{{color ? 'color:' + color : ''}}">
+  <text class="currency">{{formatted.currency}}</text>
+  <text class="integer">{{formatted.integer}}</text>
+  <text wx:if="{{formatted.decimal}}" class="decimal">{{formatted.decimal}}</text>
+  <text wx:if="{{origFormatted}}" class="original-price">{{origFormatted}}</text>
+</view>

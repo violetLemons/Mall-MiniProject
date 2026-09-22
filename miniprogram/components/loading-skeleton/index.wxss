@@ -1,0 +1,111 @@
+.skeleton-wrapper {
+  width: 100%;
+}
+
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20rpx;
+  padding: 0 24rpx;
+}
+
+.skeleton-card {
+  background: #FFFFFF;
+  border-radius: var(--radius-md, 20rpx);
+  overflow: hidden;
+  border: 1rpx solid #F0F2F5;
+}
+
+.sk-image {
+  width: 100%;
+  padding-top: 100%;
+}
+
+.skeleton-content {
+  padding: 20rpx;
+}
+
+.sk-tag {
+  width: 80rpx;
+  height: 28rpx;
+  border-radius: 6rpx;
+  margin-bottom: 12rpx;
+}
+
+.sk-title {
+  width: 90%;
+  height: 32rpx;
+  border-radius: 6rpx;
+  margin-bottom: 10rpx;
+}
+
+.sk-title-sub {
+  width: 65%;
+  height: 24rpx;
+  border-radius: 6rpx;
+  margin-bottom: 24rpx;
+}
+
+.skeleton-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sk-price {
+  width: 120rpx;
+  height: 40rpx;
+  border-radius: 6rpx;
+}
+
+.sk-sales {
+  width: 80rpx;
+  height: 24rpx;
+  border-radius: 6rpx;
+}
+
+/* 详情骨架 */
+.skeleton-detail {
+  width: 100%;
+}
+
+.sk-banner {
+  width: 100%;
+  height: 750rpx;
+}
+
+.skeleton-detail-body {
+  padding: 32rpx 28rpx;
+  background: #FFFFFF;
+  border-radius: 32rpx 32rpx 0 0;
+  margin-top: -24rpx;
+  position: relative;
+}
+
+.sk-detail-price {
+  width: 200rpx;
+  height: 56rpx;
+  margin-bottom: 20rpx;
+}
+
+.sk-detail-title {
+  width: 95%;
+  height: 44rpx;
+  margin-bottom: 16rpx;
+}
+
+.sk-detail-desc {
+  width: 70%;
+  height: 32rpx;
+  margin-bottom: 40rpx;
+}
+
+.sk-detail-sku {
+  width: 100%;
+  height: 96rpx;
+  border-radius: 16rpx;
+}
+
+.skeleton-box {
+  background-color: #F0F2F5;
+}

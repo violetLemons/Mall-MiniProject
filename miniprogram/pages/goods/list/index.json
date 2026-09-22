@@ -1,0 +1,12 @@
+{
+  "usingComponents": {
+    "custom-navbar": "../../../components/custom-navbar/index",
+    "search-bar": "../../../components/search-bar/index",
+    "product-grid": "../../../components/product-grid/index",
+    "loading-skeleton": "../../../components/loading-skeleton/index",
+    "empty-state": "../../../components/empty-state/index"
+  },
+  "navigationStyle": "custom",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
+}

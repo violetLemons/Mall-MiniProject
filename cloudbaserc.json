@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.cloudbase.net/cli/cloudbaserc.schema.json",
+  "envId": "cloud1-d3gffg6ok96e6cf3f",
+  "functionRoot": "cloudfunctions",
+  "functions": [
+    { "name": "adminAuth", "timeout": 20, "handler": "index.main", "memorySize": 256 },
+    { "name": "adminBanners", "timeout": 20, "handler": "index.main", "memorySize": 256 },
+    { "name": "adminCategories", "timeout": 20, "handler": "index.main", "memorySize": 256 },
+    { "name": "auth", "timeout": 20, "handler": "index.main", "memorySize": 256 },
+    { "name": "paymentCallback", "timeout": 20, "handler": "index.main", "memorySize": 256 },
+    { "name": "products", "timeout": 20, "handler": "index.main", "memorySize": 256 },
+    { "name": "adminProducts", "timeout": 20, "handler": "index.main", "memorySize": 256 },
+    { "name": "adminInventory", "timeout": 20, "handler": "index.main", "memorySize": 256 },
+    { "name": "adminUsers", "timeout": 20, "handler": "index.main", "memorySize": 256 },
+    { "name": "adminOrders", "timeout": 20, "handler": "index.main", "memorySize": 256 },
+    { "name": "orders", "timeout": 20, "handler": "index.main", "memorySize": 256 },
+    { "name": "payment", "timeout": 20, "handler": "index.main", "memorySize": 256 },
+    { "name": "orderTimeoutJob", "timeout": 30, "handler": "index.main", "memorySize": 256 },
+    { "name": "initDb", "timeout": 60, "handler": "index.main", "memorySize": 256 }
+  ]
+}

@@ -1,0 +1,161 @@
+<view class="order-detail-page">
+  <custom-navbar title="订单详情" showBack="{{true}}" />
+
+  <view wx:if="{{loading}}" class="detail-empty">加载中…</view>
+  <view wx:elif="{{!order}}" class="detail-empty">
+    <text class="empty-title">{{errorMessage || '未找到对应商城订单'}}</text>
+    <text class="empty-sub" style="font-size: 24rpx; color: #94A3B8; margin-top: 12rpx;">请核对商品订单号是否正确，如有疑问请联系门店客服</text>
+  </view>
+
+  <block wx:else>
+    <!-- 1. 顶部状态横幅 -->
+    <view class="status-card">
+      <view class="status-main">
+        <text class="status-title">{{order.statusLabel}}</text>
+        <text class="status-badge {{order.status}}">极速快递</text>
+      </view>
+      <view class="status-sub-row" bindtap="onCopyOrderNo">
+        <text class="status-sub">订单编号：{{order.orderNo}}</text>
+        <text class="copy-btn">复制</text>
+      </view>
+    </view>
+
+    <!-- 2. 履约配送信息卡片 -->
+    <!-- 2.1 快递配送模式 -->
+    <view wx:if="{{order.isExpress}}" class="detail-card delivery-card">
+      <view class="card-header">
+        <text class="card-title">配送信息</text>
+        <text class="card-tag">极速快递包邮</text>
+      </view>
+      <view class="address-box">
+        <view class="contact-row">
+          <text class="contact-name">{{order.shippingAddress.name}}</text>
+          <text class="contact-phone">{{order.shippingAddress.phone}}</text>
+        </view>
+        <text class="contact-addr">{{order.shippingAddress.province}}{{order.shippingAddress.city}}{{order.shippingAddress.district}}{{order.shippingAddress.detail}}</text>
+      </view>
+
+      <view class="logistics-box">
+        <view class="logistics-row">
+          <text class="logistics-label">物流状态：</text>
+          <text class="logistics-val {{order.trackingNo ? 'val-shipped' : 'val-pending'}}">{{order.trackingNo ? '已发货' : '待发货'}}</text>
+        </view>
+        <block wx:if="{{order.trackingNo}}">
+          <view class="logistics-row">
+            <text class="logistics-label">快递公司：</text>
+            <text class="logistics-val">{{order.logisticsCompany || order.expressCompany || '极速快递'}}</text>
+          </view>
+          <view class="logistics-row">
+            <text class="logistics-label">运单编号：</text>
+            <text class="logistics-val">{{order.trackingNo}}</text>
+          </view>
+          <view wx:if="{{order.shippedAtFormatted}}" class="logistics-row">
+            <text class="logistics-label">发货时间：</text>
+            <text class="logistics-val">{{order.shippedAtFormatted}}</text>
+          </view>
+        </block>
+      </view>
+    </view>
+
+    <!-- 2.2 到店自提模式 (严格无自提码，无收货地址，无运单号) -->
+    <view wx:elif="{{false}}" class="detail-card pickup-card">
+      <view class="card-header">
+        <text class="card-title">自提网点</text>
+        <text class="card-tag tag-pickup">潮流旗舰店到店自提</text>
+      </view>
+      <view class="pickup-box">
+        <text class="pickup-name">{{order.pickupInfo.pointName || order.pickupPointName || '示例大学潮流自提站'}}</text>
+        <text class="pickup-addr">{{order.pickupInfo.address || order.pickupPointAddress || '示例省示例市示例区大学城学苑大道1088号'}}</text>
+        <view class="pickup-meta">
+          <text class="meta-label">自提状态：</text>
+          <text class="meta-val" style="color: #FF5500; font-weight: 600;">{{order.pickupStatusLabel}}</text>
+        </view>
+        <view class="pickup-meta">
+          <text class="meta-label">营业时间：</text>
+          <text class="meta-val">09:00 - 21:30</text>
+        </view>
+        <view class="pickup-meta">
+          <text class="meta-label">自提说明：</text>
+          <text class="meta-val">到店核对订单号或登记手机号即可提货，由店员在系统确认交付</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 3. 商品清单卡片 -->
+    <view class="detail-card goods-card">
+      <view class="card-header">
+        <text class="card-title">商品清单</text>
+        <text class="item-count">共 {{order.items.length}} 款商品</text>
+      </view>
+      <view wx:for="{{order.items}}" wx:for-item="line" wx:key="skuId" class="detail-item">
+        <image src="{{line.image}}" mode="aspectFill" class="detail-image" />
+        <view class="detail-item-info">
+          <text class="detail-name">{{line.productName}}</text>
+          <text class="detail-meta">{{line.colorName ? line.colorName + ' · ' : ''}}{{line.size}}</text>
+          <view class="detail-price-row">
+            <text class="unit-price">¥{{line.unitPriceYuan}}</text>
+            <text class="unit-count">× {{line.count}}</text>
+          </view>
+        </view>
+        <view class="line-total">
+          <text class="total-text">¥{{line.totalAmountYuan}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 4. 订单金额明细卡片 -->
+    <view class="detail-card amount-card">
+      <view class="amount-row">
+        <text class="amount-label">商品总额</text>
+        <text class="amount-val">¥{{order.totalAmountYuan || order.payAmountYuan}}</text>
+      </view>
+      <view class="amount-row">
+        <text class="amount-label">配送运费</text>
+        <text class="amount-val green-text">包邮 ¥0.00</text>
+      </view>
+      <view class="amount-row total-row">
+        <text class="total-label">实付金额</text>
+        <view class="total-val-wrap">
+          <text class="c-price-symbol">¥</text>
+          <text class="c-price-val">{{order.payAmountYuan}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 5. 订单核心信息卡片 -->
+    <view class="detail-card info-card">
+      <view class="info-row">
+        <text class="info-label">订单编号</text>
+        <text class="info-val" bindtap="onCopyOrderNo">{{order.orderNo}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">支付方式</text>
+        <text class="info-val">微信支付 (JSAPI)</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">支付状态</text>
+        <text class="info-val {{order.paymentStatusLabel === '已支付' ? 'val-paid' : ''}}">{{order.paymentStatusLabel}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">下单时间</text>
+        <text class="info-val">{{order.createdAtFormatted}}</text>
+      </view>
+      <view wx:if="{{order.paidAtFormatted}}" class="info-row">
+        <text class="info-label">支付时间</text>
+        <text class="info-val">{{order.paidAtFormatted}}</text>
+      </view>
+    </view>
+
+    <!-- 6. 底部操作栏 -->
+    <view wx:if="{{order.status === 'PENDING_PAYMENT' || order.status === 'SHIPPED'}}" class="detail-actions">
+      <block wx:if="{{order.status === 'PENDING_PAYMENT'}}">
+        <button class="pay-btn" bindtap="onPay" loading="{{submitting}}">立即支付</button>
+        <button class="secondary cancel-btn" bindtap="onCancel">取消订单</button>
+      </block>
+      <block wx:elif="{{order.status === 'SHIPPED'}}">
+        <button class="confirm-btn" bindtap="onConfirmReceive">确认收货</button>
+      </block>
+    </view>
+  </block>
+</view>
+

@@ -1,0 +1,38 @@
+<view class="navbar-wrapper {{borderBottom ? 'border-bottom' : ''}}" style="background: {{background}}; height: {{navInfo.totalNavHeight}}px;">
+  <!-- 状态栏占位 -->
+  <view class="status-bar" style="height: {{navInfo.statusBarHeight}}px;"></view>
+  
+  <!-- 导航栏内容行 -->
+  <view class="nav-content" style="height: {{navInfo.navBarHeight}}px;">
+    <!-- 模式 1: 品牌 Logo 模式 (首页专用) -->
+    <block wx:if="{{showLogo}}">
+      <view class="nav-logo-left">
+        <text class="logo-bold" style="{{textColor ? 'color:' + textColor : ''}}">{{logoText}}</text>
+        <text class="logo-dot">·</text>
+        <text class="logo-sub">STUDIO</text>
+      </view>
+      <view class="nav-right" style="width: {{navInfo.capsuleTotalWidth}}px;"></view>
+    </block>
+
+    <!-- 模式 2: 标准标题模式 (三栏居中对称，完美避让胶囊与返回键) -->
+    <block wx:else>
+      <view class="nav-left" style="width: {{navInfo.capsuleTotalWidth}}px;">
+        <view wx:if="{{showBack}}" class="nav-back press-active" bindtap="onBack">
+          <view class="back-icon" style="{{textColor ? 'border-left-color:' + textColor + '; border-bottom-color:' + textColor : ''}}"></view>
+        </view>
+      </view>
+
+      <view class="nav-center">
+        <view wx:if="{{title}}" class="nav-title ellipsis-1" style="color: {{textColor}};">
+          {{title}}
+        </view>
+        <slot wx:else></slot>
+      </view>
+
+      <view class="nav-right" style="width: {{navInfo.capsuleTotalWidth}}px;"></view>
+    </block>
+  </view>
+</view>
+
+<!-- 页面防遮挡占位高度 -->
+<view class="navbar-placeholder" style="height: {{navInfo.totalNavHeight}}px;"></view>

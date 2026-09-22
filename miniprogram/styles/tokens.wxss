@@ -1,0 +1,61 @@
+/**
+ * Design Tokens - 微信小程序商城全局视觉规范
+ * 风格定位：年轻化、极简、高级潮流运动质感
+ */
+
+page {
+  /* 品牌色彩系统 */
+  --brand-color: #111111;              /* 潮流哑光黑曜石 (主调性) */
+  --brand-color-light: #F4F5F7;        /* 品牌浅灰色背景 */
+  --brand-accent: #FF5500;             /* 破晓活力橙 (核心强调/秒杀/重点CTA) */
+  --brand-accent-light: #FFF1EA;       /* 强调色轻微背景 */
+  --brand-badge: #FF3B30;              /* 热卖/降价警示红 */
+
+  /* 中性文字系统 */
+  --text-primary: #18191B;             /* 主标题/重要正文 */
+  --text-regular: #4E5259;             /* 常规描述/正文 */
+  --text-secondary: #8A8D93;           /* 次级文字/标签/辅助信息 */
+  --text-placeholder: #BCBFC4;         /* 占位提示符/失效文字 */
+  --text-inverse: #FFFFFF;             /* 反白文字 */
+
+  /* 容器与背景 */
+  --background: #F5F6F8;               /* 全局页面底色 (清爽浅灰) */
+  --surface: #FFFFFF;                  /* 主卡片背景 (纯白) */
+  --surface-subtle: #F8F9FA;           /* 弱化区域/输入框浅底 */
+  --surface-active: #F0F1F3;           /* 卡片按压反馈色 */
+
+  /* 边框与分割线 */
+  --border-color: #EBEDF0;             /* 常规分割线 */
+  --border-color-light: #F2F3F5;       /* 极弱边框 */
+  --border-color-dark: #D4D6DC;        /* 突出边框 */
+
+  /* 状态反馈色 */
+  --success: #07C160;
+  --warning: #FF9800;
+  --error: #FA5151;
+  --info: #108EE9;
+
+  /* 间距系统 (4/8/12/16/24/32/48 rpx) */
+  --spacing-xs: 8rpx;
+  --spacing-sm: 16rpx;
+  --spacing-md: 24rpx;
+  --spacing-lg: 32rpx;
+  --spacing-xl: 48rpx;
+
+  /* 圆角规范 */
+  --radius-xs: 8rpx;
+  --radius-sm: 12rpx;
+  --radius-md: 20rpx;                  /* 核心卡片圆角 (16-24rpx 区间) */
+  --radius-lg: 28rpx;
+  --radius-full: 9999rpx;              /* 大胶囊按钮/搜索框圆角 */
+
+  /* 投影系统 (极轻、克制、高保真) */
+  --shadow-sm: 0 4rpx 12rpx rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 8rpx 24rpx rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 16rpx 48rpx rgba(0, 0, 0, 0.08);
+
+  /* 动效时长与缓动规范 */
+  --transition-fast: 120ms cubic-bezier(0.2, 0, 0, 1);
+  --transition-normal: 200ms cubic-bezier(0.25, 0.1, 0.25, 1);
+  --transition-bounce: 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}

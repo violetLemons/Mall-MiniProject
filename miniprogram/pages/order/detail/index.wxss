@@ -1,0 +1,343 @@
+.order-detail-page {
+  min-height: 100vh;
+  padding-bottom: 60rpx;
+  background: #F5F6F8;
+}
+
+/* 顶部黑色状态栏 */
+.status-card {
+  padding: 36rpx 28rpx 30rpx;
+  background: #111111;
+  color: #FFFFFF;
+}
+.status-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.status-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  letter-spacing: 0.5rpx;
+}
+.status-badge {
+  font-size: 20rpx;
+  font-weight: 600;
+  padding: 6rpx 16rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.15);
+  color: #FFFFFF;
+}
+.status-badge.PAID, .status-badge.COMPLETED {
+  background: rgba(46, 204, 113, 0.2);
+  color: #2ECC71;
+}
+.status-sub-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 14rpx;
+}
+.status-sub {
+  color: #A0A5AB;
+  font-size: 22rpx;
+  font-family: monospace;
+}
+.copy-btn {
+  font-size: 20rpx;
+  padding: 2rpx 12rpx;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 6rpx;
+  color: #D4D6DC;
+}
+
+/* 卡片公共结构 */
+.detail-card {
+  margin: 20rpx 24rpx 0;
+  padding: 24rpx 24rpx;
+  background: #FFFFFF;
+  border-radius: 18rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.02);
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 18rpx;
+  border-bottom: 1rpx solid #F0F2F5;
+  margin-bottom: 18rpx;
+}
+.card-title {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #111111;
+}
+.card-tag {
+  font-size: 20rpx;
+  font-weight: 600;
+  color: #FF5500;
+  background: rgba(255, 85, 0, 0.08);
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+}
+.card-tag.tag-pickup {
+  color: #0F62FE;
+  background: rgba(15, 98, 254, 0.08);
+}
+.item-count {
+  font-size: 22rpx;
+  color: #8A8D93;
+}
+
+/* 配送信息 (快递) */
+.address-box {
+  padding-bottom: 16rpx;
+  border-bottom: 1rpx dashed #EAECEF;
+}
+.contact-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+.contact-name {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #111111;
+}
+.contact-phone {
+  font-size: 26rpx;
+  color: #555555;
+  font-family: monospace;
+}
+.contact-addr {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: #666666;
+}
+.logistics-box {
+  margin-top: 16rpx;
+}
+.logistics-row {
+  display: flex;
+  align-items: center;
+  margin-top: 8rpx;
+  font-size: 23rpx;
+}
+.logistics-label {
+  color: #8A8D93;
+  width: 140rpx;
+}
+.logistics-val {
+  color: #222222;
+  font-weight: 500;
+}
+.logistics-val.val-shipped {
+  color: #2ECC71;
+  font-weight: 600;
+}
+.logistics-val.val-pending {
+  color: #FF9900;
+}
+
+/* 配送信息 (自提) */
+.pickup-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+.pickup-name {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #111111;
+}
+.pickup-addr {
+  font-size: 24rpx;
+  color: #666666;
+  line-height: 1.4;
+}
+.pickup-meta {
+  display: flex;
+  align-items: center;
+  margin-top: 4rpx;
+  font-size: 22rpx;
+}
+.meta-label {
+  color: #8A8D93;
+  width: 140rpx;
+}
+.meta-val {
+  color: #333333;
+}
+
+/* 商品清单 */
+.detail-item {
+  display: flex;
+  align-items: center;
+  padding: 14rpx 0;
+  border-bottom: 1rpx solid #F8F9FA;
+}
+.detail-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.detail-image {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 12rpx;
+  background: #F8F9FA;
+  flex-shrink: 0;
+}
+.detail-item-info {
+  flex: 1;
+  margin: 0 18rpx;
+}
+.detail-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 25rpx;
+  font-weight: 600;
+  color: #111111;
+  line-height: 1.35;
+}
+.detail-meta {
+  display: block;
+  margin-top: 6rpx;
+  color: #8A8D93;
+  font-size: 21rpx;
+}
+.detail-price-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 8rpx;
+}
+.unit-price {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #111111;
+}
+.unit-count {
+  font-size: 21rpx;
+  color: #999999;
+}
+.line-total {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #111111;
+}
+
+/* 金额明细卡片 */
+.amount-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14rpx;
+  font-size: 24rpx;
+}
+.amount-row:first-child {
+  margin-top: 0;
+}
+.amount-label {
+  color: #666666;
+}
+.amount-val {
+  color: #111111;
+  font-weight: 500;
+}
+.amount-val.green-text {
+  color: #2ECC71;
+}
+.amount-row.total-row {
+  margin-top: 20rpx;
+  padding-top: 18rpx;
+  border-top: 1rpx solid #F0F2F5;
+}
+.total-label {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #111111;
+}
+.total-val-wrap {
+  display: flex;
+  align-items: baseline;
+  color: #FF5500;
+}
+.c-price-symbol {
+  font-size: 22rpx;
+  font-weight: 700;
+}
+.c-price-val {
+  font-size: 36rpx;
+  font-weight: 800;
+  letter-spacing: -0.5rpx;
+}
+
+/* 订单核心信息卡片 */
+.info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14rpx;
+  font-size: 23rpx;
+}
+.info-row:first-child {
+  margin-top: 0;
+}
+.info-label {
+  color: #8A8D93;
+}
+.info-val {
+  color: #222222;
+  font-family: monospace;
+}
+.info-val.val-paid {
+  color: #2ECC71;
+  font-weight: 600;
+}
+
+/* 底部操作栏 (严格 Flex 双向居中) */
+.detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin: 28rpx 24rpx;
+}
+.detail-actions button {
+  flex: 1;
+  height: 76rpx;
+  min-height: 76rpx;
+  max-height: 76rpx;
+  line-height: normal;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border-radius: 999rpx;
+  background: #FF5500;
+  color: #FFFFFF;
+  font-size: 26rpx;
+  font-weight: 600;
+  border: none;
+  box-sizing: border-box;
+}
+.detail-actions button::after {
+  border: none;
+}
+.detail-actions button.secondary {
+  background: #FFFFFF;
+  border: 1rpx solid #D4D6DC;
+  color: #555555;
+}
+
+.detail-empty {
+  padding: 180rpx 0;
+  text-align: center;
+  color: #8A8D93;
+  font-size: 26rpx;
+}

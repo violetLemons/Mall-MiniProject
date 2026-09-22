@@ -1,0 +1,9 @@
+{
+  "name": "initDb",
+  "version": "1.0.0",
+  "description": "One-time cloud DB initializer: create collections + seed demo data + create admin",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

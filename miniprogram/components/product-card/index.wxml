@@ -1,0 +1,43 @@
+<view class="product-card press-active fade-in" bindtap="onTapCard">
+  <!-- 统一比例商品图容器 (1:1 保持视觉重心) -->
+  <view class="image-wrapper">
+    <image
+      class="product-image"
+      src="{{product.cover || '/assets/images/default-avatar.png'}}"
+      mode="aspectFill"
+    />
+    <!-- 品牌微标 -->
+    <view wx:if="{{product.brand}}" class="brand-tag">{{product.brand}}</view>
+  </view>
+
+  <!-- 内容信息区 -->
+  <view class="info-wrapper">
+    <!-- 标签阵列 -->
+    <view wx:if="{{product.tags && product.tags.length > 0}}" class="tags-row">
+      <text
+        wx:for="{{product.tags}}"
+        wx:key="*this"
+        class="tag-pill {{item === '新品' ? 'tag-new' : ''}} {{item === '学生价' ? 'tag-student' : ''}} {{item === '限时' ? 'tag-limit' : ''}} {{(item === '热卖' || item === '爆款') ? 'tag-hot' : ''}}"
+      >{{item}}</text>
+    </view>
+
+    <!-- 商品标题 (2行截断) -->
+    <view class="title-text ellipsis-2">{{product.title || product.name || ''}}</view>
+
+    <!-- 副标题/卖点提示 (1行截断) -->
+    <view wx:if="{{product.subtitle}}" class="subtitle-text ellipsis-1">{{product.subtitle}}</view>
+
+    <!-- 价格与销量底部行 -->
+    <view class="bottom-row">
+      <view class="price-box">
+        <c-price
+          price="{{product.price || 0}}"
+          originalPrice="{{product.originalPrice || 0}}"
+          size="md"
+          accent="{{true}}"
+        />
+      </view>
+      <text class="sales-text">{{formattedSales}}</text>
+    </view>
+  </view>
+</view>

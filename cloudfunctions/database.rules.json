@@ -1,0 +1,82 @@
+{
+  "users": {
+    "read": "doc._openid == auth.openid",
+    "write": false
+  },
+  "admins": {
+    "read": false,
+    "write": false
+  },
+  "auth_limits": {
+    "read": false,
+    "write": false
+  },
+  "products": {
+    "read": true,
+    "write": false
+  },
+  "product_skus": {
+    "read": true,
+    "write": false
+  },
+  "categories": {
+    "read": true,
+    "write": false
+  },
+  "carts": {
+    "read": "doc.userId == auth.openid",
+    "write": false
+  },
+  "orders": {
+    "read": "doc.userId == auth.openid",
+    "write": false
+  },
+  "order_items": {
+    "read": false,
+    "write": false
+  },
+  "addresses": {
+    "read": "doc.userId == auth.openid",
+    "write": false
+  },
+  "address_meta": {
+    "read": false,
+    "write": false
+  },
+  "favorites": {
+    "read": "doc.userId == auth.openid",
+    "write": false
+  },
+  "coupons": {
+    "read": true,
+    "write": false
+  },
+  "user_coupons": {
+    "read": "doc.userId == auth.openid",
+    "write": false
+  },
+  "banners": {
+    "read": true,
+    "write": false
+  },
+  "operation_logs": {
+    "read": false,
+    "write": false
+  },
+  "inventory_logs": {
+    "read": false,
+    "write": false
+  },
+  "payment_transactions": {
+    "read": false,
+    "write": false
+  },
+  "refund_records": {
+    "read": false,
+    "write": false
+  },
+  "pickup_points": {
+    "read": true,
+    "write": false
+  }
+}

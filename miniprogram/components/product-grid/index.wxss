@@ -1,0 +1,11 @@
+.product-grid-container {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20rpx;
+  padding: 0 24rpx;
+  box-sizing: border-box;
+}
+
+.grid-col-item {
+  width: 100%;
+}

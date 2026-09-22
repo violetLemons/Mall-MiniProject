@@ -1,0 +1,13 @@
+{
+  "usingComponents": {
+    "custom-navbar": "../../components/custom-navbar/index",
+    "search-bar": "../../components/search-bar/index",
+    "category-nav": "../../components/category-nav/index",
+    "promo-card": "../../components/promo-card/index",
+    "product-grid": "../../components/product-grid/index",
+    "loading-skeleton": "../../components/loading-skeleton/index"
+  },
+  "navigationStyle": "custom",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
+}

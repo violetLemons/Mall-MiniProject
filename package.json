@@ -1,0 +1,21 @@
+{
+  "name": "wechat-sneaker-mall",
+  "version": "1.0.0",
+  "description": "通用电商微信小程序商城前端 (Native WXML + WXSS + TypeScript)",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w"
+  },
+  "keywords": [
+    "wechat-miniprogram",
+    "ecommerce",
+    "mall",
+    "typescript"
+  ],
+  "author": "lmh",
+  "license": "MIT",
+  "devDependencies": {
+    "miniprogram-api-typings": "^5.2.3",
+    "typescript": "^5.4.5"
+  }
+}

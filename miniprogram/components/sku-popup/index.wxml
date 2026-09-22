@@ -1,0 +1,97 @@
+<view wx:if="{{visible}}" class="sku-popup-container" catchtouchmove="preventD">
+  <!-- 渐变浅色背景遮罩 -->
+  <view class="sku-mask" bindtap="onClose"></view>
+
+  <!-- 200ms ease-out 上滑抽屉面板 -->
+  <view class="sku-panel">
+    <!-- 头部商品概要 -->
+    <view class="sku-header">
+      <image class="sku-thumb" src="{{selectedColor ? selectedColor.image : product.cover}}" mode="aspectFill" />
+      <view class="header-info">
+        <c-price price="{{product.price}}" originalPrice="{{product.originalPrice}}" size="lg" accent="{{true}}" />
+        <view class="stock-tip">库存: {{selectedSize ? selectedSize.stockCount + ' 件' : '充足'}}</view>
+        <view class="selected-summary ellipsis-1">{{selectedText}}</view>
+      </view>
+      <!-- 关闭按钮 -->
+      <view class="close-btn press-active" bindtap="onClose">
+        <view class="close-line c-1"></view>
+        <view class="close-line c-2"></view>
+      </view>
+    </view>
+
+    <!-- 可滚动规格选择区 -->
+    <scroll-view class="sku-scroll-body" scroll-y>
+      <!-- 规格 1: 颜色选择 -->
+      <view class="spec-section">
+        <view class="spec-title">颜色分类</view>
+        <view class="color-chips">
+          <view
+            wx:for="{{product.colors}}"
+            wx:key="id"
+            class="color-chip press-active {{selectedColor.id === item.id ? 'is-selected' : ''}}"
+            data-color="{{item}}"
+            bindtap="onSelectColor"
+          >
+            <image class="chip-image" src="{{item.image}}" mode="aspectFill" />
+            <text class="chip-name">{{item.name}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 规格 2: 规格选择 -->
+      <view class="spec-section">
+        <view class="spec-title-row">
+          <text class="spec-title">规格</text>
+          <text class="spec-guide">请按需选择规格</text>
+        </view>
+        <view class="size-grid">
+          <view
+            wx:for="{{dynamicSizes && dynamicSizes.length > 0 ? dynamicSizes : product.sizes}}"
+            wx:key="size"
+            class="size-box press-active {{!item.inStock ? 'is-disabled' : ''}} {{selectedSize.size === item.size ? 'is-selected' : ''}}"
+            data-size="{{item}}"
+            bindtap="onSelectSize"
+          >
+            <text class="size-num">{{item.size}}</text>
+            <text wx:if="{{!item.inStock}}" class="oos-tag">缺货</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 购买数量步进器 -->
+      <view class="stepper-section">
+        <view class="stepper-title-box">
+          <text class="spec-title">购买数量</text>
+          <text class="stepper-sub">每人限购5件</text>
+        </view>
+        <view class="stepper-wrap">
+          <view class="stepper-btn {{quantity <= 1 ? 'disabled' : 'press-active'}}" bindtap="onMinus">-</view>
+          <text class="stepper-val">{{quantity}}</text>
+          <view class="stepper-btn press-active" bindtap="onPlus">+</view>
+        </view>
+      </view>
+    </scroll-view>
+
+    <!-- 底部操作按钮 -->
+    <view class="sku-footer safe-bottom">
+      <block wx:if="{{actionType === 'both'}}">
+        <button class="footer-btn btn-cart press-active" data-type="cart" bindtap="onConfirm">
+          加入购物车
+        </button>
+        <button class="footer-btn btn-buy press-active" data-type="buy" bindtap="onConfirm">
+          立即购买
+        </button>
+      </block>
+      <block wx:elif="{{actionType === 'cart'}}">
+        <button class="footer-btn btn-single-primary press-active" data-type="cart" bindtap="onConfirm">
+          确定加入购物车
+        </button>
+      </block>
+      <block wx:else>
+        <button class="footer-btn btn-single-primary press-active" data-type="buy" bindtap="onConfirm">
+          确定立即购买
+        </button>
+      </block>
+    </view>
+  </view>
+</view>

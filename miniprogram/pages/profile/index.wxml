@@ -1,0 +1,416 @@
+<view class="profile-page">
+  <custom-navbar title="个人中心" background="#111111" textColor="#FFFFFF" />
+
+  <!-- 头部用户信息卡片 (黑曜质感) -->
+  <view class="user-header-card">
+    <image class="user-avatar press-active" src="{{userInfo.avatarUrl}}" mode="aspectFill" bindtap="onTapAvatar" />
+    <view class="user-meta">
+      <view class="user-name-row press-active" bindtap="onEditNickname">
+        <text class="user-name">{{userInfo.nickName}}</text>
+        <text class="user-level-tag">通用商城 用户</text>
+      </view>
+      <view class="user-id-row press-active" bindtap="onCopyUid">
+        <text class="user-id">{{userInfo.userId}}</text>
+        <text class="copy-uid-tag">复制</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 订单中心宫格 -->
+  <view class="profile-card order-card">
+    <view class="card-title-row">
+      <text class="card-main-title">我的订单</text>
+      <text class="card-sub-action press-active" data-key="ALL" bindtap="onTapOrder">全部订单 ›</text>
+    </view>
+
+    <view class="order-status-grid">
+      <view
+        wx:for="{{orderStats}}"
+        wx:key="key"
+        class="order-stat-item press-active"
+        data-key="{{item.key}}"
+        bindtap="onTapOrder"
+      >
+        <view class="stat-icon-box">
+          <view class="stat-icon stat-{{item.key}}"></view>
+          <text wx:if="{{item.count > 0}}" class="stat-badge">{{item.count}}</text>
+        </view>
+        <text class="stat-label">{{item.label}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 常用功能列表 -->
+  <view class="profile-card menu-card">
+    <view
+      wx:for="{{menuItems}}"
+      wx:key="id"
+      class="menu-item press-active"
+      data-id="{{item.id}}"
+      bindtap="onTapMenu"
+    >
+      <text class="menu-title">{{item.title}}</text>
+      <view class="menu-right">
+        <text wx:if="{{item.badge}}" class="menu-badge">{{item.badge}}</text>
+        <view class="arrow-right"></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 全局统一底部滑入抽屉 (Drawer) -->
+  <view class="drawer-mask {{activeDrawer ? 'mask-visible' : ''}}" bindtap="closeDrawer"></view>
+  <view class="drawer-container {{activeDrawer ? 'drawer-visible' : ''}}">
+    <!-- 抽屉顶部头部 -->
+    <view class="drawer-header">
+      <text class="drawer-title">{{drawerTitle}}</text>
+      <view class="drawer-close press-active" bindtap="closeDrawer">✕</view>
+    </view>
+
+    <!-- 抽屉滚动内容区 -->
+    <scroll-view scroll-y class="drawer-scroll-body">
+      <!-- 1. 订单中心抽屉 -->
+      <block wx:if="{{activeDrawer === 'order'}}">
+        <view class="drawer-tabs">
+          <view
+            class="tab-pill press-active {{orderActiveTab === 'ALL' ? 'tab-active' : ''}}"
+            data-tab="ALL"
+            bindtap="onSelectOrderTab"
+          >全部</view>
+          <view
+            class="tab-pill press-active {{orderActiveTab === 'PENDING_PAYMENT' ? 'tab-active' : ''}}"
+            data-tab="PENDING_PAYMENT"
+            bindtap="onSelectOrderTab"
+          >待付款</view>
+          <view
+            class="tab-pill press-active {{orderActiveTab === 'PAID' ? 'tab-active' : ''}}"
+            data-tab="PAID"
+            bindtap="onSelectOrderTab"
+          >待发货</view>
+          <view
+            class="tab-pill press-active {{orderActiveTab === 'SHIPPED' ? 'tab-active' : ''}}"
+            data-tab="SHIPPED"
+            bindtap="onSelectOrderTab"
+          >待收货</view>
+          <view
+            class="tab-pill press-active {{orderActiveTab === 'REFUND' ? 'tab-active' : ''}}"
+            data-tab="REFUND"
+            bindtap="onSelectOrderTab"
+          >售后/退款</view>
+        </view>
+
+        <!-- 订单列表 -->
+        <view class="order-sheet-list">
+          <view wx:if="{{filteredOrders.length === 0}}" class="sheet-empty">
+            <text class="sheet-empty-text">暂无相关订单记录</text>
+          </view>
+
+          <view wx:for="{{filteredOrders}}" wx:key="id" class="sheet-order-card">
+            <view class="soc-header">
+              <text class="soc-no">单号: {{item.orderNo}}</text>
+              <text class="soc-status {{item.status === 'PENDING_PAYMENT' ? 'status-unpaid' : ''}} {{item.status === 'PAID' ? 'status-paid' : ''}} {{(item.status === 'WAITING_PICKUP' || item.status === 'READY_FOR_PICKUP') ? 'status-pickup' : ''}} {{item.status === 'SHIPPED' ? 'status-shipped' : ''}}">
+                {{item.status === 'PENDING_PAYMENT' ? '待付款' : (item.status === 'PAID' ? '待发货' : ((item.status === 'WAITING_PICKUP' || item.status === 'READY_FOR_PICKUP') ? '待收货' : (item.status === 'SHIPPED' ? '包裹运输中' : (item.status === 'REFUNDING' ? '退款处理中' : (item.status === 'REFUNDED' ? '已退款' : (item.status === 'COMPLETED' ? '已完成' : '已取消'))))))}}
+              </text>
+            </view>
+
+            <!-- 商品行 -->
+            <view wx:for="{{item.items}}" wx:for-item="prod" wx:key="skuId" class="soc-product-row">
+              <image class="soc-prod-img" src="{{prod.image}}" mode="aspectFill" />
+              <view class="soc-prod-info">
+                <text class="soc-prod-title ellipsis-1">{{prod.productName}}</text>
+                <text class="soc-prod-sku">{{prod.colorName}} / {{prod.size}}</text>
+                <view class="soc-prod-bottom">
+                  <text class="soc-prod-price">¥{{prod.unitPriceYuan || (prod.unitPrice / 100)}}</text>
+                  <text class="soc-prod-count">x{{prod.count}}</text>
+                </view>
+              </view>
+            </view>
+
+            <!-- 实付金额 -->
+            <view class="soc-summary">
+              <text class="soc-sum-count">共 {{item.items.length}} 件商品</text>
+              <text class="soc-sum-pay">实付: <text class="sum-price-val">¥{{item.payAmountYuan || (item.payAmount / 100)}}</text></text>
+            </view>
+
+            <!-- 订单底部操作条 -->
+            <view class="soc-actions">
+              <block wx:if="{{item.status === 'PENDING_PAYMENT'}}">
+                <button class="soc-btn btn-ghost press-active" data-id="{{item.id}}" bindtap="onCancelOrder">取消订单</button>
+                <button class="soc-btn btn-solid-accent press-active" data-id="{{item.id}}" bindtap="onPayOrder">立即付款</button>
+              </block>
+              <block wx:elif="{{item.status === 'PAID'}}">
+                <button class="soc-btn btn-ghost press-active" bindtap="onRemindShipping">催促发货</button>
+              </block>
+              <block wx:elif="{{false}}">
+                <button class="soc-btn btn-solid-dark press-active" data-id="{{item.id}}" bindtap="onConfirmReceive">确认提货</button>
+              </block>
+              <block wx:elif="{{item.status === 'SHIPPED'}}">
+                <button class="soc-btn btn-ghost press-active" data-no="{{item.trackingNo}}" bindtap="onViewTracking">查看物流</button>
+                <button class="soc-btn btn-solid-dark press-active" data-id="{{item.id}}" bindtap="onConfirmReceive">确认收货</button>
+              </block>
+              <block wx:else>
+                <button class="soc-btn btn-ghost press-active" data-pid="{{item.items[0].productId}}" bindtap="onRebuy">再次购买</button>
+              </block>
+            </view>
+          </view>
+        </view>
+      </block>
+
+      <!-- 2. 优惠券抽屉 -->
+      <block wx:elif="{{activeDrawer === 'coupon'}}">
+        <view class="drawer-tabs">
+          <view
+            class="tab-pill press-active {{couponActiveTab === 'available' ? 'tab-active' : ''}}"
+            data-tab="available"
+            bindtap="onSelectCouponTab"
+          >可用优惠券 ({{availableCoupons.length}})</view>
+          <view
+            class="tab-pill press-active {{couponActiveTab === 'expired' ? 'tab-active' : ''}}"
+            data-tab="expired"
+            bindtap="onSelectCouponTab"
+          >已失效 ({{expiredCoupons.length}})</view>
+        </view>
+
+        <view class="coupon-sheet-list">
+          <block wx:if="{{couponActiveTab === 'available'}}">
+            <view wx:for="{{availableCoupons}}" wx:key="id" class="coupon-item-card">
+              <view class="cic-left">
+                <view class="cic-amount-box">
+                  <text class="cic-symbol">¥</text>
+                  <text class="cic-amount">{{item.amount}}</text>
+                </view>
+                <text class="cic-condition">{{item.minAmount > 0 ? '满' + item.minAmount + '元可用' : '无门槛包邮'}}</text>
+              </view>
+              <view class="cic-right">
+                <view class="cic-title-row">
+                  <text class="cic-badge">{{item.tag}}</text>
+                  <text class="cic-title ellipsis-1">{{item.title}}</text>
+                </view>
+                <text class="cic-date">有效期至 {{item.expireDate}}</text>
+                <button class="cic-use-btn press-active" bindtap="onUseCoupon">去使用</button>
+              </view>
+            </view>
+          </block>
+
+          <block wx:else>
+            <view wx:for="{{expiredCoupons}}" wx:key="id" class="coupon-item-card is-expired">
+              <view class="cic-left">
+                <view class="cic-amount-box">
+                  <text class="cic-symbol">¥</text>
+                  <text class="cic-amount">{{item.amount}}</text>
+                </view>
+                <text class="cic-condition">满{{item.minAmount}}元可用</text>
+              </view>
+              <view class="cic-right">
+                <view class="cic-title-row">
+                  <text class="cic-badge badge-gray">{{item.tag}}</text>
+                  <text class="cic-title ellipsis-1">{{item.title}}</text>
+                </view>
+                <text class="cic-date">已于 {{item.expireDate}} 过期</text>
+              </view>
+            </view>
+          </block>
+        </view>
+      </block>
+
+      <!-- 3. 我的收藏抽屉 -->
+      <block wx:elif="{{activeDrawer === 'fav'}}">
+        <view wx:if="{{favoriteList.length === 0}}" class="sheet-empty">
+          <text class="sheet-empty-text">收藏夹空空如也，去挑几件心仪商品吧</text>
+        </view>
+        <view wx:else class="fav-sheet-list">
+          <view wx:for="{{favoriteList}}" wx:key="id" class="fav-item-card press-active" data-id="{{item.id}}" bindtap="onGoGoodsDetail">
+            <image class="fav-img" src="{{item.cover}}" mode="aspectFill" />
+            <view class="fav-info">
+              <text class="fav-brand">{{item.brand}}</text>
+              <text class="fav-title ellipsis-1">{{item.title}}</text>
+              <view class="fav-price-row">
+                <text class="fav-price">¥{{item.priceYuan || (item.price / 100)}}</text>
+                <text wx:if="{{item.originalPrice > item.price}}" class="fav-origin">¥{{item.originalPriceYuan || (item.originalPrice / 100)}}</text>
+              </view>
+              <view class="fav-actions" catchtap="true">
+                <button class="fav-act-btn btn-cart press-active" data-item="{{item}}" bindtap="onAddToCartFromFav">加购物车</button>
+                <button class="fav-act-btn btn-remove press-active" data-id="{{item.id}}" bindtap="onRemoveFav">取消</button>
+              </view>
+            </view>
+          </view>
+        </view>
+      </block>
+
+      <!-- 4. 浏览历史抽屉 -->
+      <block wx:elif="{{activeDrawer === 'history'}}">
+        <view class="history-top-bar">
+          <text class="htb-count">共记录 {{historyList.length}} 款浏览足迹</text>
+          <text wx:if="{{historyList.length > 0}}" class="htb-clear press-active" bindtap="onClearHistory">清空足迹</text>
+        </view>
+
+        <view wx:if="{{historyList.length === 0}}" class="sheet-empty">
+          <text class="sheet-empty-text">暂无足迹记录，去探索最新商品吧</text>
+        </view>
+        <view wx:else class="history-sheet-list">
+          <view wx:for="{{historyList}}" wx:key="id" class="history-item-card press-active" data-id="{{item.id}}" bindtap="onGoGoodsDetail">
+            <image class="hist-img" src="{{item.cover}}" mode="aspectFill" />
+            <view class="hist-info">
+              <text class="hist-brand">{{item.brand}}</text>
+              <text class="hist-title ellipsis-1">{{item.title}}</text>
+              <view class="hist-bottom">
+                <text class="hist-price">¥{{item.priceYuan || (item.price / 100)}}</text>
+                <text class="hist-go">查看 ›</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </block>
+
+      <!-- 5. 收货地址抽屉 -->
+      <block wx:elif="{{activeDrawer === 'address'}}">
+        <!-- 列表态 -->
+        <block wx:if="{{!showAddressForm}}">
+          <view class="addr-sheet-list">
+            <view wx:for="{{addresses}}" wx:key="id" class="addr-item-card">
+              <view class="aic-head">
+                <view class="aic-user">
+                  <text class="aic-name">{{item.name}}</text>
+                  <text class="aic-phone">{{item.phone}}</text>
+                  <text class="aic-tag">{{item.tag}}</text>
+                  <text wx:if="{{item.isDefault}}" class="aic-default-badge">默认</text>
+                </view>
+              </view>
+              <view class="aic-detail">{{item.region}} {{item.detail}}</view>
+              <view class="aic-foot">
+                <view class="aic-def-switch press-active" data-id="{{item.id}}" bindtap="onSetDefaultAddress">
+                  <text class="radio-circle {{item.isDefault ? 'is-checked' : ''}}"></text>
+                  <text class="def-text">{{item.isDefault ? '默认收货地址' : '设为默认'}}</text>
+                </view>
+                <text class="aic-del-btn press-active" data-id="{{item.id}}" bindtap="onDeleteAddress">删除</text>
+              </view>
+            </view>
+          </view>
+          <view class="addr-add-btn-wrap">
+            <button class="btn-add-address press-active" bindtap="onOpenAddAddress">+ 添加新收货地址</button>
+          </view>
+        </block>
+
+        <!-- 新增地址表单态 -->
+        <block wx:else>
+          <view class="addr-form-wrap">
+            <view class="form-title">新建收货地址</view>
+            <view class="form-row">
+              <text class="form-label">收货人</text>
+              <input class="form-input" placeholder="姓名" value="{{addressForm.name}}" data-field="name" bindinput="onAddressInput" />
+            </view>
+            <view class="form-row">
+              <text class="form-label">手机号码</text>
+              <input class="form-input" type="number" maxlength="11" placeholder="11位手机号" value="{{addressForm.phone}}" data-field="phone" bindinput="onAddressInput" />
+            </view>
+            <view class="form-row">
+              <text class="form-label">所在省市</text>
+              <picker mode="region" bindchange="onRegionChange" value="{{addressRegionValue}}">
+                <view class="form-picker-val {{addressForm.region ? '' : 'placeholder-val'}}">
+                  {{addressForm.region ? addressForm.region : '点击选择省 / 市 / 区 ›'}}
+                </view>
+              </picker>
+            </view>
+            <view class="form-row">
+              <text class="form-label">详细地址</text>
+              <input class="form-input" placeholder="街道、门牌号、宿舍号等" value="{{addressForm.detail}}" data-field="detail" bindinput="onAddressInput" />
+            </view>
+            <view class="form-row">
+              <text class="form-label">地址标签</text>
+              <view class="tag-selector">
+                <text class="tag-opt press-active {{addressForm.tag === '学校' ? 'tag-selected' : ''}}" data-tag="学校" bindtap="onSelectAddressTag">学校</text>
+                <text class="tag-opt press-active {{addressForm.tag === '家' ? 'tag-selected' : ''}}" data-tag="家" bindtap="onSelectAddressTag">家</text>
+                <text class="tag-opt press-active {{addressForm.tag === '公司' ? 'tag-selected' : ''}}" data-tag="公司" bindtap="onSelectAddressTag">公司</text>
+              </view>
+            </view>
+
+            <view class="form-btns">
+              <button class="f-btn f-cancel press-active" bindtap="onCancelAddressForm">
+                <text>取消</text>
+              </button>
+              <button class="f-btn f-save press-active" bindtap="onSaveAddress">
+                <text>保存地址</text>
+              </button>
+            </view>
+          </view>
+        </block>
+      </block>
+
+      <!-- 6. 官方客服抽屉 -->
+      <block wx:elif="{{activeDrawer === 'service'}}">
+        <view class="service-sheet-wrap">
+          <view class="service-banner-card">
+            <view class="sbc-title">通用商城服务顾问</view>
+            <view class="sbc-sub">服务时间：每日 09:00 - 22:00 全年无休</view>
+            <view class="sbc-tip">正品防伪 · 规格咨询 · 物流时效 · 售后退换</view>
+          </view>
+
+          <!-- 客服电话接入按钮 (居中，点击弹出客服电话) -->
+          <view class="btn-wechat-contact press-active" bindtap="onContactService">
+            <text>💬 接入微信官方在线客服</text>
+          </view>
+
+          <!-- 电话呼叫 -->
+          <view class="btn-phone-contact press-active" bindtap="onCallHotline">
+            <text class="bpc-text">拨打客服专线：{{customerServicePhone || '400-000-0000'}}</text>
+          </view>
+
+          <!-- 常见问题 (仅保留规格退换问题，防伪扣改为吊牌) -->
+          <view class="service-faq-box">
+            <view class="faq-head">常见咨询 FAQ</view>
+            <view class="faq-item">
+              <view class="faq-q">Q: 规格不合适支持 7 天退换吗？</view>
+              <view class="faq-a">A: 保持商品完好未使用、吊牌完好且包装齐全的情况下，支持 7 天无理由退换货。</view>
+            </view>
+          </view>
+        </view>
+      </block>
+
+      <!-- 7. 通用设置抽屉 -->
+      <block wx:elif="{{activeDrawer === 'setting'}}">
+        <view class="setting-sheet-wrap">
+          <view class="setting-group">
+            <view class="setting-row">
+              <view class="sr-left">
+                <text class="sr-label">本地缓存占用</text>
+                <text class="sr-desc">包含商品离线图片、临时缓存</text>
+              </view>
+              <view class="sr-right">
+                <text class="sr-val">{{storageSize}}</text>
+                <button class="btn-clean-cache press-active" bindtap="onClearCache">清理</button>
+              </view>
+            </view>
+
+            <view class="setting-row">
+              <view class="sr-left">
+                <text class="sr-label">订单状态推送通知</text>
+                <text class="sr-desc">发货、降价提醒</text>
+              </view>
+              <view class="sr-right">
+                <switch checked="{{notifyEnabled}}" color="#FF5500" bindchange="onToggleNotify" />
+              </view>
+            </view>
+          </view>
+
+          <view class="setting-group">
+            <view class="setting-row">
+              <text class="sr-label">应用名称</text>
+              <text class="sr-val">通用商城</text>
+            </view>
+            <view class="setting-row">
+              <text class="sr-label">当前版本</text>
+              <text class="sr-val">v1.0.0 (最新稳定版)</text>
+            </view>
+            <view class="setting-row">
+              <text class="sr-label">开发者团队</text>
+              <text class="sr-val">开源社区开发组</text>
+            </view>
+          </view>
+
+          <view class="logout-btn-wrap">
+            <button class="btn-logout press-active" bindtap="onLogout">退出登录 / 切换账号</button>
+          </view>
+        </view>
+      </block>
+    </scroll-view>
+  </view>
+</view>

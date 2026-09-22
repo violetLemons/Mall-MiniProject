@@ -1,0 +1,18 @@
+<view class="category-nav-container">
+  <view
+    wx:for="{{formattedList}}"
+    wx:key="id"
+    class="cat-item press-active"
+    data-item="{{item}}"
+    bindtap="onSelect"
+  >
+    <!-- 图标外圈 -->
+    <view class="icon-box">
+      <image wx:if="{{item.isImageIcon}}" class="cat-icon" src="{{item.icon}}" mode="aspectFit" data-index="{{index}}" binderror="onIconError" />
+      <text wx:else class="cat-emoji">{{item.iconDisplay}}</text>
+      <text wx:if="{{item.badge}}" class="cat-badge">{{item.badge}}</text>
+    </view>
+    <!-- 分类名 -->
+    <text class="cat-title">{{item.name}}</text>
+  </view>
+</view>

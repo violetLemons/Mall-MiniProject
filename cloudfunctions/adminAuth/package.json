@@ -1,0 +1,9 @@
+{
+  "name": "adminAuth",
+  "version": "1.0.0",
+  "description": "通用商城 Cloud Function - adminAuth",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

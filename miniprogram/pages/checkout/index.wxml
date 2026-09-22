@@ -1,0 +1,140 @@
+<view class="checkout-page">
+  <custom-navbar title="确认订单" />
+  
+  <view class="checkout-list">
+    <view wx:for="{{items}}" wx:key="id" class="checkout-item">
+      <image src="{{item.image}}" mode="aspectFill" class="checkout-image" />
+      <view class="checkout-item-info">
+        <text class="checkout-item-title">{{item.title}}</text>
+        <text class="checkout-item-sku">{{item.skuText}} × {{item.count}}</text>
+        <c-price price="{{item.price * item.count}}" size="md" accent="{{true}}" />
+      </view>
+    </view>
+  </view>
+
+  <view class="checkout-card">
+    <text class="checkout-title">配送方式</text>
+    <view class="checkout-types">
+      <view class="checkout-type {{deliveryType === 'DELIVERY' ? 'active' : ''}}" data-type="DELIVERY" bindtap="onSelectDelivery">极速快递包邮</view>
+      <view wx:if="{{false}}" class="checkout-type {{deliveryType === 'PICKUP' ? 'active' : ''}}" data-type="PICKUP" bindtap="onSelectDelivery">潮流旗舰店到店自提</view>
+    </view>
+
+    <!-- 顺丰快递包邮：收货地址展示区域 -->
+    <view wx:if="{{deliveryType === 'DELIVERY'}}" class="address-row" bindtap="onOpenAddressPicker">
+      <view wx:if="{{selectedAddress}}" class="addr-content-box">
+        <view class="addr-head-row">
+          <text class="address-main">{{selectedAddress.name}} {{maskedPhone}}</text>
+          <text wx:if="{{selectedAddress.tag}}" class="checkout-tag">{{selectedAddress.tag}}</text>
+          <text wx:if="{{selectedAddress.isDefault}}" class="checkout-default-tag">默认</text>
+        </view>
+        <text class="address-sub">{{selectedAddress.province}}{{selectedAddress.city}}{{selectedAddress.district}}{{selectedAddress.detail}}</text>
+      </view>
+      <text wx:else class="address-empty">您还没有收货地址，点击添加 ›</text>
+      
+      <view class="addr-right-ops">
+        <text wx:if="{{selectedAddress && addressList.length >= 2}}" class="change-addr-btn" catchtap="onOpenAddressPicker">更换地址</text>
+        <text class="arrow">›</text>
+      </view>
+    </view>
+
+    <!-- 潮流旗舰店到店自提：自提点展示区域 -->
+    <view wx:else class="pickup-section">
+      <view wx:for="{{pickupPoints}}" wx:key="id" class="pickup-row {{selectedPickupPoint.id === item.id ? 'active' : ''}}" data-index="{{index}}" bindtap="onSelectPickupPoint">
+        <view class="radio {{selectedPickupPoint.id === item.id ? 'checked' : ''}}"></view>
+        <view>
+          <text class="address-main">{{item.name}}</text>
+          <text class="address-sub">{{item.address}} · {{item.hours}}</text>
+        </view>
+      </view>
+      <text wx:if="{{pickupPoints.length === 0}}" class="address-empty">暂无可用自提点</text>
+    </view>
+  </view>
+
+  <view class="checkout-bottom safe-bottom">
+    <view>
+      <text class="total-label">合计</text>
+      <c-price price="{{totalPrice}}" size="lg" accent="{{true}}" />
+    </view>
+    <button class="submit-btn" loading="{{submitting || paying}}" disabled="{{submitting || paying}}" bindtap="submitOrder">提交订单</button>
+  </view>
+
+  <!-- 1. 地址选择器抽屉 (>2个地址自动弹出，或点击“更换地址”弹出) -->
+  <view class="drawer-mask {{showAddressPickerModal ? 'mask-visible' : ''}}" bindtap="onCloseAddressPicker"></view>
+  <view class="drawer-container {{showAddressPickerModal ? 'drawer-visible' : ''}}">
+    <view class="drawer-header">
+      <text class="drawer-title">选择收货地址</text>
+      <view class="drawer-close press-active" bindtap="onCloseAddressPicker">✕</view>
+    </view>
+    <scroll-view scroll-y class="drawer-scroll-body">
+      <view class="picker-sheet-list">
+        <view
+          wx:for="{{sortedAddresses}}"
+          wx:key="id"
+          class="picker-addr-item {{selectedAddressId === (item.id || item._id) ? 'is-selected' : ''}}"
+          data-id="{{item.id || item._id}}"
+          bindtap="onPickAddress"
+        >
+          <view class="pai-left">
+            <view class="pai-user-row">
+              <text class="pai-name">{{item.name}}</text>
+              <text class="pai-phone">{{item.maskedPhone || item.phone}}</text>
+              <text wx:if="{{item.tag}}" class="checkout-tag">{{item.tag}}</text>
+              <text wx:if="{{item.isDefault}}" class="checkout-default-tag">默认</text>
+            </view>
+            <view class="pai-detail">{{item.province}} {{item.city}} {{item.district}} {{item.detail}}</view>
+          </view>
+          <view class="radio {{selectedAddressId === (item.id || item._id) ? 'checked' : ''}}"></view>
+        </view>
+      </view>
+      <view class="drawer-foot-btn-wrap">
+        <button class="btn-drawer-action press-active" bindtap="onOpenAddAddressModal">+ 新增收货地址</button>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 2. 新增收货地址抽屉 (0地址时自动弹出，或点击“+ 新增收货地址”弹出) -->
+  <view class="drawer-mask {{showAddAddressModal ? 'mask-visible' : ''}}" bindtap="onCloseAddAddressModal"></view>
+  <view class="drawer-container {{showAddAddressModal ? 'drawer-visible' : ''}}">
+    <view class="drawer-header">
+      <text class="drawer-title">新建收货地址</text>
+      <view class="drawer-close press-active" bindtap="onCloseAddAddressModal">✕</view>
+    </view>
+    <scroll-view scroll-y class="drawer-scroll-body">
+      <view class="modal-form-wrap">
+        <view class="form-row">
+          <text class="form-label">收货人</text>
+          <input class="form-input" placeholder="姓名" value="{{addAddressForm.name}}" data-field="name" bindinput="onAddAddressInput" />
+        </view>
+        <view class="form-row">
+          <text class="form-label">手机号码</text>
+          <input class="form-input" type="number" maxlength="11" placeholder="11位真实手机号" value="{{addAddressForm.phone}}" data-field="phone" bindinput="onAddAddressInput" />
+        </view>
+        <view class="form-row">
+          <text class="form-label">所在省市</text>
+          <picker mode="region" bindchange="onRegionChange" value="{{regionValue}}">
+            <view class="form-picker-val {{addAddressForm.province ? '' : 'placeholder-val'}}">
+              {{addAddressForm.province ? (addAddressForm.province + ' ' + addAddressForm.city + ' ' + addAddressForm.district) : '点击选择省 / 市 / 区 ›'}}
+            </view>
+          </picker>
+        </view>
+        <view class="form-row">
+          <text class="form-label">详细地址</text>
+          <input class="form-input" placeholder="街道、门牌号、宿舍号等" value="{{addAddressForm.detail}}" data-field="detail" bindinput="onAddAddressInput" />
+        </view>
+        <view class="form-row">
+          <text class="form-label">地址标签</text>
+          <view class="tag-selector">
+            <text wx:for="{{tagList}}" wx:key="*this" class="tag-chip {{addAddressForm.tag === item ? 'tag-active' : ''}}" data-tag="{{item}}" bindtap="onSelectTag">{{item}}</text>
+          </view>
+        </view>
+        <view class="form-row-switch">
+          <text class="form-label">设为默认收货地址</text>
+          <switch checked="{{addAddressForm.isDefault}}" color="#FF5500" bindchange="onDefaultSwitchChange" />
+        </view>
+        <view class="drawer-foot-btn-wrap">
+          <button class="btn-drawer-action btn-save-accent press-active" loading="{{savingAddress}}" disabled="{{savingAddress}}" bindtap="onSaveNewAddress">保存并使用</button>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+</view>

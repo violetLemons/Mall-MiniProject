@@ -1,0 +1,107 @@
+/**
+ * Common Utilities & Animations - 全局通用原子类与轻量动效
+ */
+
+/* 布局原子类 */
+.flex-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.flex-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+/* 文本截断 */
+.ellipsis-1 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ellipsis-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-all;
+}
+
+/* 标准白色卡片 */
+.card-base {
+  background-color: var(--surface, #FFFFFF);
+  border-radius: var(--radius-md, 20rpx);
+  overflow: hidden;
+}
+
+/* 交互动效: 按钮/卡片按压反馈 (克制收敛 scale 0.97) */
+.press-active {
+  transition: transform var(--transition-fast, 120ms ease), opacity var(--transition-fast, 120ms ease);
+}
+
+.press-active:active {
+  transform: scale(0.97);
+  opacity: 0.92;
+}
+
+/* 淡入动效 */
+.fade-in {
+  animation: fadeIn 200ms ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 骨架屏微弱光泽流动 */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, #F0F2F5 25%, #E6E8EC 37%, #F0F2F5 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.5s ease infinite;
+}
+
+/* 安全区域适配 */
+.safe-bottom {
+  padding-bottom: constant(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-bottom-margin {
+  margin-bottom: constant(safe-area-inset-bottom);
+  margin-bottom: env(safe-area-inset-bottom);
+}

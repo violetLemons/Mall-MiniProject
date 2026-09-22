@@ -1,0 +1,41 @@
+<view class="search-bar-wrap">
+  <!-- 胶囊搜索框主体 -->
+  <view class="search-capsule {{readonly ? 'press-active' : ''}}" bindtap="onTapBar">
+    <!-- 搜索图标 -->
+    <view class="search-icon">
+      <view class="search-glass"></view>
+      <view class="search-handle"></view>
+    </view>
+
+    <!-- 文本或输入框 -->
+    <view class="input-area">
+      <input
+        wx:if="{{!readonly}}"
+        class="search-input"
+        type="text"
+        value="{{inputValue}}"
+        placeholder="{{placeholder}}"
+        placeholder-class="input-placeholder"
+        confirm-type="search"
+        bindinput="onInput"
+        bindconfirm="onConfirm"
+      />
+      <text wx:else class="search-fake-placeholder ellipsis-1">{{inputValue || placeholder}}</text>
+    </view>
+
+    <!-- 清除按钮 -->
+    <view wx:if="{{!readonly && inputValue}}" class="clear-btn press-active" catchtap="onClear">
+      <view class="cross-line cross-1"></view>
+      <view class="cross-line cross-2"></view>
+    </view>
+  </view>
+
+  <!-- 右侧消息铃铛按钮 -->
+  <view wx:if="{{showMessage}}" class="message-btn press-active" bindtap="onMessageTap">
+    <view class="bell-icon">
+      <view class="bell-top"></view>
+      <view class="bell-bottom"></view>
+    </view>
+    <view wx:if="{{hasUnread}}" class="unread-dot"></view>
+  </view>
+</view>
