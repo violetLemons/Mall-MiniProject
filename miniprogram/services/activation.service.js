@@ -9,30 +9,16 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CategoryService = void 0;
+exports.ActivationService = void 0;
 const cloud_1 = require("./cloud");
-class CategoryService {
+class ActivationService {
     /**
-     * 获取首页快捷分类/金刚区（仅一级分类/主要词条）
+     * 卡密兑换 (调用 activation.redeem，服务端校验并原子认领)
      */
-    static getQuickCategories() {
+    static redeem(code) {
         return __awaiter(this, void 0, void 0, function* () {
-            const list = yield (0, cloud_1.callCloud)('products', 'categories', { parentId: '' });
-            if (!Array.isArray(list))
-                throw new Error('分类响应格式异常');
-            return list;
-        });
-    }
-    /**
-     * 获取两级分类树（一级分类内嵌 children 二级分类数组，供分类页）
-     */
-    static getCategoryTree() {
-        return __awaiter(this, void 0, void 0, function* () {
-            const tree = yield (0, cloud_1.callCloud)('products', 'categoryTree', {});
-            if (!Array.isArray(tree))
-                throw new Error('分类树响应格式异常');
-            return tree;
+            return (0, cloud_1.callCloud)('activation', 'redeem', { code });
         });
     }
 }
-exports.CategoryService = CategoryService;
+exports.ActivationService = ActivationService;

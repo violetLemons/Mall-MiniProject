@@ -55,6 +55,10 @@ export interface ProductCategory {
   name: string;
   icon: string;
   badge?: string;
+  // 两级分类扩展字段
+  parentId?: string;                // 空串/null = 一级分类（主要词条）；否则为所属一级分类 id
+  children?: ProductCategory[];     // 一级分类下挂载的二级分类（次要词条）
+  isPrimary?: boolean;              // 是否一级分类（主要词条）
 }
 
 export type SortType = 'default' | 'sales' | 'newest' | 'price_asc' | 'price_desc';

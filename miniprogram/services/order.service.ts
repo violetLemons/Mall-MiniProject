@@ -1,6 +1,21 @@
 ﻿import { callCloud } from './cloud';
 import { PaginatedList } from '../models/common';
 
+/**
+ * 订单列表组合状态 token（与后端 orders.list 的 status 过滤逻辑对齐）
+ * 后端将部分 token 展开为多个底层状态：REFUND → REFUND_PENDING|REFUNDING；
+ * PENDING_REVIEW → COMPLETED 且未评价；SHIPPED → SHIPPED|WAITING_PICKUP|READY_FOR_PICKUP。
+ */
+export const ORDER_STATUS_TOKEN = {
+  ALL: 'ALL',                         // 全部订单
+  PENDING_PAYMENT: 'PENDING_PAYMENT', // 待付款
+  PAID: 'PAID',                       // 待发货（已付款未发货）
+  SHIPPED: 'SHIPPED',                 // 待收货（已发货 / 待自提）
+  REFUND: 'REFUND',                   // 退款中
+  PENDING_REVIEW: 'PENDING_REVIEW',   // 待评价（已完成且未评价）
+  COMPLETED: 'COMPLETED'              // 已完成
+} as const;
+
 export interface OrderItemSnapshot {
   productId: string;
   skuId: string;
@@ -39,6 +54,11 @@ export interface OrderModel {
   shippingAddress?: any;
   trackingNo?: string;
   createdAt: string | Date;
+  // 评价相关 (reviewed=true 表示已完成且已评价，从「待评价」归入「已完成」)
+  reviewed?: boolean;
+  reviewRating?: number;
+  reviewComment?: string;
+  reviewedAt?: string | Date;
 }
 
 export interface PayOrderResult {
@@ -128,6 +148,17 @@ export class OrderService {
       'orders',
       'applyRefund',
       { id, reason }
+    );
+  }
+
+  /**
+   * 订单评价 (已完成订单 -> reviewed=true，待评价转已完成)
+   */
+  static async submitReview(id: string, params: { rating?: number; comment?: string }): Promise<{ status: string; reviewed: boolean }> {
+    return callCloud<{ status: string; reviewed: boolean }>(
+      'orders',
+      'review',
+      { id, rating: params.rating, comment: params.comment }
     );
   }
 
