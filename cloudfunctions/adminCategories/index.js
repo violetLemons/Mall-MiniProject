@@ -91,14 +91,23 @@ exports.main = async (event, context) => {
 
       case 'create': {
         requirePermission(admin, 'category.manage');
-        const { name, icon, badge = '', sort = 100 } = params;
+        const { name, icon, badge = '', sort = 100, parentId = '' } = params;
         if (!name || !icon) return fail('INVALID_PARAMS', '分类名与图标不可为空');
+
+        // 可选父级：parentId 非空时校验父级存在（一级分类 parentId 为空串）
+        let parent = '';
+        if (parentId) {
+          parent = String(parentId).trim();
+          const parentDoc = await db.collection('categories').doc(parent).get().catch(() => null);
+          if (!parentDoc || !parentDoc.data) return fail('INVALID_PARAMS', '父级分类不存在');
+        }
 
         const addRes = await db.collection('categories').add({
           data: {
             name,
             icon,
             badge,
+            parentId: parent,
             sort: Number(sort) || 100,
             status: 'ACTIVE',
             createdAt: db.serverDate(),
@@ -112,7 +121,7 @@ exports.main = async (event, context) => {
           action: 'CREATE_CATEGORY',
           resourceType: 'CATEGORY',
           resourceId: addRes._id,
-          after: { name }
+          after: { name, parentId: parent }
         });
 
         return success({ categoryId: addRes._id }, '分类创建成功');
@@ -151,6 +160,12 @@ exports.main = async (event, context) => {
 
         if (prodCount.total > 0) {
           return fail('CATEGORY_HAS_PRODUCTS', `该分类下仍有 ${prodCount.total} 款有效商品，禁止直接删除！请先将商品转移至其他分类。`);
+        }
+
+        // 强安全外键约束：一级分类下仍有二级分类时禁止删除
+        const childCount = await db.collection('categories').where({ parentId: id }).count().catch(() => ({ total: 0 }));
+        if (childCount.total > 0) {
+          return fail('CATEGORY_HAS_CHILDREN', `该分类下仍有 ${childCount.total} 个二级分类，禁止直接删除！请先删除或转移二级分类。`);
         }
 
         await db.collection('categories').doc(id).remove();

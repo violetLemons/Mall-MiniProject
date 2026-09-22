@@ -276,15 +276,40 @@ exports.main = async (event, context) => {
       }
 
       /**
-       * 4. 快捷分类
+       * 4. 快捷分类 (支持 parentId 过滤：空串=仅一级，具体 id=该一级下的二级)
        */
       case 'categories': {
+        const where = { status: 'ACTIVE' };
+        if (typeof params.parentId === 'string') {
+          where.parentId = params.parentId === '' ? '' : params.parentId;
+        }
+        const res = await db.collection('categories')
+          .where(where)
+          .orderBy('sort', 'desc')
+          .get();
+
+        return success((res.data || []).map(c => ({ ...c, id: c._id || c.id })));
+      }
+
+      /**
+       * 4.1 两级分类树 (一级分类，内嵌 children 二级分类数组)
+       */
+      case 'categoryTree': {
         const res = await db.collection('categories')
           .where({ status: 'ACTIVE' })
           .orderBy('sort', 'desc')
           .get();
 
-        return success(res.data || []);
+        const all = (res.data || []).map(c => ({ ...c, id: c._id || c.id }));
+        const isPrimary = c => !c.parentId || c.parentId === '';
+        const primaries = all.filter(isPrimary);
+        const secondaries = all.filter(c => !isPrimary(c));
+        const tree = primaries.map(p => ({
+          ...p,
+          children: secondaries.filter(s => s.parentId === p.id)
+        }));
+
+        return success(tree);
       }
 
       /**

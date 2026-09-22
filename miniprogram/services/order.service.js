@@ -9,8 +9,22 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.OrderService = void 0;
+exports.OrderService = exports.ORDER_STATUS_TOKEN = void 0;
 const cloud_1 = require("./cloud");
+/**
+ * 订单列表组合状态 token（与后端 orders.list 的 status 过滤逻辑对齐）
+ * 后端将部分 token 展开为多个底层状态：REFUND → REFUND_PENDING|REFUNDING；
+ * PENDING_REVIEW → COMPLETED 且未评价；SHIPPED → SHIPPED|WAITING_PICKUP|READY_FOR_PICKUP。
+ */
+exports.ORDER_STATUS_TOKEN = {
+    ALL: 'ALL', // 全部订单
+    PENDING_PAYMENT: 'PENDING_PAYMENT', // 待付款
+    PAID: 'PAID', // 待发货（已付款未发货）
+    SHIPPED: 'SHIPPED', // 待收货（已发货 / 待自提）
+    REFUND: 'REFUND', // 退款中
+    PENDING_REVIEW: 'PENDING_REVIEW', // 待评价（已完成且未评价）
+    COMPLETED: 'COMPLETED' // 已完成
+};
 class OrderService {
     /**
      * 提交创建订单 (金额单位：分)
@@ -64,6 +78,14 @@ class OrderService {
     static applyRefund(id, reason) {
         return __awaiter(this, void 0, void 0, function* () {
             return (0, cloud_1.callCloud)('orders', 'applyRefund', { id, reason });
+        });
+    }
+    /**
+     * 订单评价 (已完成订单 -> reviewed=true，待评价转已完成)
+     */
+    static submitReview(id, params) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return (0, cloud_1.callCloud)('orders', 'review', { id, rating: params.rating, comment: params.comment });
         });
     }
     /**

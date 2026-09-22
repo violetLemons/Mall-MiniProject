@@ -67,8 +67,9 @@ const COLLECTIONS_CONFIG = [
   },
   {
     name: 'categories',
-    desc: '商品分类表',
+    desc: '商品分类表（一级/二级两级词条）',
     indexes: [
+      { name: 'idx_parent', key: { parentId: 1 } },
       { name: 'idx_sort', key: { sort: -1 } },
       { name: 'idx_status', key: { status: 1 } }
     ]
@@ -129,6 +130,22 @@ const COLLECTIONS_CONFIG = [
       { name: 'idx_merchant', key: { merchantId: 1 } },
       { name: 'idx_parent_order', key: { parentOrderId: 1 } },
       { name: 'idx_created_at', key: { createdAt: -1 } }
+    ]
+  },
+  {
+    name: 'activation_codes',
+    desc: '卡密兑换码（激活码）主表',
+    indexes: [
+      { name: 'idx_code', key: { code: 1 }, unique: true },
+      { name: 'idx_status', key: { status: 1 } }
+    ]
+  },
+  {
+    name: 'activation_records',
+    desc: '卡密兑换流水记录表',
+    indexes: [
+      { name: 'idx_user', key: { userId: 1 } },
+      { name: 'idx_code', key: { code: 1 } }
     ]
   },
   {

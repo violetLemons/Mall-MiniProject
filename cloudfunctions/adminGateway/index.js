@@ -9,7 +9,7 @@ const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
 const ALLOWED_FUNCTIONS = new Set([
-  'adminAuth', 'adminBanners', 'adminCategories', 'adminInventory',
+  'activation', 'adminAuth', 'adminBanners', 'adminCategories', 'adminInventory',
   'adminOrders', 'adminProducts', 'adminUsers', 'pickupPoints', 'testPayment'
 ]);
 

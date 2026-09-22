@@ -13,7 +13,7 @@
 | **`products`** | 商品 SPU 基础信息与销售状态 | 所有用户可读，仅管理端可写 | `products`, `adminProducts` |
 | **`product_audit_tickets`** | 商品审核工单（商户新增/修改商品需平台审核） | 所有用户不可访问 (私有) | `adminProducts` |
 | **`product_skus`** | 商品 SKU 规格、多规格与独立库存表 | 所有用户可读，仅事务云函数可写 | `products`, `adminInventory` |
-| **`categories`** | 商品分类层级与排序 | 所有用户可读，仅管理端可写 | `products`, `adminCategories` |
+| **`categories`** | 商品分类层级与排序（一级/二级两级词条） | 所有用户可读，仅管理端可写 | `products`, `adminCategories` |
 | **`banners`** | 首页顶部轮播大图与活动专区卡片 | 所有用户可读，仅管理端可写 | `products`, `adminBanners` |
 | **`pickup_points`** | 线下门店与校园自提网点 | 所有用户可读，仅管理端可写 | `pickupPoints` |
 | **`carts`** | 用户购物车条目 | 仅创建者可读写 | `cart` 云函数 |
@@ -23,6 +23,8 @@
 | **`merchant_orders`** | 商家子订单表（按商品拆分，合并支付下独立履约/发货/退款） | 所有用户不可访问 (私有) | `orders`, `adminOrders` |
 | **`payment_transactions`** | 微信支付 API v3 交易记录流水表 | 所有用户不可访问 (私有) | `payment`, `paymentCallback` |
 | **`refund_records`** | 退款申请与流水记录表（按子订单整单退） | 所有用户不可访问 (私有) | `payment`, `adminOrders` |
+| **`activation_codes`** | 卡密兑换码（激活码）主表 | 所有用户不可访问 (私有) | `activation` 云函数 |
+| **`activation_records`** | 卡密兑换流水记录表 | 所有用户不可访问 (私有) | `activation` 云函数 |
 | **`inventory_logs`** | 库存变更与补货出入库流水 | 所有用户不可访问 (私有) | `adminInventory` |
 | **`operation_logs`** | 管理员操作审计流水日志 | 所有用户不可访问 (私有) | `adminGateway` |
 
@@ -136,6 +138,7 @@
   "deliveryType": "DELIVERY",
   "shippingAddress": { "name": "张三", "phone": "13800000000" },
   "status": "PAID",
+  "reviewed": false, // 买家是否已评价（区分「待评价 / 已完成」）
   "shipments": [
     { "trackingNo": "SF1234567890", "logisticsCompany": "极速快递", "expressCompany": "SF", "shippedAt": "2026-09-22T12:00:00.000Z" }
   ],
@@ -162,6 +165,50 @@
 }
 ```
 
+### 6. 分类表 (`categories`)
+
+> 分类支持「一级 / 二级」两级词条：左侧菜单显示一级（主要词条），右侧显示二级（次要词条），点击二级后才展示对应商品。
+
+```json
+{
+  "_id": "cat_fruit_apple",
+  "name": "苹果",
+  "icon": "🍎",
+  "badge": "热卖",
+  "parentId": "cat_fruit", // 空字符串或不存在 = 一级分类；否则为所属一级分类 _id（二级分类）
+  "sort": 100,
+  "status": "ACTIVE"
+}
+```
+
+### 7. 卡密兑换码表 (`activation_codes`)
+
+```json
+{
+  "_id": "ac_66f001_xxxx",
+  "code": "FRUIT-2026-0001", // 卡密，唯一
+  "status": "UNUSED",       // UNUSED | USED | DISABLED
+  "type": "COUPON",          // 权益类型：COUPON | POINTS | MEMBERSHIP | BALANCE
+  "benefit": "满100减10优惠券", // 权益描述
+  "value": 1000,             // 权益数值（优惠券为分，积分为分/个，视 type 而定）
+  "redeemedBy": "oUpF8u_demo_user_openid", // 兑换用户 openid
+  "redeemedAt": "2026-09-23T10:00:00.000Z"
+}
+```
+
+### 8. 卡密兑换流水表 (`activation_records`)
+
+```json
+{
+  "_id": "ar_66f001_xxxx",
+  "code": "FRUIT-2026-0001",
+  "userId": "oUpF8u_demo_user_openid",
+  "type": "COUPON",
+  "benefit": "满100减10优惠券",
+  "value": 1000,
+  "createdAt": "2026-09-23T10:00:00.000Z"
+}
+```
 ---
 
 ## 三、推荐索引清单 (Database Indexes)
@@ -178,6 +225,10 @@
    - `idx_category`: `{ "categoryId": 1, "sort": -1 }`
    - `idx_sales`: `{ "sales": -1 }`
    - `idx_merchant`: `{ "merchantId": 1 }`
+2.1 **`categories`**:
+   - `idx_parent`: `{ "parentId": 1 }`
+   - `idx_sort`: `{ "sort": -1 }`
+   - `idx_status`: `{ "status": 1 }`
 3. **`product_skus`**:
    - `idx_product_id`: `{ "productId": 1 }`
    - `idx_sku_code`: `{ "skuCode": 1 }` (唯一索引)
@@ -202,3 +253,9 @@
 8. **`payment_transactions`**:
    - `idx_out_trade_no`: `{ "outTradeNo": 1 }` (唯一索引)
    - `idx_order_id`: `{ "orderId": 1 }`
+8. **`activation_codes`**:
+   - `idx_code`: `{ "code": 1 }` (唯一索引)
+   - `idx_status`: `{ "status": 1 }`
+9. **`activation_records`**:
+   - `idx_user`: `{ "userId": 1 }`
+   - `idx_code`: `{ "code": 1 }`

@@ -3,6 +3,7 @@
   "envId": "cloud1-d3gffg6ok96e6cf3f",
   "functionRoot": "cloudfunctions",
   "functions": [
+    { "name": "activation", "timeout": 20, "handler": "index.main", "memorySize": 256 },
     { "name": "adminAuth", "timeout": 20, "handler": "index.main", "memorySize": 256 },
     { "name": "adminBanners", "timeout": 20, "handler": "index.main", "memorySize": 256 },
     { "name": "adminCategories", "timeout": 20, "handler": "index.main", "memorySize": 256 },
