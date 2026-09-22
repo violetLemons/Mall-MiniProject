@@ -5,6 +5,7 @@
 const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
+const _ = db.command;
 const crypto = require('crypto');
 
 function err(code, message) {
@@ -308,8 +309,24 @@ exports.main = async (event, context) => {
       const page = integer(params.page || 1, '页码', 1, 10000);
       const pageSize = integer(params.pageSize || 20, '每页数量', 1, 50);
       const query = { userId };
-      if (params.status && params.status !== 'ALL') {
-        query.status = text(params.status, '状态', 1, 30);
+      const status = params.status;
+      if (status && status !== 'ALL') {
+        if (status === 'REFUND') {
+          // 退款中 = 待审核退款 (REFUND_PENDING) + 退款处理中 (REFUNDING)
+          query.status = _.in(['REFUND_PENDING', 'REFUNDING']);
+        } else if (status === 'PENDING_REVIEW') {
+          // 待评价 = 已完成且未评价
+          query.status = 'COMPLETED';
+          query.reviewed = _.neq(true);
+        } else if (status === 'SHIPPED') {
+          // 待收货 = 已发货 / 待自提
+          query.status = _.in(['SHIPPED', 'WAITING_PICKUP', 'READY_FOR_PICKUP']);
+        } else if (status === 'COMPLETED') {
+          // 已完成 = 已完成（含已评价）
+          query.status = 'COMPLETED';
+        } else {
+          query.status = text(status, '状态', 1, 30);
+        }
       }
 
       let total = 0;
@@ -490,6 +507,19 @@ exports.main = async (event, context) => {
       }});
       await db.collection('merchant_orders').doc(sub._id).update({ data: { status: 'REFUND_PENDING', refundNo, updatedAt: new Date() } });
       return success({ status: 'REFUND_PENDING', refundNo });
+    }
+
+    // 7. 买家评价 (已完成订单 -> reviewed=true，待评价转已完成)
+    if (action === 'review') {
+      const sub = await findUserSubOrder(db, params);
+      if (sub.status !== 'COMPLETED') throw err('INVALID_ORDER_STATUS', '仅已完成订单支持评价');
+      const rating = integer(params.rating || 5, '评分', 1, 5);
+      const comment = String(params.comment || '').slice(0, 500);
+      const reviewedAt = new Date();
+      await db.collection('merchant_orders').doc(sub._id).update({
+        data: { reviewed: true, reviewRating: rating, reviewComment: comment, reviewedAt, updatedAt: reviewedAt }
+      });
+      return success({ status: 'COMPLETED', reviewed: true });
     }
 
     throw err('ACTION_NOT_FOUND', `未知的订单操作: ${action}`);
