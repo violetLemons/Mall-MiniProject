@@ -1,0 +1,45 @@
+<view class="activation-page">
+  <custom-navbar title="激活卡密" showBack="{{true}}" />
+
+  <view class="act-banner-card">
+    <text class="act-banner-title">卡密兑换</text>
+    <text class="act-banner-sub">输入卡密，兑换专属权益</text>
+  </view>
+
+  <view class="act-form-card">
+    <view class="act-input-row">
+      <text class="act-label">卡密</text>
+      <input
+        class="act-input"
+        placeholder="请输入卡密"
+        placeholder-class="act-placeholder"
+        value="{{code}}"
+        bindinput="onCodeInput"
+      />
+    </view>
+
+    <button class="act-redeem-btn press-active" loading="{{loading}}" disabled="{{loading}}" bindtap="onRedeem">
+      立即兑换
+    </button>
+  </view>
+
+  <!-- 兑换结果 -->
+  <view wx:if="{{result && result.success}}" class="act-result success">
+    <text class="act-result-icon">🎉</text>
+    <text class="act-result-title">{{result.message}}</text>
+    <text wx:if="{{result.benefit}}" class="act-result-benefit">已发放权益：{{result.benefit}}</text>
+    <text wx:else class="act-result-benefit">权益已发放至账户，请注意查收</text>
+  </view>
+
+  <view wx:elif="{{result && !result.success}}" class="act-result fail">
+    <text class="act-result-icon">⚠️</text>
+    <text class="act-result-title">{{result.message}}</text>
+  </view>
+
+  <view class="act-tips">
+    <text class="act-tips-title">兑换须知</text>
+    <text class="act-tips-line">· 每张卡密仅可兑换一次，兑换后立即生效</text>
+    <text class="act-tips-line">· 卡密不区分大小写，输入时请勿包含空格</text>
+    <text class="act-tips-line">· 如有疑问，请前往「客服」页联系在线客服</text>
+  </view>
+</view>

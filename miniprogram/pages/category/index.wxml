@@ -33,6 +33,19 @@
         <text class="banner-title">{{categories[activeCategoryIndex].name}}系列</text>
       </view>
 
+      <!-- 二级分类词条（次要词条），选中后展示对应水果 -->
+      <scroll-view wx:if="{{subCategories.length > 0}}" class="sub-cat-scroll" scroll-x enable-flex>
+        <view class="sub-cat-list">
+          <view
+            wx:for="{{subCategories}}"
+            wx:key="id"
+            class="sub-cat-item press-active {{activeSubIndex === index ? 'is-active' : ''}}"
+            data-index="{{index}}"
+            bindtap="onSelectSubCategory"
+          >{{item.name}}</view>
+        </view>
+      </scroll-view>
+
       <view wx:if="{{categoryProducts.length > 0}}" class="cat-products-grid">
         <view
           wx:for="{{categoryProducts}}"

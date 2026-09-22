@@ -42,7 +42,15 @@ type OrderViewModel = OrderModel & {
 };
 
 Page({
-  data: { order: null as OrderViewModel | null, loading: true, submitting: false, errorMessage: '' },
+  data: {
+    order: null as OrderViewModel | null,
+    loading: true,
+    submitting: false,
+    errorMessage: '',
+    reviewVisible: false,
+    reviewRating: 5,
+    reviewComment: ''
+  },
 
   onLoad(options: any) {
     const identifier = options?.orderNo || options?.order_no || options?.outTradeNo || options?.out_trade_no || options?.order_id || options?.orderId || options?.id || '';
@@ -150,6 +158,44 @@ Page({
       this.loadOrder(id);
     } catch (err: any) {
       wx.showToast({ title: err?.message || '操作失败', icon: 'none' });
+    }
+  },
+
+  onOpenReview() {
+    this.setData({ reviewVisible: true, reviewRating: 5, reviewComment: '' });
+  },
+
+  onCloseReview() {
+    this.setData({ reviewVisible: false });
+  },
+
+  onSelectRating(e: any) {
+    const rating = Number(e.currentTarget.dataset.rating);
+    if (rating >= 1 && rating <= 5) {
+      this.setData({ reviewRating: rating });
+    }
+  },
+
+  onCommentInput(e: any) {
+    this.setData({ reviewComment: e.detail.value });
+  },
+
+  async onSubmitReview() {
+    const id = this.data.order?._id || this.data.order?.id || this.data.order?.orderNo;
+    if (!id || this.data.submitting) return;
+    this.setData({ submitting: true });
+    try {
+      await OrderService.submitReview(id, {
+        rating: this.data.reviewRating,
+        comment: this.data.reviewComment
+      });
+      wx.showToast({ title: '评价成功', icon: 'success' });
+      this.setData({ reviewVisible: false });
+      this.loadOrder(id);
+    } catch (err: any) {
+      wx.showToast({ title: err?.message || '评价失败', icon: 'none' });
+    } finally {
+      this.setData({ submitting: false });
     }
   }
 });

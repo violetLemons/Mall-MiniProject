@@ -2,13 +2,15 @@
   "pages": [
     "pages/home/index",
     "pages/category/index",
+    "pages/service/index",
     "pages/cart/index",
     "pages/profile/index",
     "pages/checkout/index",
     "pages/order/list/index",
     "pages/order/detail/index",
     "pages/goods/list/index",
-    "pages/goods/detail/index"
+    "pages/goods/detail/index",
+    "pages/activation/index"
   ],
   "window": {
     "backgroundTextStyle": "dark",
@@ -35,6 +37,12 @@
         "text": "分类",
         "iconPath": "assets/icons/category.png",
         "selectedIconPath": "assets/icons/category-active.png"
+      },
+      {
+        "pagePath": "pages/service/index",
+        "text": "客服",
+        "iconPath": "assets/icons/service.png",
+        "selectedIconPath": "assets/icons/service-active.png"
       },
       {
         "pagePath": "pages/cart/index",

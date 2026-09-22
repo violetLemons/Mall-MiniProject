@@ -113,6 +113,37 @@
   font-weight: 800;
 }
 
+/* 二级分类词条横向滚动条 */
+.sub-cat-scroll {
+  width: 100%;
+  white-space: nowrap;
+  margin-bottom: 20rpx;
+  box-sizing: border-box;
+}
+
+.sub-cat-list {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 4rpx 0;
+}
+
+.sub-cat-item {
+  flex-shrink: 0;
+  padding: 12rpx 28rpx;
+  border-radius: 999rpx;
+  background-color: var(--surface-subtle, #F8F9FA);
+  font-size: 24rpx;
+  color: var(--text-secondary, #8A8D93);
+  box-sizing: border-box;
+}
+
+.sub-cat-item.is-active {
+  background-color: var(--brand-accent, #FF5500);
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
 /* 商品双列网格：使用 minmax(0, 1fr) 防止子项固有宽度溢出 */
 .cat-products-grid {
   display: grid;

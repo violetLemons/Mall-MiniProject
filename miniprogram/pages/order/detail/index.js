@@ -35,7 +35,15 @@ function formatDateTime(val) {
     return `${Y}-${M}-${D} ${h}:${m}:${s}`;
 }
 Page({
-    data: { order: null, loading: true, submitting: false, errorMessage: '' },
+    data: {
+        order: null,
+        loading: true,
+        submitting: false,
+        errorMessage: '',
+        reviewVisible: false,
+        reviewRating: 5,
+        reviewComment: ''
+    },
     onLoad(options) {
         const identifier = (options === null || options === void 0 ? void 0 : options.orderNo) || (options === null || options === void 0 ? void 0 : options.order_no) || (options === null || options === void 0 ? void 0 : options.outTradeNo) || (options === null || options === void 0 ? void 0 : options.out_trade_no) || (options === null || options === void 0 ? void 0 : options.order_id) || (options === null || options === void 0 ? void 0 : options.orderId) || (options === null || options === void 0 ? void 0 : options.id) || '';
         this.loadOrder(identifier, options);
@@ -140,6 +148,45 @@ Page({
             }
             catch (err) {
                 wx.showToast({ title: (err === null || err === void 0 ? void 0 : err.message) || '操作失败', icon: 'none' });
+            }
+        });
+    },
+    onOpenReview() {
+        this.setData({ reviewVisible: true, reviewRating: 5, reviewComment: '' });
+    },
+    onCloseReview() {
+        this.setData({ reviewVisible: false });
+    },
+    onSelectRating(e) {
+        const rating = Number(e.currentTarget.dataset.rating);
+        if (rating >= 1 && rating <= 5) {
+            this.setData({ reviewRating: rating });
+        }
+    },
+    onCommentInput(e) {
+        this.setData({ reviewComment: e.detail.value });
+    },
+    onSubmitReview() {
+        return __awaiter(this, void 0, void 0, function* () {
+            var _a, _b, _c;
+            const id = ((_a = this.data.order) === null || _a === void 0 ? void 0 : _a._id) || ((_b = this.data.order) === null || _b === void 0 ? void 0 : _b.id) || ((_c = this.data.order) === null || _c === void 0 ? void 0 : _c.orderNo);
+            if (!id || this.data.submitting)
+                return;
+            this.setData({ submitting: true });
+            try {
+                yield order_service_1.OrderService.submitReview(id, {
+                    rating: this.data.reviewRating,
+                    comment: this.data.reviewComment
+                });
+                wx.showToast({ title: '评价成功', icon: 'success' });
+                this.setData({ reviewVisible: false });
+                this.loadOrder(id);
+            }
+            catch (err) {
+                wx.showToast({ title: (err === null || err === void 0 ? void 0 : err.message) || '评价失败', icon: 'none' });
+            }
+            finally {
+                this.setData({ submitting: false });
             }
         });
     }

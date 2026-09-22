@@ -1,0 +1,37 @@
+<view class="service-page">
+  <custom-navbar title="客服中心" />
+
+  <!-- 客服横幅 -->
+  <view class="service-banner-card">
+    <view class="sbc-title">通用商城服务顾问</view>
+    <view class="sbc-sub">服务时间：每日 09:00 - 22:00 全年无休</view>
+    <view class="sbc-tip">正品防伪 · 规格咨询 · 物流时效 · 售后退换</view>
+  </view>
+
+  <!-- 在线客服接入按钮 -->
+  <button class="btn-contact btn-wechat press-active" bindtap="onContactService">
+    <text>💬 接入微信官方在线客服</text>
+  </button>
+
+  <!-- 电话呼叫 -->
+  <button class="btn-contact btn-phone press-active" bindtap="onCallHotline">
+    <text class="bpc-text">拨打客服专线：{{customerServicePhone || '400-000-0000'}}</text>
+  </button>
+
+  <!-- 常见问题 FAQ -->
+  <view class="service-faq-box">
+    <view class="faq-head">常见咨询 FAQ</view>
+    <view class="faq-item">
+      <view class="faq-q">Q: 规格不合适支持 7 天退换吗？</view>
+      <view class="faq-a">A: 保持商品完好未使用、吊牌完好且包装齐全的情况下，支持 7 天无理由退换货。</view>
+    </view>
+    <view class="faq-item">
+      <view class="faq-q">Q: 水果生鲜类商品如何保证新鲜？</view>
+      <view class="faq-a">A: 全程冷链配送，支持到货开箱验货，如有质量问题可当场拒收并联系客服处理。</view>
+    </view>
+    <view class="faq-item">
+      <view class="faq-q">Q: 下单后多久发货？</view>
+      <view class="faq-a">A: 生鲜类当日 16:00 前下单当日发出，其余品类 24 小时内发出，具体以物流信息为准。</view>
+    </view>
+  </view>
+</view>

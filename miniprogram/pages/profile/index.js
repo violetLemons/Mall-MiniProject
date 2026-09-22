@@ -13,6 +13,7 @@ const auth_service_1 = require("../../services/auth.service");
 const order_service_1 = require("../../services/order.service");
 const cart_service_1 = require("../../services/cart.service");
 const address_service_1 = require("../../services/address.service");
+const activation_service_1 = require("../../services/activation.service");
 const store_1 = require("../../config/store");
 const STORAGE_FAV_KEY = 'sneaker_mall_favorites';
 const STORAGE_HISTORY_KEY = 'sneaker_mall_history';
@@ -25,10 +26,11 @@ Page({
             userId: ''
         },
         orderStats: [
+            { key: 'all', label: '全部订单', count: 0 },
             { key: 'unpaid', label: '待付款', count: 0 },
             { key: 'unshipped', label: '待发货', count: 0 },
             { key: 'shipped', label: '待收货', count: 0 },
-            { key: 'refund', label: '售后/退款', count: 0 }
+            { key: 'refund', label: '退款中', count: 0 }
         ],
         menuItems: [
             { id: 'fav', title: '我的收藏', badge: '' },
@@ -67,7 +69,11 @@ Page({
         },
         // 系统设置
         storageSize: '128 KB',
-        notifyEnabled: true
+        notifyEnabled: true,
+        // 激活卡密抽屉
+        actCode: '',
+        actLoading: false,
+        actResult: null
     },
     onShow() {
         this.initLocalData();
@@ -113,11 +119,14 @@ Page({
                 const unpaidCount = list.filter(o => o.status === 'PENDING_PAYMENT').length;
                 const unshippedCount = list.filter(o => o.status === 'PAID').length;
                 const shippedCount = list.filter(o => o.status === 'SHIPPED' || o.status === 'WAITING_PICKUP' || o.status === 'READY_FOR_PICKUP').length;
+                const refundCount = list.filter(o => o.status === 'REFUND_PENDING' || o.status === 'REFUNDING').length;
                 this.setData({
                     allOrders: list,
-                    'orderStats[0].count': unpaidCount,
-                    'orderStats[1].count': unshippedCount,
-                    'orderStats[2].count': shippedCount
+                    'orderStats[0].count': list.length, // 全部订单
+                    'orderStats[1].count': unpaidCount,
+                    'orderStats[2].count': unshippedCount,
+                    'orderStats[3].count': shippedCount,
+                    'orderStats[4].count': refundCount
                 });
                 // 如果当前订单抽屉已打开，同步刷新过滤列表
                 if (this.data.activeDrawer === 'order') {
@@ -229,6 +238,52 @@ Page({
         const tab = e.currentTarget.dataset.tab;
         this.setData({ orderActiveTab: tab });
         this.filterOrdersByTab(tab);
+    },
+    onTapActivation() {
+        this.setData({
+            activeDrawer: 'activation',
+            drawerTitle: '激活卡密',
+            actCode: '',
+            actResult: null
+        });
+    },
+    onActCodeInput(e) {
+        this.setData({ actCode: e.detail.value });
+    },
+    onActRedeem() {
+        return __awaiter(this, void 0, void 0, function* () {
+            const code = String(this.data.actCode || '').trim();
+            if (!code) {
+                wx.showToast({ title: '请输入卡密', icon: 'none' });
+                return;
+            }
+            this.setData({ actLoading: true, actResult: null });
+            try {
+                const res = yield activation_service_1.ActivationService.redeem(code);
+                this.setData({
+                    actResult: {
+                        success: true,
+                        message: '兑换成功',
+                        benefit: res.benefit,
+                        type: res.type,
+                        value: res.value
+                    }
+                });
+                wx.showToast({ title: '兑换成功', icon: 'success' });
+            }
+            catch (err) {
+                this.setData({
+                    actResult: {
+                        success: false,
+                        message: (err === null || err === void 0 ? void 0 : err.message) || '兑换失败，请稍后重试'
+                    }
+                });
+                wx.showToast({ title: (err === null || err === void 0 ? void 0 : err.message) || '兑换失败', icon: 'none' });
+            }
+            finally {
+                this.setData({ actLoading: false });
+            }
+        });
     },
     filterOrdersByTab(tab) {
         const list = this.data.allOrders;
