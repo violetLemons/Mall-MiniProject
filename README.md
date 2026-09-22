@@ -1,5 +1,7 @@
 # 微信小程序全功能电商商城开源模板 (WeChat Mini Program Mall Template)
 
+
+
 > **基于微信原生小程序 (TypeScript) + 微信云开发 (CloudBase Node.js) + React 18 PC 管理后台构建的商业级开源商城全套解决方案。**
 
 ---
