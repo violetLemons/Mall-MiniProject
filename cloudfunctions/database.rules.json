@@ -75,6 +75,14 @@
     "read": false,
     "write": false
   },
+  "activation_codes": {
+    "read": false,
+    "write": false
+  },
+  "activation_records": {
+    "read": false,
+    "write": false
+  },
   "pickup_points": {
     "read": true,
     "write": false
