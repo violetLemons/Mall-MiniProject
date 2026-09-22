@@ -97,8 +97,21 @@ exports.main = async (event, context) => {
         if (!username || !password || password.length < 8) {
           return fail('INVALID_PARAMS', '账号与密码不可为空，且密码长度不少于 8 位密码');
         }
-        if (role === 'MERCHANT' && !merchantId) {
-          return fail('INVALID_PARAMS', '创建商家账号必须填写商家 ID (merchantId)');
+
+        // 商家账号的 merchantId 由平台自动生成（m1、m2、m3… 最大序号 +1），不再要求管理员手动填写
+        let merchantIdValue = merchantId;
+        if (role === 'MERCHANT' && !merchantIdValue) {
+          const existing = await db.collection('admins')
+            .where({ role: 'MERCHANT' })
+            .field({ merchantId: true })
+            .limit(1000)
+            .get();
+          let maxSeq = 0;
+          for (const a of existing.data) {
+            const m = /^m(\d+)$/.exec(a.merchantId || '');
+            if (m) maxSeq = Math.max(maxSeq, parseInt(m[1], 10));
+          }
+          merchantIdValue = 'm' + (maxSeq + 1);
         }
 
         let subMchIdEnc = null;
@@ -129,7 +142,7 @@ exports.main = async (event, context) => {
             passwordHash: pwdHash,
             salt,
             role,
-            merchantId: role === 'MERCHANT' ? merchantId : null,
+            merchantId: role === 'MERCHANT' ? merchantIdValue : null,
             subMchIdEnc,
             permissions: role === 'SUPER_ADMIN' ? ['*'] : permissions,
             status: 'ACTIVE',
@@ -146,7 +159,7 @@ exports.main = async (event, context) => {
           action: 'CREATE_ADMIN',
           resourceType: 'ADMIN',
           resourceId: addRes._id,
-          after: { username, role, merchantId: role === 'MERCHANT' ? merchantId : null, subMchIdMask: subMchIdEnc ? maskSecret(subMchIdEnc) : '' }
+          after: { username, role, merchantId: role === 'MERCHANT' ? merchantIdValue : null, subMchIdMask: subMchIdEnc ? maskSecret(subMchIdEnc) : '' }
         });
 
         return success({ adminId: addRes._id, subMchIdMask: subMchIdEnc ? maskSecret(subMchIdEnc) : '' }, '管理员账号创建成功');
@@ -182,6 +195,109 @@ exports.main = async (event, context) => {
         });
 
         return success(null, status === 'ACTIVE' ? '管理员已启用' : '管理员已冻结封禁');
+      }
+
+      /**
+       * 下架商家：账号冻结(SUSPENDED，不可登录) + 商品全部下架，快照 ON_SALE 商品供上架撤回恢复
+       */
+      case 'suspendMerchant': {
+        const { adminId } = params;
+        if (!adminId) return fail('INVALID_PARAMS', '缺少目标账号ID');
+        const target = await db.collection('admins').doc(adminId).get().catch(() => null);
+        if (!target || !target.data) return fail('ADMIN_NOT_FOUND', '目标账号不存在');
+        if (target.data.role !== 'MERCHANT') return fail('INVALID_PARAMS', '仅商家账号可下架');
+        if (target.data.status !== 'ACTIVE') return fail('INVALID_PARAMS', '仅正常状态的商家可下架');
+        const mId = target.data.merchantId;
+        if (!mId) return fail('INVALID_PARAMS', '商家账号缺少 merchantId');
+
+        const onSale = await db.collection('products').where({ merchantId: mId, status: 'ON_SALE' }).field({ _id: true }).limit(1000).get();
+        const ids = onSale.data.map(p => p._id);
+        if (ids.length > 0) {
+          await db.collection('products').where({ merchantId: mId, status: 'ON_SALE' }).update({ data: { status: 'OFF_SALE', updatedAt: db.serverDate() } });
+        }
+
+        await db.collection('admins').doc(adminId).update({
+          data: {
+            status: 'SUSPENDED',
+            suspendedProductIds: ids,
+            suspendedAt: db.serverDate(),
+            updatedAt: db.serverDate()
+          }
+        });
+
+        await recordOperationLog(db, {
+          adminId: admin.adminId,
+          adminUsername: admin.username,
+          action: 'SUSPEND_MERCHANT',
+          resourceType: 'ADMIN',
+          resourceId: adminId,
+          after: { merchantId: mId, suspendedProductCount: ids.length }
+        });
+
+        return success({ suspendedProductCount: ids.length }, '商家已下架，其商品已全部下架');
+      }
+
+      /**
+       * 上架撤回：恢复商家为 ACTIVE，并把快照中仍为 OFF_SALE 的商品恢复 ON_SALE
+       */
+      case 'resumeMerchant': {
+        const { adminId } = params;
+        if (!adminId) return fail('INVALID_PARAMS', '缺少目标账号ID');
+        const target = await db.collection('admins').doc(adminId).get().catch(() => null);
+        if (!target || !target.data) return fail('ADMIN_NOT_FOUND', '目标账号不存在');
+        if (target.data.status !== 'SUSPENDED') return fail('INVALID_PARAMS', '仅下架中的商家可上架撤回');
+        const mId = target.data.merchantId;
+        const ids = Array.isArray(target.data.suspendedProductIds) ? target.data.suspendedProductIds : [];
+
+        if (mId && ids.length > 0) {
+          await db.collection('products').where({ merchantId: mId, status: 'OFF_SALE', _id: db.command.in(ids) }).update({ data: { status: 'ON_SALE', updatedAt: db.serverDate() } });
+        }
+
+        await db.collection('admins').doc(adminId).update({
+          data: { status: 'ACTIVE', suspendedProductIds: [], suspendedAt: null, updatedAt: db.serverDate() }
+        });
+
+        await recordOperationLog(db, {
+          adminId: admin.adminId,
+          adminUsername: admin.username,
+          action: 'RESUME_MERCHANT',
+          resourceType: 'ADMIN',
+          resourceId: adminId,
+          after: { merchantId: mId, restoredProductCount: ids.length }
+        });
+
+        return success(null, '商家已上架撤回，商品状态已恢复');
+      }
+
+      /**
+       * 删除商家：账号 DELETED(永久不可登录) + 商品全部下架，历史订单保留不删
+       */
+      case 'deleteMerchant': {
+        const { adminId } = params;
+        if (!adminId) return fail('INVALID_PARAMS', '缺少目标账号ID');
+        if (adminId === admin.adminId) return fail('OPERATION_FORBIDDEN', '不能删除当前登录账号');
+        const target = await db.collection('admins').doc(adminId).get().catch(() => null);
+        if (!target || !target.data) return fail('ADMIN_NOT_FOUND', '目标账号不存在');
+        if (target.data.role !== 'MERCHANT') return fail('INVALID_PARAMS', '仅商家账号可删除');
+        const mId = target.data.merchantId;
+        if (!mId) return fail('INVALID_PARAMS', '商家账号缺少 merchantId');
+
+        await db.collection('products').where({ merchantId: mId, status: db.command.in(['ON_SALE', 'OFF_SALE']) }).update({ data: { status: 'OFF_SALE', updatedAt: db.serverDate() } });
+
+        await db.collection('admins').doc(adminId).update({
+          data: { status: 'DELETED', suspendedProductIds: [], suspendedAt: null, updatedAt: db.serverDate() }
+        });
+
+        await recordOperationLog(db, {
+          adminId: admin.adminId,
+          adminUsername: admin.username,
+          action: 'DELETE_MERCHANT',
+          resourceType: 'ADMIN',
+          resourceId: adminId,
+          after: { merchantId: mId }
+        });
+
+        return success(null, '商家已删除，其商品已全部下架，历史订单已保留');
       }
 
       /**

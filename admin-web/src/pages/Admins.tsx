@@ -4,7 +4,7 @@ import { AdminUser, AdminRole } from '../types';
 import { Badge } from '../components/Badge';
 import { Modal } from '../components/Modal';
 import { useToast } from '../components/Toast';
-import { ShieldCheck, Plus, UserCheck, Lock } from 'lucide-react';
+import { ShieldCheck, Plus, UserCheck, Lock, Ban, Undo2, Trash2 } from 'lucide-react';
 
 const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
   SUPER_ADMIN: ['*'],
@@ -28,8 +28,7 @@ export const Admins: React.FC = () => {
   const [formData, setFormData] = useState<Partial<AdminUser>>({
     username: '',
     name: '',
-    role: 'OPERATOR',
-    merchantId: ''
+    role: 'OPERATOR'
   });
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -53,8 +52,7 @@ export const Admins: React.FC = () => {
     setFormData({
       username: '',
       name: '',
-      role: 'OPERATOR',
-      merchantId: ''
+      role: 'OPERATOR'
     });
     setPassword('');
     setConfirmPassword('');
@@ -78,10 +76,6 @@ export const Admins: React.FC = () => {
     }
 
     const role = formData.role || 'OPERATOR';
-    if (role === 'MERCHANT' && !formData.merchantId?.trim()) {
-      toast('创建商家账号必须填写商家 ID (merchantId)', 'error');
-      return;
-    }
     if (role === 'MERCHANT' && subMchId.trim() && !/^\d{8,32}$/.test(subMchId.trim())) {
       toast('商户号格式不正确（需为 8-32 位数字）', 'error');
       return;
@@ -90,7 +84,6 @@ export const Admins: React.FC = () => {
     try {
       await AdminApi.saveAdmin({
         ...formData,
-        merchantId: role === 'MERCHANT' ? (formData.merchantId || '').trim() : null,
         subMchId: role === 'MERCHANT' ? subMchId.trim() : '',
         password,
         permissions: ROLE_PERMISSIONS[role]
@@ -100,6 +93,39 @@ export const Admins: React.FC = () => {
       await loadData();
     } catch (err: any) {
       toast(err.message || '开通失败', 'error');
+    }
+  };
+
+  const handleSuspend = async (adm: AdminUser) => {
+    if (!window.confirm(`确定下架商家「${adm.name}」吗？其名下所有在售商品将全部下架，商家账号将冻结无法登录。`)) return;
+    try {
+      const res = await AdminApi.suspendMerchant(adm.id);
+      toast(`商家「${adm.name}」已下架，${res.suspendedProductCount} 件商品已下架`, 'success');
+      await loadData();
+    } catch (err: any) {
+      toast(err.message || '下架失败', 'error');
+    }
+  };
+
+  const handleResume = async (adm: AdminUser) => {
+    if (!window.confirm(`确定上架撤回商家「${adm.name}」吗？其名下商品将恢复为下架前的在售状态。`)) return;
+    try {
+      await AdminApi.resumeMerchant(adm.id);
+      toast(`商家「${adm.name}」已恢复上架`, 'success');
+      await loadData();
+    } catch (err: any) {
+      toast(err.message || '上架撤回失败', 'error');
+    }
+  };
+
+  const handleDelete = async (adm: AdminUser) => {
+    if (!window.confirm(`确定删除商家「${adm.name}」吗？删除后其账号永久无法登录，名下所有商品下架，但历史订单保留。此操作不可撤销。`)) return;
+    try {
+      await AdminApi.deleteMerchant(adm.id);
+      toast(`商家「${adm.name}」已删除`, 'success');
+      await loadData();
+    } catch (err: any) {
+      toast(err.message || '删除失败', 'error');
     }
   };
 
@@ -154,6 +180,7 @@ export const Admins: React.FC = () => {
               <th style={{ padding: '14px 18px' }}>状态</th>
               <th style={{ padding: '14px 18px' }}>最近登录时间</th>
               <th style={{ padding: '14px 18px' }}>创建时间</th>
+              <th style={{ padding: '14px 18px' }}>操作</th>
             </tr>
           </thead>
           <tbody>
@@ -176,10 +203,9 @@ export const Admins: React.FC = () => {
                   >
                     {adm.role === 'SUPER_ADMIN' ? '超级管理员' : adm.role === 'MERCHANT' ? '商家' : adm.role === 'WAREHOUSE' ? '仓库专员' : '运营人员'}
                   </span>
-                  {adm.role === 'MERCHANT' && (
+                  {adm.role === 'MERCHANT' && adm.subMchIdMask && (
                     <div style={{ fontSize: '11px', color: '#64748B', marginTop: '4px' }}>
-                      商家ID: {adm.merchantId || '—'}
-                      {adm.subMchIdMask && <span style={{ marginLeft: '8px' }}>商户号: {adm.subMchIdMask}</span>}
+                      商户号: {adm.subMchIdMask}
                     </div>
                   )}
                 </td>
@@ -189,13 +215,41 @@ export const Admins: React.FC = () => {
                   </code>
                 </td>
                 <td style={{ padding: '14px 18px' }}>
-                  <Badge status={adm.status} />
+                  <Badge status={adm.status} text={adm.status === 'DELETED' ? '已删除' : undefined} />
                 </td>
                 <td style={{ padding: '14px 18px', color: '#64748B' }}>
                   {adm.lastLoginAt || '未登录'}
                 </td>
                 <td style={{ padding: '14px 18px', color: '#94A3B8' }}>
                   {adm.createdAt}
+                </td>
+                <td style={{ padding: '14px 18px' }}>
+                  {adm.role === 'MERCHANT' && adm.status !== 'DELETED' && (
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      {adm.status === 'ACTIVE' && (
+                        <button
+                          onClick={() => handleSuspend(adm)}
+                          style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid #FDE68A', backgroundColor: '#FFFBEB', color: '#D97706', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <Ban size={13} /> 下架
+                        </button>
+                      )}
+                      {adm.status === 'SUSPENDED' && (
+                        <button
+                          onClick={() => handleResume(adm)}
+                          style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid #A7F3D0', backgroundColor: '#ECFDF5', color: '#059669', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <Undo2 size={13} /> 上架撤回
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDelete(adm)}
+                        style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid #FECACA', backgroundColor: '#FEF2F2', color: '#DC2626', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <Trash2 size={13} /> 删除
+                      </button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
@@ -248,24 +302,6 @@ export const Admins: React.FC = () => {
               <option value="SUPER_ADMIN">超级管理员 (拥有全部权限与物理清除权)</option>
             </select>
           </div>
-
-          {formData.role === 'MERCHANT' && (
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                商家 ID (merchantId)
-              </label>
-              <input
-                type="text"
-                value={formData.merchantId || ''}
-                onChange={(e) => setFormData({ ...formData, merchantId: e.target.value })}
-                placeholder="例如: m1 / merchant_001"
-                style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px' }}
-              />
-              <p style={{ fontSize: '12px', color: '#64748B', marginTop: '6px' }}>
-                该商家账号登录后仅能查看与操作 merchantId 对应的商品、订单与库存。
-              </p>
-            </div>
-          )}
 
           {formData.role === 'MERCHANT' && (
             <div>

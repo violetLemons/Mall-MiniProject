@@ -312,6 +312,13 @@ exports.main = async event => {
           const category = await getDoc(tx, 'categories', prodData.categoryId);
           if (!category || category.status !== 'ACTIVE') throw error('INVALID_CATEGORY', '请选择有效分类');
         }
+        // 商家若已被下架/删除，新商品审核通过后保持下架，避免绕过商家管控
+        let merchantActive = true;
+        if (ticket.merchantId) {
+          const mRes = await tx.collection('admins').where({ merchantId: ticket.merchantId, role: 'MERCHANT' }).limit(1).get();
+          const m = mRes.data && mRes.data[0];
+          merchantActive = !m || m.status === 'ACTIVE';
+        }
         if (ticket.type === 'CREATE') {
           if (!prodData.name || !prodData.cover) throw error('INVALID_PARAMS', '工单缺少商品名称或封面');
           const newId = key(crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
@@ -319,7 +326,7 @@ exports.main = async event => {
             ...prodData,
             merchantId: ticket.merchantId || null,
             platformFee,
-            status: 'ON_SALE',
+            status: merchantActive ? 'ON_SALE' : 'OFF_SALE',
             deletedAt: null,
             sales: 0,
             totalStock: prodData.totalStock || 0,

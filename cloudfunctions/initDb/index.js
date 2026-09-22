@@ -8,7 +8,7 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 
 const COLLECTIONS = [
-  'users', 'admins', 'auth_limits', 'products', 'product_skus',
+  'users', 'admins', 'auth_limits', 'products', 'product_skus', 'product_audit_tickets',
   'categories', 'carts', 'orders', 'order_items', 'merchant_orders',
   'payment_transactions', 'refund_records', 'activation_codes', 'activation_records',
   'addresses', 'address_meta', 'favorites', 'coupons',

@@ -58,6 +58,10 @@ export const Badge: React.FC<BadgeProps> = ({ status, text, variant }) => {
           else if (status === 'CANCELLED') label = '已取消';
         }
         break;
+      case 'SUSPENDED':
+        v = 'warning';
+        if (!text) label = '下架整改中';
+        break;
       case 'DELETED':
         v = 'danger';
         if (!text) label = '已删除(回收站)';

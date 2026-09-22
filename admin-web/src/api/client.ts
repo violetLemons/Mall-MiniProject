@@ -534,6 +534,18 @@ export const AdminApi = {
     await requestCloud('adminUsers', 'toggleStatus', { adminId, status });
   },
 
+  suspendMerchant: async (adminId: string): Promise<{ suspendedProductCount: number }> => {
+    return requestCloud<{ suspendedProductCount: number }>('adminUsers', 'suspendMerchant', { adminId });
+  },
+
+  resumeMerchant: async (adminId: string): Promise<void> => {
+    await requestCloud('adminUsers', 'resumeMerchant', { adminId });
+  },
+
+  deleteMerchant: async (adminId: string): Promise<void> => {
+    await requestCloud('adminUsers', 'deleteMerchant', { adminId });
+  },
+
   // ---------------- 审计日志 ----------------
   getOperationLogs: async (): Promise<OperationLog[]> => {
     const res = await requestCloud<{ list: any[] }>('adminUsers', 'operationLogs', {

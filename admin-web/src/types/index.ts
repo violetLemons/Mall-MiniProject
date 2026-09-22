@@ -8,7 +8,7 @@ export interface AdminUser {
   permissions: string[];
   merchantId?: string | null;
   subMchIdMask?: string;
-  status: 'ACTIVE' | 'DISABLED';
+  status: 'ACTIVE' | 'DISABLED' | 'SUSPENDED' | 'DELETED';
   lastLoginAt?: string;
   createdAt: string;
 }

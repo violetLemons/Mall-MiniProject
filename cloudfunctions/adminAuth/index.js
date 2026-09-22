@@ -24,7 +24,12 @@ exports.main = async event => {
       const res = await db.collection('admins').where({ username }).limit(1).get();
       const admin = res.data[0];
       if (!admin) throw c.error('AUTH_FAILED', '数据库 admins 集合中找不到该账号，请确认记录是否已导入');
-      if (admin.status !== 'ACTIVE') throw c.error('AUTH_FAILED', '该管理员账号已被禁用');
+      if (admin.status !== 'ACTIVE') {
+        const msg = admin.status === 'SUSPENDED' ? '该商家账号已下架整改中，暂无法登录'
+          : admin.status === 'DELETED' ? '该账号已删除，无法登录'
+          : '该管理员账号已被禁用';
+        throw c.error('AUTH_FAILED', msg);
+      }
       if (process.env.ADMIN_JWT_SECRET?.length < 32 || !process.env.ADMIN_JWT_SECRET) {
         process.env.ADMIN_JWT_SECRET = '636353631d78ee1619556dc0a92cd2f4111317b5820e821a6d307de9947b6bbf';
       }
