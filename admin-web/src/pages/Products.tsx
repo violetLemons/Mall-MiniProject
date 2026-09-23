@@ -68,6 +68,9 @@ export const Products: React.FC = () => {
   });
 
   const currentUser = AdminApi.getCurrentUser();
+  const [parentCategoryId, setParentCategoryId] = useState('');
+  const level1Categories = categories.filter(c => !c.parentId);
+  const level2Categories = categories.filter(c => c.parentId === parentCategoryId);
 
   const loadCategories = async () => {
     try {
@@ -148,15 +151,26 @@ export const Products: React.FC = () => {
     }
   };
 
+  const handleSelectLevel1 = (level1Id: string) => {
+    setParentCategoryId(level1Id);
+    const children = categories.filter(c => c.parentId === level1Id);
+    const cat = categories.find(c => c.id === level1Id);
+    setFormData(prev => ({
+      ...prev,
+      categoryId: children.length === 0 ? level1Id : '',
+      category: children.length === 0 ? (cat?.name || '') : ''
+    }));
+  };
+
   const handleOpenCreateModal = () => {
-    const defaultCat = categories.find(c => c.status === 'ACTIVE') || categories[0];
+    const firstLevel1 = categories.find(c => c.status === 'ACTIVE' && !c.parentId) || categories.find(c => !c.parentId);
     setFormData({
       name: '',
       subtitle: '',
       description: '',
       brand: '',
-      category: defaultCat?.name || '',
-      categoryId: defaultCat?.id || '',
+      category: '',
+      categoryId: '',
       cover: 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?w=800',
       minPrice: '',
       maxPrice: '',
@@ -168,9 +182,14 @@ export const Products: React.FC = () => {
     setDetailUrlInput('');
     setNewTagInput('');
     setEditModalOpen(true);
+    if (firstLevel1) handleSelectLevel1(firstLevel1.id);
+    else setParentCategoryId('');
   };
 
   const handleOpenEditModal = (p: Product) => {
+    const targetCat = categories.find(c => c.id === p.categoryId);
+    const parentId = targetCat?.parentId || p.categoryId || '';
+    setParentCategoryId(parentId);
     setFormData({
       ...p,
       name: p.name || p.title || '',
@@ -863,31 +882,53 @@ export const Products: React.FC = () => {
                 所属品类 *
               </label>
               <select
-                value={formData.categoryId || ''}
-                onChange={(e) => {
-                  const catId = e.target.value;
-                  const found = categories.find(c => c.id === catId);
-                  setFormData({
-                    ...formData,
-                    categoryId: catId,
-                    category: found ? found.name : formData.category
-                  });
-                }}
+                value={parentCategoryId}
+                onChange={(e) => handleSelectLevel1(e.target.value)}
                 style={{
                   width: '100%',
                   padding: '9px 12px',
                   borderRadius: '8px',
                   border: '1px solid #CBD5E1',
-                  fontSize: '14px'
+                  fontSize: '14px',
+                  marginBottom: '8px'
                 }}
               >
-                <option value="">请选择品类</option>
-                {categories.map((c) => (
+                <option value="">请选择一级分类</option>
+                {level1Categories.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
                 ))}
               </select>
+              {level2Categories.length > 0 ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {level2Categories.map((c) => {
+                    const selected = formData.categoryId === c.id;
+                    return (
+                      <span
+                        key={c.id}
+                        onClick={() => setFormData({ ...formData, categoryId: c.id, category: c.name })}
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          backgroundColor: selected ? '#FF5500' : '#F1F5F9',
+                          color: selected ? '#FFF' : '#475569',
+                          border: selected ? '1px solid #FF5500' : '1px solid #E2E8F0'
+                        }}
+                      >
+                        {selected ? `✓ ${c.name}` : c.name}
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : (
+                parentCategoryId ? (
+                  <div style={{ fontSize: '12px', color: '#64748B' }}>该一级分类下暂无二级分类，将直接作为品类。</div>
+                ) : null
+              )}
             </div>
           </div>
 

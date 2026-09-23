@@ -148,6 +148,8 @@ export interface Category {
   name: string;
   icon: string;
   iconFileID?: string;
+  parentId?: string;
+  badge?: string;
   sort: number;
   status: 'ACTIVE' | 'DISABLED';
   productCount: number;

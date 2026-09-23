@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AdminApi } from '../api/client';
-import { ProductAuditTicket } from '../types';
+import { ProductAuditTicket, Category } from '../types';
 import { Badge } from '../components/Badge';
 import { useToast } from '../components/Toast';
 import { formatCents } from '../utils/format';
@@ -20,9 +20,11 @@ export const AuditTickets: React.FC = () => {
   const [tickets, setTickets] = useState<ProductAuditTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
-  const [feeInputs, setFeeInputs] = useState<Record<string, string>>({});
   const [processing, setProcessing] = useState<string | null>(null);
   const [detailTicket, setDetailTicket] = useState<ProductAuditTicket | null>(null);
+  const [approveTicket, setApproveTicket] = useState<ProductAuditTicket | null>(null);
+  const [approveFee, setApproveFee] = useState('');
+  const [categories, setCategories] = useState<Category[]>([]);
 
   const loadData = async () => {
     setLoading(true);
@@ -36,28 +38,43 @@ export const AuditTickets: React.FC = () => {
     }
   };
 
+  const loadCategories = async () => {
+    try {
+      const list = await AdminApi.getCategories();
+      setCategories(Array.isArray(list) ? list : []);
+    } catch {
+      setCategories([]);
+    }
+  };
+
   useEffect(() => {
     loadData();
+    loadCategories();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
-  const handleApprove = async (ticket: ProductAuditTicket): Promise<boolean> => {
-    const raw = feeInputs[ticket.id] ?? '0';
-    const feeYuan = Number(raw);
+  const handleOpenApprove = (ticket: ProductAuditTicket) => {
+    setApproveFee('');
+    setApproveTicket(ticket);
+  };
+
+  const handleConfirmApprove = async () => {
+    if (!approveTicket) return;
+    const feeYuan = Number(approveFee);
     if (isNaN(feeYuan) || feeYuan < 0) {
       toast('请输入有效的平台抽成金额（每件，元）', 'error');
-      return false;
+      return;
     }
     const platformFee = Math.round(feeYuan * 100);
-    setProcessing(ticket.id);
+    setProcessing(approveTicket.id);
     try {
-      await AdminApi.reviewTicket(ticket.id, 'approve', platformFee);
+      await AdminApi.reviewTicket(approveTicket.id, 'approve', platformFee);
       toast('已通过审核，平台抽成已写入', 'success');
+      setApproveTicket(null);
+      setDetailTicket(null);
       await loadData();
-      return true;
     } catch (err: any) {
       toast(err.message || '审核通过失败', 'error');
-      return false;
     } finally {
       setProcessing(null);
     }
@@ -86,11 +103,6 @@ export const AuditTickets: React.FC = () => {
 
   const openDetail = (ticket: ProductAuditTicket) => setDetailTicket(ticket);
 
-  const approveFromModal = async () => {
-    if (!detailTicket) return;
-    if (await handleApprove(detailTicket)) setDetailTicket(null);
-  };
-
   const rejectFromModal = async () => {
     if (!detailTicket) return;
     if (await handleReject(detailTicket)) setDetailTicket(null);
@@ -101,6 +113,13 @@ export const AuditTickets: React.FC = () => {
   const detailMeta = detailTicket
     ? STATUS_META[detailTicket.status] || { label: detailTicket.status, variant: 'default' as const }
     : null;
+  const categoryName = detailProduct.categoryId
+    ? categories.find(c => c.id === detailProduct.categoryId)?.name || detailProduct.categoryId
+    : '—';
+  const detailImages = Array.isArray(detailProduct.detailImages) && detailProduct.detailImages.length > 0
+    ? detailProduct.detailImages
+    : Array.isArray(detailProduct.images) ? detailProduct.images : [];
+  const deliveryTypes = Array.isArray(detailProduct.deliveryTypes) ? detailProduct.deliveryTypes : [];
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -226,18 +245,9 @@ export const AuditTickets: React.FC = () => {
                       <td style={{ padding: '14px 18px', textAlign: 'right' }}>
                         {t.status === 'PENDING' ? (
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              placeholder="抽成/件 ¥"
-                              value={feeInputs[t.id] ?? ''}
-                              onChange={e => setFeeInputs(prev => ({ ...prev, [t.id]: e.target.value }))}
-                              style={{ width: '90px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
-                            />
                             <button
                               disabled={processing === t.id}
-                              onClick={() => handleApprove(t)}
+                              onClick={() => handleOpenApprove(t)}
                               style={{
                                 padding: '6px 12px', borderRadius: '6px', border: '1px solid #A7F3D0',
                                 backgroundColor: '#ECFDF5', color: '#059669', fontSize: '12px', fontWeight: 700,
@@ -309,13 +319,17 @@ export const AuditTickets: React.FC = () => {
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', color: '#334155' }}>
                 <div style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>{detailProduct.name || '(未命名商品)'}</div>
+                {detailProduct.subtitle && <div style={{ fontSize: '12px', color: '#64748B' }}>{detailProduct.subtitle}</div>}
                 <div>品牌：{detailProduct.brand || '—'}</div>
-                <div>分类：{detailProduct.categoryId || '—'}</div>
+                <div>分类：{categoryName}</div>
                 <div>
                   基准价：{formatCents(detailProduct.minPrice)}
                   {detailProduct.maxPrice !== undefined && detailProduct.maxPrice !== detailProduct.minPrice ? ` ~ ${formatCents(detailProduct.maxPrice)}` : ''}
                 </div>
                 <div>库存：{detailProduct.totalStock ?? '—'}</div>
+                {deliveryTypes.length > 0 && (
+                  <div>配送方式：{deliveryTypes.map(t => t === 'DELIVERY' ? '顺丰快递包邮' : t === 'PICKUP' ? '到店自提' : t).join('、')}</div>
+                )}
                 {Array.isArray(detailProduct.tags) && detailProduct.tags.length > 0 && (
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     {detailProduct.tags.map((tag: string) => (
@@ -333,9 +347,9 @@ export const AuditTickets: React.FC = () => {
               </div>
             )}
 
-            {Array.isArray(detailProduct.images) && detailProduct.images.length > 1 && (
+            {detailImages.length > 0 && (
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                {detailProduct.images.map((img: string, i: number) => (
+                {detailImages.map((img: string, i: number) => (
                   <img key={i} src={img} alt="" style={{ width: '64px', height: '64px', borderRadius: '8px', objectFit: 'cover' }} />
                 ))}
               </div>
@@ -371,22 +385,12 @@ export const AuditTickets: React.FC = () => {
             {/* 平台审核操作 */}
             {isSuper && detailTicket.status === 'PENDING' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderTop: '1px solid #E2E8F0', paddingTop: '16px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>平台抽成(每件)</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="抽成/件 ¥"
-                  value={feeInputs[detailTicket.id] ?? ''}
-                  onChange={e => setFeeInputs(prev => ({ ...prev, [detailTicket.id]: e.target.value }))}
-                  style={{ width: '110px', padding: '7px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
-                />
                 <button
                   disabled={processing === detailTicket.id}
-                  onClick={approveFromModal}
+                  onClick={() => handleOpenApprove(detailTicket)}
                   style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #A7F3D0', backgroundColor: '#ECFDF5', color: '#059669', fontSize: '13px', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                 >
-                  <Check size={14} /> 通过
+                  <Check size={14} /> 通过（填写抽成）
                 </button>
                 <button
                   disabled={processing === detailTicket.id}
@@ -399,6 +403,53 @@ export const AuditTickets: React.FC = () => {
             )}
           </div>
         )}
+      </Modal>
+
+      {/* 通过审核 · 填写平台抽成弹窗 */}
+      <Modal
+        isOpen={!!approveTicket}
+        onClose={() => setApproveTicket(null)}
+        title="通过审核 · 填写平台抽成"
+        width="440px"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <p style={{ fontSize: '13px', color: '#475569', lineHeight: 1.6 }}>
+            为商品「{approveTicket?.payload?.product?.name || '(未命名商品)'}」设置平台抽成金额（每件，元），通过后自动上架。
+          </p>
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+              平台抽成 (¥ / 每件)
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              autoFocus
+              placeholder="例如: 0.50"
+              value={approveFee}
+              onChange={e => setApproveFee(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleConfirmApprove(); } }}
+              style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px' }}
+            />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            <button
+              type="button"
+              onClick={() => setApproveTicket(null)}
+              style={{ padding: '9px 18px', borderRadius: '8px', border: '1px solid #CBD5E1', backgroundColor: '#FFF', color: '#475569', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              disabled={processing === approveTicket?.id}
+              onClick={handleConfirmApprove}
+              style={{ padding: '9px 24px', borderRadius: '8px', border: 'none', backgroundColor: '#059669', color: '#FFF', fontSize: '14px', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+            >
+              <Check size={15} /> 确认通过
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

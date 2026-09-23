@@ -113,82 +113,52 @@
   font-weight: 800;
 }
 
-/* 二级分类词条横向滚动条 */
-.sub-cat-scroll {
-  width: 100%;
-  white-space: nowrap;
-  margin-bottom: 20rpx;
-  box-sizing: border-box;
-}
-
-.sub-cat-list {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-  padding: 4rpx 0;
-}
-
-.sub-cat-item {
-  flex-shrink: 0;
-  padding: 12rpx 28rpx;
-  border-radius: 999rpx;
-  background-color: var(--surface-subtle, #F8F9FA);
-  font-size: 24rpx;
-  color: var(--text-secondary, #8A8D93);
-  box-sizing: border-box;
-}
-
-.sub-cat-item.is-active {
-  background-color: var(--brand-accent, #FF5500);
-  color: #FFFFFF;
-  font-weight: 600;
-}
-
-/* 商品双列网格：使用 minmax(0, 1fr) 防止子项固有宽度溢出 */
-.cat-products-grid {
+/* 二级分类图片卡片网格 */
+.sub-cat-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16rpx;
+  gap: 20rpx;
   width: 100%;
   box-sizing: border-box;
 }
 
-.cat-product-item {
+.sub-cat-card {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  gap: 14rpx;
   background-color: var(--surface-subtle, #F8F9FA);
   border-radius: var(--radius-sm, 12rpx);
-  padding: 12rpx;
+  padding: 24rpx 12rpx;
   min-width: 0;
   box-sizing: border-box;
   overflow: hidden;
 }
 
-.cat-product-thumb {
-  width: 100%;
-  height: 180rpx;
-  border-radius: 8rpx;
-  object-fit: cover;
-  margin-bottom: 10rpx;
-  display: block;
+.sub-cat-icon {
+  width: 140rpx;
+  height: 140rpx;
+  border-radius: 16rpx;
   background-color: #FFFFFF;
+  box-sizing: border-box;
 }
 
-.cat-product-title {
-  font-size: 22rpx;
+.sub-cat-icon-emoji {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 60rpx;
+  line-height: 1;
+}
+
+.sub-cat-name {
+  font-size: 26rpx;
   font-weight: 600;
   color: var(--text-primary, #18191B);
-  margin-bottom: 6rpx;
+  max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  width: 100%;
-}
-
-.cat-product-price {
-  font-size: 24rpx;
-  font-weight: 700;
-  color: var(--brand-accent, #FF5500);
 }
 
 .cat-empty-hint {

@@ -392,6 +392,8 @@ export const AdminApi = {
       name: c.name,
       icon: c.icon || '👟',
       iconFileID: c.iconFileID || '',
+      parentId: c.parentId || '',
+      badge: c.badge || '',
       sort: Number(c.sort) || 0,
       status: c.status || 'ACTIVE',
       productCount: Number(c.productCount) || 0,

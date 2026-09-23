@@ -10,15 +10,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const category_service_1 = require("../../services/category.service");
-const product_service_1 = require("../../services/product.service");
+const IMAGE_ICON_REGEX = /^(https?:\/\/|cloud:\/\/|\/|data:image\/(?:png|jpeg|webp|svg\+xml)[;,])/i;
 Page({
     data: {
-        categories: [], // 一级分类（主要词条）
+        categories: [],
         activeCategoryIndex: 0,
-        subCategories: [], // 当前一级下的二级分类（次要词条）
-        activeSubIndex: -1,
-        categoryProducts: [],
-        loading: false,
+        subCategories: [],
         scrollTop: 0,
         errorMessage: ''
     },
@@ -37,18 +34,18 @@ Page({
             }
             catch (err) {
                 console.error('Failed to load categories:', err);
-                this.setData({ categories: [], categoryProducts: [], errorMessage: err instanceof Error ? err.message : '云端分类加载失败，请重试' });
+                this.setData({ categories: [], subCategories: [], errorMessage: err instanceof Error ? err.message : '云端分类加载失败，请重试' });
             }
         });
     },
     onRetry() { this.initCategories(); },
+    /**
+     * 点击一级分类：展开其二级网格（无二级则右侧显示空状态，不跳转）
+     */
     onSelectCategory(e) {
         const index = Number(e.currentTarget.dataset.index);
         this.selectCategory(index);
     },
-    /**
-     * 选中一级分类：展示其二级词条，并默认加载第一个二级分类（无二级则兜底加载该一级分类）
-     */
     selectCategory(index) {
         const cat = this.data.categories[index];
         if (!cat)
@@ -56,55 +53,45 @@ Page({
         const children = Array.isArray(cat.children) ? cat.children : [];
         this.setData({
             activeCategoryIndex: index,
-            activeSubIndex: -1,
-            subCategories: children,
-            categoryProducts: [],
+            subCategories: this.formatSubCategories(children),
             scrollTop: 0
         });
-        if (children.length > 0) {
-            this.selectSubCategory(0);
-        }
-        else {
-            this.loadCategoryProducts(cat.id);
-        }
     },
-    onSelectSubCategory(e) {
-        const index = Number(e.currentTarget.dataset.index);
-        this.selectSubCategory(index);
+    formatSubCategories(children) {
+        return children.map(item => {
+            const iconStr = typeof item.icon === 'string' ? item.icon.trim() : '';
+            const isImageIcon = IMAGE_ICON_REGEX.test(iconStr);
+            return {
+                id: item.id || item._id,
+                name: item.name,
+                icon: item.icon,
+                isImageIcon,
+                iconDisplay: !isImageIcon && Array.from(iconStr).length <= 4 ? (iconStr || '🛍️') : '🛍️'
+            };
+        });
     },
     /**
-     * 选中二级分类：加载该二级分类下的商品
+     * 点击二级分类：跳转商品列表页，标题带上「一级 · 二级」
      */
-    selectSubCategory(index) {
+    onSelectSubCategory(e) {
+        const index = Number(e.currentTarget.dataset.index);
         const sub = this.data.subCategories[index];
         if (!sub)
             return;
-        this.setData({ activeSubIndex: index, scrollTop: 0 });
-        this.loadCategoryProducts(sub.id);
-    },
-    loadCategoryProducts(categoryId) {
-        return __awaiter(this, void 0, void 0, function* () {
-            this.setData({ loading: true });
-            try {
-                const res = yield product_service_1.ProductService.getList({
-                    categoryId,
-                    pageSize: 10
-                });
-                this.setData({
-                    categoryProducts: res.list,
-                    loading: false
-                });
-            }
-            catch (err) {
-                console.error(err);
-                this.setData({ loading: false, errorMessage: err instanceof Error ? err.message : '商品加载失败，请重试' });
-            }
-        });
-    },
-    onTapProduct(e) {
-        const id = e.currentTarget.dataset.id;
+        const level1 = this.data.categories[this.data.activeCategoryIndex];
+        const level1Name = level1 ? level1.name : '';
+        const categoryName = level1Name ? `${level1Name} · ${sub.name}` : sub.name;
         wx.navigateTo({
-            url: `/pages/goods/detail/index?id=${id}`
+            url: `/pages/goods/list/index?categoryId=${sub.id}&categoryName=${encodeURIComponent(categoryName)}`
         });
+    },
+    onSubIconError(e) {
+        const index = Number(e.currentTarget.dataset.index);
+        if (Number.isInteger(index) && this.data.subCategories[index]) {
+            this.setData({
+                [`subCategories[${index}].isImageIcon`]: false,
+                [`subCategories[${index}].iconDisplay`]: '🛍️'
+            });
+        }
     }
 });

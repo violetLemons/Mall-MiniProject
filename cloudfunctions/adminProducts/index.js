@@ -106,7 +106,7 @@ function fields(p) {
       out[k] = text(val, k, ['subtitle', 'description'].includes(k) ? 0 : 1, k === 'description' ? 5000 : 500);
     }
   }
-  for (const k of ['images', 'detailImages', 'tags']) {
+  for (const k of ['images', 'detailImages', 'tags', 'deliveryTypes']) {
     if (p[k] !== undefined && p[k] !== null) {
       const arr = Array.isArray(p[k]) ? p[k] : typeof p[k] === 'string' ? p[k].split(',').map(s => s.trim()).filter(Boolean) : [];
       if (arr.length > 30 || arr.some(x => typeof x !== 'string' || x.length > 2000)) throw error('INVALID_PARAMS', '图片或标签格式不正确');

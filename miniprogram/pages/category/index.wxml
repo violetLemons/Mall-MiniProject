@@ -22,47 +22,48 @@
       </view>
     </scroll-view>
 
-    <!-- 右侧商品/子类网格 -->
+    <!-- 右侧二级分类图片网格 -->
     <scroll-view class="content-scroll" scroll-y scroll-top="{{scrollTop}}">
       <view wx:if="{{errorMessage}}" class="cloud-error-box">
         <text class="cloud-error-text">{{errorMessage}}</text>
         <button class="cloud-retry-btn" bindtap="onRetry">重试</button>
       </view>
-      <view class="category-banner-card">
-        <text class="banner-hint">通用商城 · 精选</text>
-        <text class="banner-title">{{categories[activeCategoryIndex].name}}系列</text>
-      </view>
 
-      <!-- 二级分类词条（次要词条），选中后展示对应水果 -->
-      <scroll-view wx:if="{{subCategories.length > 0}}" class="sub-cat-scroll" scroll-x enable-flex>
-        <view class="sub-cat-list">
+      <block wx:else>
+        <view wx:if="{{categories.length > 0}}" class="category-banner-card">
+          <text class="banner-hint">通用商城 · 精选</text>
+          <text class="banner-title">{{categories[activeCategoryIndex].name}}系列</text>
+        </view>
+
+        <!-- 二级分类图片卡片，点击跳转该分类商品列表 -->
+        <view wx:if="{{subCategories.length > 0}}" class="sub-cat-grid">
           <view
             wx:for="{{subCategories}}"
             wx:key="id"
-            class="sub-cat-item press-active {{activeSubIndex === index ? 'is-active' : ''}}"
+            class="sub-cat-card press-active"
             data-index="{{index}}"
             bindtap="onSelectSubCategory"
-          >{{item.name}}</view>
+          >
+            <image
+              wx:if="{{item.isImageIcon}}"
+              class="sub-cat-icon"
+              src="{{item.icon}}"
+              mode="aspectFill"
+              data-index="{{index}}"
+              binderror="onSubIconError"
+            />
+            <view wx:else class="sub-cat-icon sub-cat-icon-emoji">{{item.iconDisplay}}</view>
+            <text class="sub-cat-name ellipsis-1">{{item.name}}</text>
+          </view>
         </view>
-      </scroll-view>
 
-      <view wx:if="{{categoryProducts.length > 0}}" class="cat-products-grid">
-        <view
-          wx:for="{{categoryProducts}}"
-          wx:key="id"
-          class="cat-product-item press-active"
-          data-id="{{item.id}}"
-          bindtap="onTapProduct"
-        >
-          <image class="cat-product-thumb" src="{{item.cover}}" mode="aspectFill" />
-          <text class="cat-product-title ellipsis-1">{{item.title}}</text>
-          <text class="cat-product-price">¥{{item.priceYuan || (item.price / 100)}}</text>
+        <view wx:elif="{{categories.length > 0}}" class="cat-empty-hint">
+          <text>该一级分类暂无二级分类</text>
         </view>
-      </view>
-
-      <view wx:elif="{{!loading}}" class="cat-empty-hint">
-        <text>该分类暂无更多在售商品，敬请期待</text>
-      </view>
+        <view wx:else class="cat-empty-hint">
+          <text>暂无分类，请先到管理后台添加</text>
+        </view>
+      </block>
     </scroll-view>
   </view>
 </view>
