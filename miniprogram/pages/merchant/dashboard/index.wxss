@@ -1,0 +1,167 @@
+.m-page {
+  min-height: 100vh;
+  background: #F5F6F8;
+  padding-bottom: 40rpx;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20rpx;
+  padding: 24rpx 24rpx 0;
+}
+
+.stat-card {
+  background: #FFFFFF;
+  border-radius: 20rpx;
+  padding: 28rpx;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 6rpx 24rpx rgba(0, 0, 0, 0.04);
+}
+
+.stat-value {
+  font-size: 40rpx;
+  font-weight: 800;
+  color: #111111;
+}
+
+.stat-label {
+  font-size: 24rpx;
+  color: #8A8D93;
+  margin-top: 8rpx;
+}
+
+.section-title {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #111111;
+  margin: 32rpx 24rpx 16rpx;
+}
+
+.nav-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20rpx;
+  padding: 0 24rpx;
+}
+
+.nav-item {
+  background: #FFFFFF;
+  border-radius: 20rpx;
+  padding: 28rpx;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 6rpx 24rpx rgba(0, 0, 0, 0.04);
+}
+
+.nav-icon {
+  font-size: 44rpx;
+}
+
+.nav-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #111111;
+  margin-top: 12rpx;
+}
+
+.nav-desc {
+  font-size: 22rpx;
+  color: #8A8D93;
+  margin-top: 6rpx;
+}
+
+.card {
+  background: #FFFFFF;
+  border-radius: 20rpx;
+  margin: 0 24rpx;
+  padding: 8rpx 24rpx;
+  box-shadow: 0 6rpx 24rpx rgba(0, 0, 0, 0.04);
+}
+
+.hot-row {
+  display: flex;
+  align-items: center;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #F2F3F5;
+}
+
+.hot-row:last-child {
+  border-bottom: none;
+}
+
+.hot-img {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 12rpx;
+  background: #F2F3F5;
+}
+
+.hot-meta {
+  flex: 1;
+  margin-left: 20rpx;
+  display: flex;
+  flex-direction: column;
+}
+
+.hot-name {
+  font-size: 28rpx;
+  color: #111111;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hot-sales {
+  font-size: 22rpx;
+  color: #8A8D93;
+  margin-top: 6rpx;
+}
+
+.hot-price {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #FF5500;
+}
+
+.order-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #F2F3F5;
+}
+
+.order-row:last-child {
+  border-bottom: none;
+}
+
+.order-left {
+  display: flex;
+  flex-direction: column;
+}
+
+.order-no {
+  font-size: 26rpx;
+  color: #111111;
+}
+
+.order-count {
+  font-size: 22rpx;
+  color: #8A8D93;
+  margin-top: 4rpx;
+}
+
+.order-amount {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #111111;
+}
+
+.loading-hint {
+  text-align: center;
+  font-size: 24rpx;
+  color: #B0B3B8;
+  padding: 24rpx;
+}

@@ -1,0 +1,107 @@
+.m-page {
+  min-height: 100vh;
+  background: #F5F6F8;
+  padding-bottom: 40rpx;
+}
+
+.card {
+  background: #FFFFFF;
+  border-radius: 20rpx;
+  margin: 24rpx;
+  padding: 32rpx;
+  box-shadow: 0 6rpx 24rpx rgba(0, 0, 0, 0.04);
+}
+
+.card-title {
+  font-size: 30rpx;
+  font-weight: 800;
+  color: #111111;
+  margin-bottom: 24rpx;
+}
+
+.f-item {
+  margin-bottom: 28rpx;
+}
+
+.f-label {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 12rpx;
+}
+
+.f-input {
+  background: #F5F6F8;
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  font-size: 28rpx;
+}
+
+.f-textarea {
+  background: #F5F6F8;
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  font-size: 28rpx;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 120rpx;
+}
+
+.f-tip {
+  display: block;
+  font-size: 22rpx;
+  color: #B0B3B8;
+  margin-top: 12rpx;
+}
+
+.mask-row {
+  background: #F8F9FA;
+  border-radius: 12rpx;
+  padding: 24rpx;
+  margin-bottom: 24rpx;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mask-label {
+  font-size: 24rpx;
+  color: #8A8D93;
+}
+
+.mask-value {
+  font-size: 30rpx;
+  font-weight: 800;
+  color: #111111;
+  letter-spacing: 2rpx;
+}
+
+.btn-dark {
+  background: #111111;
+  color: #FFFFFF;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+  border: none;
+  padding: 24rpx 0;
+}
+
+.btn-dark::after {
+  border: none;
+}
+
+.btn-logout {
+  background: #FFFFFF;
+  color: #DC2626;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+  border: none;
+  margin: 24rpx;
+  padding: 24rpx 0;
+}
+
+.btn-logout::after {
+  border: none;
+}

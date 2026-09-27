@@ -13,7 +13,8 @@ import {
   Store,
   LogOut,
   ExternalLink,
-  Flame
+  Flame,
+  KeyRound
 } from 'lucide-react';
 import { AdminApi } from '../api/client';
 
@@ -66,7 +67,10 @@ export const Layout: React.FC = () => {
         { label: '类目中心', path: '/categories', icon: Layers },
         { label: '轮播营销', path: '/banners', icon: ImageIcon },
         ...(user?.role === 'SUPER_ADMIN'
-          ? [{ label: '管理员权限', path: '/admins', icon: ShieldCheck }]
+          ? [
+              { label: '管理员权限', path: '/admins', icon: ShieldCheck },
+              { label: '卡密管理', path: '/card-keys', icon: KeyRound }
+            ]
           : []),
         { label: '审计日志', path: '/logs', icon: FileText }
       ];

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { AdminApi } from '../api/client';
 import { Order } from '../types';
 import { Badge } from '../components/Badge';
@@ -10,8 +10,17 @@ import {
   Truck,
   Eye,
   RefreshCw,
-  AlertTriangle
+  AlertTriangle,
+  Download
 } from 'lucide-react';
+import { exportOrdersExcel } from '../utils/excel';
+
+const EXPORT_STATUS_OPTIONS = [
+  { label: '待付款', value: 'PENDING_PAYMENT' },
+  { label: '待发货', value: 'PAID' },
+  { label: '已完成', value: 'COMPLETED' },
+  { label: '已取消', value: 'CANCELLED' }
+];
 
 export const Orders: React.FC = () => {
   const { toast } = useToast();
@@ -22,6 +31,13 @@ export const Orders: React.FC = () => {
   const [deliveryFilter, setDeliveryFilter] = useState('ALL');
   const [searchKeyword, setSearchKeyword] = useState('');
   const [syncingWechat, setSyncingWechat] = useState(false);
+  const [merchantFilter, setMerchantFilter] = useState('');
+  const [merchantSearchText, setMerchantSearchText] = useState('');
+  const [merchantDropdownOpen, setMerchantDropdownOpen] = useState(false);
+  const merchantBoxRef = useRef<HTMLDivElement>(null);
+  const [merchants, setMerchants] = useState<{ merchantId: string; name: string }[]>([]);
+  const [exportStatuses, setExportStatuses] = useState<string[]>([]);
+  const [exporting, setExporting] = useState(false);
 
   // Shipping Modal
   const [shipModalOpen, setShipModalOpen] = useState(false);
@@ -43,7 +59,8 @@ export const Orders: React.FC = () => {
       const list = await AdminApi.getOrders({
         status: statusFilter,
         deliveryType: deliveryFilter,
-        keyword: searchKeyword
+        keyword: searchKeyword,
+        merchantId: merchantFilter
       });
       setOrders(list);
     } finally {
@@ -53,11 +70,86 @@ export const Orders: React.FC = () => {
 
   useEffect(() => {
     loadOrders();
-  }, [statusFilter, deliveryFilter]);
+  }, [statusFilter, deliveryFilter, merchantFilter]);
+
+  useEffect(() => {
+    if (!isMerchant) {
+      AdminApi.getMerchants().then(setMerchants).catch(() => setMerchants([]));
+    }
+  }, [isMerchant]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     loadOrders();
+  };
+
+  const toggleExportStatus = (s: string) => {
+    setExportStatuses(prev => (prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]));
+  };
+
+  const filteredMerchants = merchants.filter(m =>
+    !merchantSearchText.trim() || (m.name || '').toLowerCase().includes(merchantSearchText.trim().toLowerCase())
+  );
+
+  const handleSelectMerchant = (m: { merchantId: string; name: string }) => {
+    setMerchantFilter(m.merchantId);
+    setMerchantSearchText(m.name);
+    setMerchantDropdownOpen(false);
+  };
+
+  const handleClearMerchant = () => {
+    setMerchantFilter('');
+    setMerchantSearchText('');
+    setMerchantDropdownOpen(false);
+  };
+
+  useEffect(() => {
+    if (!merchantDropdownOpen) return;
+    const onDocMouseDown = (e: MouseEvent) => {
+      if (merchantBoxRef.current && !merchantBoxRef.current.contains(e.target as Node)) {
+        setMerchantDropdownOpen(false);
+        const selected = merchants.find(m => m.merchantId === merchantFilter);
+        setMerchantSearchText(selected ? selected.name : '');
+      }
+    };
+    document.addEventListener('mousedown', onDocMouseDown);
+    return () => document.removeEventListener('mousedown', onDocMouseDown);
+  }, [merchantDropdownOpen, merchants, merchantFilter]);
+
+  const handleExportAll = () => {
+    if (orders.length === 0) {
+      toast('当前无订单可导出', 'error');
+      return;
+    }
+    exportOrdersExcel(orders);
+    toast(`已导出当前显示的 ${orders.length} 条订单`, 'success');
+  };
+
+  const handleExportByStatus = async () => {
+    if (exportStatuses.length === 0) {
+      toast('请先勾选要导出的状态', 'error');
+      return;
+    }
+    setExporting(true);
+    try {
+      const list = await AdminApi.getOrders({
+        statuses: exportStatuses,
+        deliveryType: deliveryFilter,
+        keyword: searchKeyword,
+        merchantId: merchantFilter,
+        pageSize: 1000
+      });
+      if (list.length === 0) {
+        toast('该筛选条件下暂无订单', 'error');
+        return;
+      }
+      exportOrdersExcel(list);
+      toast(`已导出 ${list.length} 条订单`, 'success');
+    } catch (e: any) {
+      toast(e.message || '导出失败', 'error');
+    } finally {
+      setExporting(false);
+    }
   };
 
   // 批量同步微信发货状态
@@ -265,6 +357,76 @@ export const Orders: React.FC = () => {
         </form>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          {/* 商户筛选：可搜索组合框 (仅平台可见) */}
+          {!isMerchant && (
+            <div ref={merchantBoxRef} style={{ position: 'relative', minWidth: '180px' }}>
+              <div style={{ position: 'relative' }}>
+                <Search size={14} color="#94A3B8" style={{ position: 'absolute', left: '10px', top: '9px' }} />
+                <input
+                  type="text"
+                  value={merchantSearchText}
+                  placeholder="搜索商户名称..."
+                  onFocus={() => setMerchantDropdownOpen(true)}
+                  onChange={(e) => { setMerchantSearchText(e.target.value); setMerchantDropdownOpen(true); }}
+                  style={{
+                    width: '100%',
+                    padding: '7px 12px 7px 30px',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    fontSize: '13px',
+                    color: '#334155',
+                    backgroundColor: '#FFF'
+                  }}
+                />
+              </div>
+              {merchantDropdownOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    marginTop: '4px',
+                    maxHeight: '240px',
+                    overflowY: 'auto',
+                    backgroundColor: '#FFF',
+                    border: '1px solid #E2E8F0',
+                    borderRadius: '8px',
+                    boxShadow: '0 8px 24px rgba(15,23,42,0.12)',
+                    zIndex: 50
+                  }}
+                >
+                  <div
+                    onClick={handleClearMerchant}
+                    style={{ padding: '8px 12px', fontSize: '13px', color: '#64748B', cursor: 'pointer', borderBottom: '1px solid #F1F5F9' }}
+                  >
+                    全部商户
+                  </div>
+                  {filteredMerchants.length === 0 ? (
+                    <div style={{ padding: '10px 12px', fontSize: '12px', color: '#94A3B8' }}>无匹配商户</div>
+                  ) : (
+                    filteredMerchants.map(m => (
+                      <div
+                        key={m.merchantId}
+                        onClick={() => handleSelectMerchant(m)}
+                        style={{
+                          padding: '8px 12px',
+                          fontSize: '13px',
+                          color: merchantFilter === m.merchantId ? '#FF5500' : '#334155',
+                          fontWeight: merchantFilter === m.merchantId ? 700 : 400,
+                          cursor: 'pointer',
+                          backgroundColor: merchantFilter === m.merchantId ? '#FFF7ED' : '#FFF'
+                        }}
+                      >
+                        {m.name || '未命名商户'}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Delivery Type Filter */}
           <div style={{ display: 'flex', backgroundColor: '#F1F5F9', borderRadius: '8px', padding: '3px' }}>
             {[
@@ -322,6 +484,78 @@ export const Orders: React.FC = () => {
         </div>
       </div>
 
+      {/* 导出订单 */}
+      <div
+        style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: '14px',
+          padding: '14px 20px',
+          border: '1px solid #E2E8F0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px',
+          flexWrap: 'wrap'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>导出订单</span>
+          {EXPORT_STATUS_OPTIONS.map(opt => (
+            <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#475569', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={exportStatuses.includes(opt.value)}
+                onChange={() => toggleExportStatus(opt.value)}
+                style={{ cursor: 'pointer' }}
+              />
+              <span>{opt.label}</span>
+            </label>
+          ))}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            onClick={handleExportAll}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '8px',
+              border: '1px solid #CBD5E1',
+              backgroundColor: '#FFF',
+              color: '#334155',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <Download size={14} />
+            导出全部显示
+          </button>
+          <button
+            onClick={handleExportByStatus}
+            disabled={exporting}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '8px',
+              border: 'none',
+              backgroundColor: '#0F172A',
+              color: '#FFF',
+              fontSize: '13px',
+              fontWeight: 700,
+              cursor: exporting ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              opacity: exporting ? 0.6 : 1
+            }}
+          >
+            <Download size={14} />
+            {exporting ? '导出中...' : '按勾选状态导出'}
+          </button>
+        </div>
+      </div>
+
       {/* Orders Table with responsive horizontal scrolling */}
       <div
         style={{
@@ -332,12 +566,13 @@ export const Orders: React.FC = () => {
           boxShadow: 'var(--shadow-sm)'
         }}
       >
-        <table style={{ width: '100%', minWidth: '980px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+        <table style={{ width: '100%', minWidth: '1120px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
           <thead style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
             <tr style={{ color: '#64748B' }}>
               <th style={{ padding: '14px 18px' }}>订单号与时间</th>
               <th style={{ padding: '14px 18px' }}>所购商品明细</th>
               <th style={{ padding: '14px 18px' }}>买家信息</th>
+              <th style={{ padding: '14px 18px' }}>商户名称</th>
               <th style={{ padding: '14px 18px' }}>配送与履约状态</th>
               <th style={{ padding: '14px 18px' }}>实付金额</th>
               <th style={{ padding: '14px 18px' }}>状态</th>
@@ -347,7 +582,7 @@ export const Orders: React.FC = () => {
           <tbody>
             {orders.length === 0 ? (
               <tr>
-                <td colSpan={7} style={{ padding: '48px', textAlign: 'center', color: '#94A3B8' }}>
+                <td colSpan={8} style={{ padding: '48px', textAlign: 'center', color: '#94A3B8' }}>
                   暂无匹配的订单
                 </td>
               </tr>
@@ -378,6 +613,10 @@ export const Orders: React.FC = () => {
                   <td style={{ padding: '14px 18px' }}>
                     <div style={{ fontWeight: 600, color: '#0F172A' }}>{o.customerName || '微信买家'}</div>
                     <div style={{ fontSize: '12px', color: '#64748B' }}>{o.customerPhone || '未填写手机号'}</div>
+                  </td>
+
+                  <td style={{ padding: '14px 18px' }}>
+                    <div style={{ fontWeight: 600, color: '#334155' }}>{o.merchantName || (o.merchantId ? '未命名商户' : '平台自营')}</div>
                   </td>
 
                   <td style={{ padding: '14px 18px' }}>

@@ -1,20 +1,22 @@
 .category-nav-container {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 24rpx 28rpx 16rpx;
+  flex-wrap: wrap;
+  padding: 24rpx 28rpx 8rpx;
   background-color: var(--surface, #FFFFFF);
   border-radius: var(--radius-md, 20rpx);
   margin: 0 24rpx 24rpx;
 }
 
 .cat-item {
+  width: 20%;
+  flex: none;
   min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   position: relative;
-  flex: 1;
+  margin-bottom: 24rpx;
 }
 
 .icon-box {

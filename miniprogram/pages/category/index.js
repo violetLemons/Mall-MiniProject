@@ -13,13 +13,15 @@ const category_service_1 = require("../../services/category.service");
 const IMAGE_ICON_REGEX = /^(https?:\/\/|cloud:\/\/|\/|data:image\/(?:png|jpeg|webp|svg\+xml)[;,])/i;
 Page({
     data: {
-        categories: [],
+        categories: [], // 一级分类（主要词条）
         activeCategoryIndex: 0,
-        subCategories: [],
+        subCategories: [], // 当前一级下的二级分类（含格式化图标信息）
         scrollTop: 0,
-        errorMessage: ''
+        errorMessage: '',
+        pendingCategoryId: ''
     },
-    onLoad() {
+    onLoad(options) {
+        this.setData({ pendingCategoryId: (options && options.categoryId) || '' });
         this.initCategories();
     },
     initCategories() {
@@ -29,7 +31,14 @@ Page({
                 const list = Array.isArray(tree) ? tree : [];
                 this.setData({ categories: list, errorMessage: '' });
                 if (list.length > 0) {
-                    this.selectCategory(0);
+                    let index = 0;
+                    const pending = this.data.pendingCategoryId;
+                    if (pending) {
+                        const found = list.findIndex(c => (c.id || c._id) === pending);
+                        if (found >= 0)
+                            index = found;
+                    }
+                    this.selectCategory(index);
                 }
             }
             catch (err) {

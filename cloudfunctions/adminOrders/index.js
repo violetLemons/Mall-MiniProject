@@ -56,6 +56,16 @@ async function syncParentExpressShipping(parentOrderId) {
   });
 }
 
+// 商户名称映射：merchantId -> 名称（独立 name 字段，未设置则为空串，由前端显示占位）
+async function getMerchantNameMap(targetDb) {
+  const res = await targetDb.collection('admins').where({ role: 'MERCHANT' }).field({ merchantId: true, name: true }).limit(1000).get();
+  const map = {};
+  for (const a of (res.data || [])) {
+    if (a.merchantId) map[a.merchantId] = a.name || '';
+  }
+  return map;
+}
+
 exports.main = async event => {
   try {
     const { action, params = {} } = event;
@@ -64,19 +74,37 @@ exports.main = async event => {
     // 1. 订单列表查询 (统一子订单视图：商家仅看自己，平台看全量)
     if (action === 'list') {
       requirePermission(admin, 'order.view');
-      const page = c.integer(params.page || 1, '页码', 1, 10000), pageSize = c.integer(params.pageSize || 20, '每页数量', 1, 50);
+      const page = c.integer(params.page || 1, '页码', 1, 10000), pageSize = c.integer(params.pageSize || 20, '每页数量', 1, 1000);
 
       const query = {};
       if (admin.merchantId) query.merchantId = admin.merchantId;
-      if (params.status && params.status !== 'ALL') query.status = c.text(params.status, '状态', 1, 30);
+      else if (params.merchantId) query.merchantId = c.text(params.merchantId, '商户ID', 1, 50);
+      if (Array.isArray(params.statuses) && params.statuses.length > 0) {
+        query.status = db.command.in(params.statuses.map(s => c.text(s, '状态', 1, 30)));
+      } else if (params.status && params.status !== 'ALL') {
+        query.status = c.text(params.status, '状态', 1, 30);
+      }
       if (params.deliveryType && params.deliveryType !== 'ALL') query.deliveryType = c.text(params.deliveryType, '配送方式', 1, 20);
       if (params.orderNo && params.orderNo !== 'ALL') query.subOrderNo = c.text(params.orderNo, '订单号', 1, 50);
 
+      const nameMap = await getMerchantNameMap(db);
       const total = (await db.collection('merchant_orders').where(query).count()).total;
       const docs = (await db.collection('merchant_orders').where(query).orderBy('createdAt', 'desc').skip((page - 1) * pageSize).limit(pageSize).get()).data;
-      const list = docs.map(o => ({ ...o, id: o._id || o.id, orderNo: o.subOrderNo || o.orderNo, payAmount: o.totalAmount || o.payAmount || 0 }));
+      const list = docs.map(o => ({ ...o, id: o._id || o.id, orderNo: o.subOrderNo || o.orderNo, payAmount: o.totalAmount || o.payAmount || 0, merchantName: nameMap[o.merchantId] || '' }));
 
       return success({ list, total, page, pageSize, hasMore: page * pageSize < total });
+    }
+
+    // 商户下拉列表 (平台按商户筛选订单用；商家仅返回自身)
+    if (action === 'merchants') {
+      requirePermission(admin, 'order.view');
+      if (admin.merchantId) return success([{ merchantId: admin.merchantId, name: admin.name || '' }]);
+      const res = await db.collection('admins').where({ role: 'MERCHANT' }).field({ merchantId: true, name: true }).limit(1000).get();
+      const list = (res.data || [])
+        .filter(a => a.merchantId)
+        .map(a => ({ merchantId: a.merchantId, name: a.name || '' }))
+        .sort((x, y) => x.merchantId.localeCompare(y.merchantId));
+      return success(list);
     }
 
     // 2. 微信发货状态主动反向对账 (单单对账 / 批量近期对账)

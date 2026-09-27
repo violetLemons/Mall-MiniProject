@@ -245,6 +245,24 @@
   color: rgba(255, 255, 255, 0.8);
 }
 
+.user-balance-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10rpx;
+  margin-top: 12rpx;
+}
+
+.user-balance-value {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: #FF5500;
+}
+
+.user-balance-label {
+  font-size: 20rpx;
+  color: rgba(255, 255, 255, 0.6);
+}
+
 /* ================================================= */
 /* 底部半屏统一抽屉 (Drawer) 样式                   */
 /* ================================================= */

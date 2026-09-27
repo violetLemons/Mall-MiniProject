@@ -138,7 +138,7 @@
 .sub-cat-icon {
   width: 140rpx;
   height: 140rpx;
-  border-radius: 16rpx;
+  border-radius: 50%;
   background-color: #FFFFFF;
   box-sizing: border-box;
 }

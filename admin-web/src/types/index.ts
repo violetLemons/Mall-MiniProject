@@ -4,6 +4,8 @@ export interface AdminUser {
   id: string;
   username: string;
   name: string;
+  phone?: string;
+  address?: string;
   role: AdminRole;
   permissions: string[];
   merchantId?: string | null;
@@ -102,6 +104,7 @@ export interface Order {
   status: 'PENDING_PAYMENT' | 'PAID' | 'SHIPPED' | 'WAITING_PICKUP' | 'READY_FOR_PICKUP' | 'COMPLETED' | 'CANCELLED' | 'REFUND_PENDING' | 'REFUNDING' | 'REFUNDED';
   isTest?: boolean;
   merchantId?: string | null;
+  merchantName?: string;
   subOrderNo?: string;
   parentOrderId?: string;
   shipments?: { trackingNo?: string; logisticsCompany?: string; expressCompany?: string; shippedAt?: string }[];
@@ -194,4 +197,18 @@ export interface OperationLog {
   ip: string;
   detail: string;
   createdAt: string;
+}
+
+export interface CardKey {
+  id: string;
+  code: string;
+  status: 'UNUSED' | 'USED' | 'DISABLED';
+  type: string;
+  benefit: string;
+  value: number; // 分
+  expireAt: string | null;
+  batchId: string;
+  redeemedBy: string;
+  redeemedAt: string | null;
+  createdAt: string | null;
 }

@@ -1,0 +1,7 @@
+{
+  "usingComponents": {
+    "custom-navbar": "../../../components/custom-navbar/index",
+    "merchant-login": "../../../components/merchant-login/index"
+  },
+  "navigationStyle": "custom"
+}

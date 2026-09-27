@@ -137,7 +137,12 @@ const COLLECTIONS_CONFIG = [
     desc: '卡密兑换码（激活码）主表',
     indexes: [
       { name: 'idx_code', key: { code: 1 }, unique: true },
-      { name: 'idx_status', key: { status: 1 } }
+      { name: 'idx_status', key: { status: 1 } },
+      { name: 'idx_type_status', key: { type: 1, status: 1 } },
+      { name: 'idx_type_value', key: { type: 1, value: 1 } },
+      { name: 'idx_type_expire_at', key: { type: 1, expireAt: 1 } },
+      { name: 'idx_type_created_at', key: { type: 1, createdAt: -1 } },
+      { name: 'idx_type_status_expire_at', key: { type: 1, status: 1, expireAt: 1 } }
     ]
   },
   {

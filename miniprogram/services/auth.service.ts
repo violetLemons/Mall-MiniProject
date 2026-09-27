@@ -8,6 +8,7 @@ export interface UserProfile {
   avatarUrl: string;
   phone?: string;
   status: 'ACTIVE' | 'FROZEN';
+  balance?: number; // 购物额度（整数分）
 }
 
 const STORAGE_USER_KEY = 'sneaker_mall_user';

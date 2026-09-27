@@ -59,6 +59,46 @@ exports.main = async (event, context) => {
       return success({ subMchIdMask: maskSecret(subMchIdEnc) }, '商户号已保存');
     }
 
+    /**
+     * 更新商户资料 (名称 + 地址)
+     * 商家可设置自己的名称与地址；超管可代任意商家填写
+     * 名称用于订单页展示，地址用于后续快递系统估算与用户距离计算运费
+     */
+    if (action === 'updateProfile') {
+      const { name, address, phone, adminId } = params;
+      const targetId = admin.role === 'SUPER_ADMIN' ? (adminId || admin.adminId) : admin.adminId;
+      const target = await db.collection('admins').doc(targetId).get().catch(() => null);
+      if (!target || !target.data) return fail('ADMIN_NOT_FOUND', '目标账号不存在');
+      if (target.data.role !== 'MERCHANT') return fail('INVALID_PARAMS', '仅商家账号可设置名称与地址');
+
+      const nameVal = typeof name === 'string' ? name.trim() : '';
+      const addressVal = typeof address === 'string' ? address.trim() : '';
+      const phoneVal = typeof phone === 'string' ? phone.trim() : '';
+      if (!nameVal && !addressVal && !phoneVal) return fail('INVALID_PARAMS', '名称、地址与手机号不能同时为空');
+      if (nameVal && (nameVal.length < 2 || nameVal.length > 64)) return fail('INVALID_PARAMS', '商户名称需为 2-64 个字符');
+      if (addressVal.length > 200) return fail('INVALID_PARAMS', '地址长度不能超过 200 字');
+      if (phoneVal && !/^1\d{10}$/.test(phoneVal)) return fail('INVALID_PARAMS', '手机号格式不正确（需为 11 位大陆手机号）');
+
+      const updateData = { updatedAt: db.serverDate() };
+      if (nameVal) updateData.name = nameVal;
+      if (addressVal) updateData.address = addressVal;
+      if (phoneVal) updateData.phone = phoneVal;
+      await db.collection('admins').doc(targetId).update({ data: updateData });
+
+      const finalName = nameVal || target.data.name || '';
+      const finalAddress = addressVal || target.data.address || '';
+      const finalPhone = phoneVal || target.data.phone || '';
+      await recordOperationLog(db, {
+        adminId: admin.adminId,
+        adminUsername: admin.username,
+        action: 'UPDATE_MERCHANT_PROFILE',
+        resourceType: 'ADMIN',
+        resourceId: targetId,
+        after: { name: finalName, address: finalAddress, phone: finalPhone }
+      });
+      return success({ name: finalName, address: finalAddress, phone: finalPhone }, '商户资料已保存');
+    }
+
     requirePermission(admin, 'admin.manage'); // 其余操作仅超管
 
     switch (action) {
@@ -70,6 +110,9 @@ exports.main = async (event, context) => {
           .field({
             _id: true,
             username: true,
+            name: true,
+            phone: true,
+            address: true,
             role: true,
             permissions: true,
             merchantId: true,
@@ -93,9 +136,17 @@ exports.main = async (event, context) => {
        * 2. 新增管理员 (服务端加盐 Hash，杜绝弱密码)
        */
       case 'create': {
-        const { username, password, role = 'ADMIN', permissions = [], merchantId = null, subMchId = null } = params;
+        const { username, password, role = 'ADMIN', permissions = [], merchantId = null, subMchId = null, name = null, phone = null } = params;
+        const nameVal = typeof name === 'string' ? name.trim() : '';
+        const phoneVal = typeof phone === 'string' ? phone.trim() : '';
         if (!username || !password || password.length < 8) {
           return fail('INVALID_PARAMS', '账号与密码不可为空，且密码长度不少于 8 位密码');
+        }
+        if (!nameVal || nameVal.length < 2 || nameVal.length > 64) {
+          return fail('INVALID_PARAMS', '姓名/名称不能为空，且长度为 2-64 字');
+        }
+        if (phoneVal && !/^1\d{10}$/.test(phoneVal)) {
+          return fail('INVALID_PARAMS', '手机号格式不正确（需为 11 位大陆手机号）');
         }
 
         // 商家账号的 merchantId 由平台自动生成（m1、m2、m3… 最大序号 +1），不再要求管理员手动填写
@@ -139,6 +190,8 @@ exports.main = async (event, context) => {
         const addRes = await db.collection('admins').add({
           data: {
             username,
+            name: nameVal,
+            phone: phoneVal,
             passwordHash: pwdHash,
             salt,
             role,
@@ -159,7 +212,7 @@ exports.main = async (event, context) => {
           action: 'CREATE_ADMIN',
           resourceType: 'ADMIN',
           resourceId: addRes._id,
-          after: { username, role, merchantId: role === 'MERCHANT' ? merchantIdValue : null, subMchIdMask: subMchIdEnc ? maskSecret(subMchIdEnc) : '' }
+          after: { username, name: nameVal, phone: phoneVal, role, merchantId: role === 'MERCHANT' ? merchantIdValue : null, subMchIdMask: subMchIdEnc ? maskSecret(subMchIdEnc) : '' }
         });
 
         return success({ adminId: addRes._id, subMchIdMask: subMchIdEnc ? maskSecret(subMchIdEnc) : '' }, '管理员账号创建成功');

@@ -3,7 +3,8 @@ import { AdminApi } from '../api/client';
 import { Category } from '../types';
 import { Badge } from '../components/Badge';
 import { Modal } from '../components/Modal';
-import { compressImage } from '../utils/image';
+import { compressImage, readFileAsDataURL, blobToFile } from '../utils/image';
+import { useImageCropper } from '../components/ImageCropper';
 import { Plus, Edit2, Trash2, ImagePlus, Loader2 } from 'lucide-react';
 
 export const Categories: React.FC = () => {
@@ -20,6 +21,7 @@ export const Categories: React.FC = () => {
   const [iconPreview, setIconPreview] = useState('');
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { openCrop, cropper } = useImageCropper();
 
   const level1 = categories.filter(c => !c.parentId);
   const level2 = categories.filter(c => c.parentId === selectedParentId);
@@ -79,7 +81,11 @@ export const Categories: React.FC = () => {
     if (!file) return;
     setUploading(true);
     try {
-      const compressed = await compressImage(file);
+      const src = await readFileAsDataURL(file);
+      const result = await openCrop(src, 1, 'image/png');
+      if (result === null) return; // 取消
+      const sourceFile = blobToFile(result, file.name, 'image/png');
+      const compressed = await compressImage(sourceFile);
       const { fileID, url } = await AdminApi.uploadCategoryImage(compressed);
       setFormData(prev => ({ ...prev, icon: fileID || url }));
       setIconPreview(url);
@@ -95,7 +101,7 @@ export const Categories: React.FC = () => {
     e.preventDefault();
     if (!formData.name?.trim()) return;
     if (!formData.icon?.trim()) {
-      alert('请上传分类图片（或填写图片链接）');
+      alert('请上传分类图片');
       return;
     }
     // 只提交业务字段，避免把 productCount/createdAt/iconFileID 等非持久化字段写入数据库
@@ -424,23 +430,6 @@ export const Categories: React.FC = () => {
 
           <div>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-              图片链接 URL（可选，直接粘贴 https 链接）
-            </label>
-            <input
-              type="text"
-              value={typeof formData.icon === 'string' && formData.icon.startsWith('http') ? formData.icon : ''}
-              onChange={(e) => {
-                const v = e.target.value.trim();
-                setFormData({ ...formData, icon: v });
-                setIconPreview(v);
-              }}
-              placeholder="https://..."
-              style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px' }}
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
               排序权重 (数字越大越靠前)
             </label>
             <input
@@ -468,6 +457,7 @@ export const Categories: React.FC = () => {
           </div>
         </form>
       </Modal>
+      {cropper}
     </div>
   );
 };

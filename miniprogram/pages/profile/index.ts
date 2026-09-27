@@ -32,7 +32,8 @@ Page({
     userInfo: {
       avatarUrl: '/assets/images/default-avatar.png',
       nickName: '微信用户',
-      userId: ''
+      userId: '',
+      balanceYuan: '0.00'
     },
     orderStats: [
       { key: 'all', label: '全部订单', count: 0 },
@@ -46,6 +47,7 @@ Page({
       { id: 'history', title: '浏览历史', badge: '' },
       { id: 'address', title: '收货地址管理', badge: '' },
       { id: 'service', title: '官方在线客服', badge: '9:00-22:00' },
+      { id: 'merchant', title: '商户跳转', badge: '' },
       { id: 'setting', title: '通用设置', badge: '' }
     ],
     customerServicePhone: STORE_CONFIG.customerServicePhone || '400-000-0000',
@@ -129,7 +131,8 @@ Page({
         this.setData({
           'userInfo.nickName': u.nickName || '商城用户',
           'userInfo.avatarUrl': u.avatarUrl || this.data.userInfo.avatarUrl,
-          'userInfo.userId': displayUserId
+          'userInfo.userId': displayUserId,
+          'userInfo.balanceYuan': ((Number(u.balance) || 0) / 100).toFixed(2)
         });
       }
 
@@ -297,6 +300,7 @@ Page({
         }
       });
       wx.showToast({ title: '兑换成功', icon: 'success' });
+      await this.syncUserData();
     } catch (err: any) {
       this.setData({
         actResult: {
@@ -430,6 +434,8 @@ Page({
         activeDrawer: 'service',
         drawerTitle: '官方在线客服'
       });
+    } else if (id === 'merchant') {
+      wx.navigateTo({ url: '/pages/merchant/dashboard/index' });
     } else if (id === 'setting') {
       const info = wx.getStorageInfoSync ? wx.getStorageInfoSync() : { currentSize: 128 };
       const currentKb = info.currentSize || 128;

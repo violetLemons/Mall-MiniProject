@@ -13,6 +13,7 @@ import { Admins } from './pages/Admins';
 import { Logs } from './pages/Logs';
 import { AuditTickets } from './pages/AuditTickets';
 import { MerchantSettings } from './pages/MerchantSettings';
+import { CardKeys } from './pages/CardKeys';
 
 // 登录守卫 (Route Guard)
 const RequireAuth: React.FC<{ children: React.ReactElement }> = ({ children }) => {
@@ -85,6 +86,14 @@ export const App: React.FC = () => {
               element={
                 <RequireSuperAdmin>
                   <Admins />
+                </RequireSuperAdmin>
+              }
+            />
+            <Route
+              path="card-keys"
+              element={
+                <RequireSuperAdmin>
+                  <CardKeys />
                 </RequireSuperAdmin>
               }
             />

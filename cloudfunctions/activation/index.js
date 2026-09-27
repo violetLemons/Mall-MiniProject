@@ -1,7 +1,8 @@
 /**
  * 卡密兑换云函数 (activation)
- * 提供用户卡密兑换 (redeem) 与管理员批量生成卡密 (generate) 两个能力。
+ * 提供用户卡密兑换 (redeem) 与管理员卡密管理 (generate / list / stats) 能力。
  * 卡密表 activation_codes：code 唯一，status 为 UNUSED / USED / DISABLED。
+ * 购物额度类型 type=BALANCE，value 为整数分，expireAt 为截止日期，batchId 为同批标识。
  */
 const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
@@ -9,14 +10,22 @@ const db = cloud.database();
 const crypto = require('crypto');
 
 const { success, fail } = require('./common/response');
-const { requireAdmin, requirePermission } = require('./common/authMiddleware');
+const { requireAdmin } = require('./common/authMiddleware');
+
+// 仅超级管理员可管理卡密（额度发放涉及资金，不放开给商家/运营）
+function requireSuperAdmin(admin) {
+  if (!admin || admin.role !== 'SUPER_ADMIN') {
+    throw Object.assign(new Error('仅超级管理员可操作卡密管理'), { code: 'PERMISSION_DENIED' });
+  }
+  return admin;
+}
 
 exports.main = async (event) => {
   const { action, params = {} } = event;
   const openid = cloud.getWXContext().OPENID;
 
   try {
-    // 1. 用户兑换卡密 (通过 openid 归属，杜绝伪造)
+    // 1. 用户兑换卡密 (通过 openid 归属，杜绝伪造；事务保证「认领 + 加额度」原子一致)
     if (action === 'redeem') {
       if (!openid) return fail('AUTH_REQUIRED', '请先登录');
 
@@ -27,18 +36,47 @@ exports.main = async (event) => {
       if (!found.data || found.data.length === 0) return fail('CODE_NOT_FOUND', '卡密不存在，请核对后重试');
 
       const card = found.data[0];
-      if (card.status === 'USED') return fail('CODE_USED', '该卡密已被使用');
-      if (card.status === 'DISABLED') return fail('CODE_DISABLED', '该卡密已失效');
+
+      const userRes = await db.collection('users').where({ _openid: openid }).limit(1).get().catch(() => ({ data: [] }));
+      if (!userRes.data || userRes.data.length === 0) return fail('USER_NOT_FOUND', '用户不存在');
+      const userId = userRes.data[0]._id;
 
       const now = new Date();
-      // 原子认领：仅当状态仍为 UNUSED 时才置为 USED，防止并发重复兑换
-      const claim = await db.collection('activation_codes')
-        .where({ _id: card._id, status: 'UNUSED' })
-        .update({ data: { status: 'USED', redeemedBy: openid, redeemedAt: now, updatedAt: now } });
-      const updated = (claim && claim.stats && claim.stats.updated) || 0;
-      if (updated === 0) return fail('CODE_USED', '该卡密已被使用');
+      let txOutcome = 'SUCCESS';
 
-      // 记录兑换流水
+      try {
+        await db.runTransaction(async (transaction) => {
+          const cardDoc = await transaction.collection('activation_codes').doc(card._id).get();
+          const c = cardDoc.data;
+          if (!c || c.status !== 'UNUSED') {
+            txOutcome = 'CODE_USED';
+            return;
+          }
+          if (c.expireAt && new Date(c.expireAt).getTime() < Date.now()) {
+            txOutcome = 'CODE_EXPIRED';
+            return;
+          }
+          await transaction.collection('activation_codes').doc(card._id).update({
+            data: { status: 'USED', redeemedBy: openid, redeemedAt: now, updatedAt: now }
+          });
+          if (c.type === 'BALANCE') {
+            // 读-改-写累加额度，事务内原子 + 冲突自动重试，避免「卡密已用但额度未到账」
+            const userDoc = await transaction.collection('users').doc(userId).get();
+            const curBalance = Number(userDoc.data && userDoc.data.balance) || 0;
+            await transaction.collection('users').doc(userId).update({
+              data: { balance: curBalance + Number(c.value || 0), updatedAt: now }
+            });
+          }
+        });
+      } catch (txErr) {
+        console.error('[activation][redeem] transaction error:', txErr && txErr.message ? txErr.message : txErr);
+        return fail('SYSTEM_ERROR', '兑换失败，请稍后重试');
+      }
+
+      if (txOutcome === 'CODE_USED') return fail('CODE_USED', '该卡密已被使用');
+      if (txOutcome === 'CODE_EXPIRED') return fail('CODE_EXPIRED', '该卡密已过期');
+
+      // 记录兑换流水（失败不阻断主流程）
       try {
         await db.collection('activation_records').add({
           data: {
@@ -64,36 +102,112 @@ exports.main = async (event) => {
 
     // 2. 管理员批量生成卡密 (经 adminGateway 转发并携带管理员凭证)
     if (action === 'generate') {
-      const admin = await requireAdmin(event, db);
-      requirePermission(admin, 'activation.manage');
+      const admin = requireSuperAdmin(await requireAdmin(event, db));
 
-      const count = Math.min(Math.max(Number(params.count) || 1, 1), 100);
-      const type = String(params.type || 'COUPON').trim();
-      const benefit = String(params.benefit || '').trim();
+      const count = Math.min(Math.max(Number(params.count) || 1, 1), 500);
+      const type = String(params.type || 'BALANCE').trim();
       const value = Number(params.value) || 0;
-      const prefix = (String(params.prefix || 'FRUIT').toUpperCase().replace(/[^A-Z0-9]/g, '') || 'FRUIT').slice(0, 8);
-
+      const expireAtRaw = params.expireAt;
       const now = new Date();
+
+      if (!Number.isInteger(value) || value <= 0) return fail('INVALID_PARAMS', '额度必须为正整数(分)');
+      if (!expireAtRaw) return fail('INVALID_PARAMS', '请设置卡密截止日期');
+      const expireAt = new Date(expireAtRaw);
+      if (isNaN(expireAt.getTime()) || expireAt.getTime() <= now.getTime()) {
+        return fail('INVALID_PARAMS', '截止日期必须晚于当前时间');
+      }
+
+      const benefit = String(params.benefit || '').trim() || (type === 'BALANCE' ? `${(value / 100)}元购物额度` : '');
+      const prefix = (String(params.prefix || 'CARD').toUpperCase().replace(/[^A-Z0-9]/g, '') || 'CARD').slice(0, 8);
+      const batchId = `B${Date.now().toString(36).toUpperCase()}${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+
+      const docs = [];
       const codes = [];
       for (let i = 0; i < count; i++) {
         const code = `${prefix}-${Date.now().toString(36).toUpperCase()}${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
-        await db.collection('activation_codes').add({
-          data: {
-            code,
-            status: 'UNUSED',
-            type,
-            benefit,
-            value,
-            redeemedBy: '',
-            redeemedAt: null,
-            createdAt: now,
-            updatedAt: now
-          }
+        docs.push({
+          code,
+          status: 'UNUSED',
+          type,
+          benefit,
+          value,
+          expireAt,
+          batchId,
+          redeemedBy: '',
+          redeemedAt: null,
+          createdAt: now,
+          updatedAt: now
         });
-        codes.push(code);
+        codes.push({ code, value, expireAt: expireAt.toISOString() });
       }
 
-      return success({ codes }, `已生成 ${count} 个卡密`);
+      // 批量插入，每 100 条一片，避免单次请求过大
+      for (let i = 0; i < docs.length; i += 100) {
+        await db.collection('activation_codes').add({ data: docs.slice(i, i + 100) });
+      }
+
+      return success({ batchId, codes }, `已生成 ${count} 个卡密`);
+    }
+
+    // 3. 管理员查询卡密列表 (排序 + 分页)
+    if (action === 'list') {
+      const admin = requireSuperAdmin(await requireAdmin(event, db));
+
+      const type = String(params.type || 'BALANCE').trim();
+      const batchId = params.batchId ? String(params.batchId).trim() : '';
+      const sortBy = ['value', 'expireAt', 'createdAt'].includes(params.sortBy) ? params.sortBy : 'createdAt';
+      const sortOrder = params.sortOrder === 'asc' ? 'asc' : 'desc';
+      const page = Math.max(Number(params.page) || 1, 1);
+      const pageSize = Math.min(Math.max(Number(params.pageSize) || 50, 1), 100);
+
+      const whereCond = { type };
+      if (batchId) whereCond.batchId = batchId;
+
+      const coll = db.collection('activation_codes');
+      const [listRes, countRes] = await Promise.all([
+        coll.where(whereCond).orderBy(sortBy, sortOrder).skip((page - 1) * pageSize).limit(pageSize).get(),
+        coll.where(whereCond).count()
+      ]);
+
+      const list = (listRes.data || []).map(c => ({
+        id: c._id,
+        code: c.code,
+        status: c.status,
+        type: c.type,
+        benefit: c.benefit || '',
+        value: c.value || 0,
+        expireAt: c.expireAt ? new Date(c.expireAt).toISOString() : null,
+        batchId: c.batchId || '',
+        redeemedBy: c.redeemedBy || '',
+        redeemedAt: c.redeemedAt ? new Date(c.redeemedAt).toISOString() : null,
+        createdAt: c.createdAt ? new Date(c.createdAt).toISOString() : null
+      }));
+
+      return success({ list, total: countRes.total || 0 });
+    }
+
+    // 4. 管理员卡密统计 (已兑换 / 已过期 / 有效期 三类互斥)
+    if (action === 'stats') {
+      const admin = requireSuperAdmin(await requireAdmin(event, db));
+
+      const type = String(params.type || 'BALANCE').trim();
+      const now = new Date();
+      const _ = db.command;
+      const coll = db.collection('activation_codes');
+
+      const [totalRes, usedRes, expiredRes, unusedRes] = await Promise.all([
+        coll.where({ type }).count(),
+        coll.where({ type, status: 'USED' }).count(),
+        coll.where({ type, status: 'UNUSED', expireAt: _.lt(now) }).count(),
+        coll.where({ type, status: 'UNUSED' }).count()
+      ]);
+
+      const total = totalRes.total || 0;
+      const used = usedRes.total || 0;
+      const expired = expiredRes.total || 0;
+      const active = (unusedRes.total || 0) - expired;
+
+      return success({ total, used, expired, active });
     }
 
     return fail('ACTION_NOT_FOUND', `未知指令: ${action}`);

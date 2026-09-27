@@ -46,7 +46,7 @@ exports.main = async event => {
       }
       await db.collection('admins').doc(admin._id).update({ data: { lastLoginAt: new Date() } });
       const token = createToken({ adminId: admin._id, version: permissionVersion(admin) }, 12 * 3600);
-      return success({ token, adminId: admin._id, username, role: admin.role, permissions: admin.permissions || [], merchantId: admin.merchantId || null, subMchIdMask: admin.subMchIdEnc ? maskSecret(admin.subMchIdEnc) : '', expiresIn: 12 * 3600 });
+      return success({ token, adminId: admin._id, username, name: admin.name || '', phone: admin.phone || '', address: admin.address || '', role: admin.role, permissions: admin.permissions || [], merchantId: admin.merchantId || null, subMchIdMask: admin.subMchIdEnc ? maskSecret(admin.subMchIdEnc) : '', expiresIn: 12 * 3600 });
     }
     const admin = await requireAdmin(event, db);
     if (action === 'getProfile') return success(admin);

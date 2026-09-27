@@ -4,7 +4,8 @@ import { Banner } from '../types';
 import { Badge } from '../components/Badge';
 import { Modal } from '../components/Modal';
 import { useToast } from '../components/Toast';
-import { compressImage } from '../utils/image';
+import { compressImage, readFileAsDataURL, blobToFile } from '../utils/image';
+import { useImageCropper } from '../components/ImageCropper';
 import { Plus, Edit2, Trash2, Image as ImageIcon, LayoutGrid, Sliders, ImagePlus, Loader2 } from 'lucide-react';
 
 const FALLBACK_BANNER_IMG = 'https://images.unsplash.com/photo-1556906781-9a412961c28c?w=1200';
@@ -20,7 +21,6 @@ export const Banners: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [formData, setFormData] = useState<Partial<Banner>>({
     title: '',
-    subtitle: '',
     imageUrl: '',
     badge: '开学特惠',
     linkUrl: '',
@@ -30,6 +30,9 @@ export const Banners: React.FC = () => {
   const [bannerPreview, setBannerPreview] = useState('');
   const [bannerUploading, setBannerUploading] = useState(false);
   const bannerFileInputRef = useRef<HTMLInputElement>(null);
+
+  // 一级分类下拉框选项（跳转目标）
+  const [categoryOptions, setCategoryOptions] = useState<{ id: string; name: string }[]>([]);
 
   // 潮流活动专区 4 格卡片状态
   const [promoCards, setPromoCards] = useState<any[]>([]);
@@ -43,6 +46,7 @@ export const Banners: React.FC = () => {
   const [promoPreview, setPromoPreview] = useState('');
   const [promoUploading, setPromoUploading] = useState(false);
   const promoFileInputRef = useRef<HTMLInputElement>(null);
+  const { openCrop, cropper } = useImageCropper();
 
   const loadData = async () => {
     setLoading(true);
@@ -52,6 +56,23 @@ export const Banners: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadCategoryOptions = async () => {
+    try {
+      const list = await AdminApi.getCategories();
+      const arr = (Array.isArray(list) ? list : []).filter(c => !c.parentId);
+      setCategoryOptions(arr.map(c => ({ id: c.id, name: c.name })));
+    } catch (err: any) {
+      console.warn('[Banners] load categories failed:', err?.message);
+    }
+  };
+
+  // 从跳转路径反解一级分类 id（用于编辑时回填下拉框）
+  const categoryIdFromUrl = (url?: string): string => {
+    if (!url) return '';
+    const m = String(url).match(/[?&]categoryId=([^&]+)/);
+    return m ? decodeURIComponent(m[1]) : '';
   };
 
   const loadPromoData = async () => {
@@ -68,6 +89,7 @@ export const Banners: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    loadCategoryOptions();
     // [隐藏] 潮流活动专区 4 格卡片已下线，暂停加载；如需恢复取消注释
     // loadPromoData();
   }, []);
@@ -75,11 +97,10 @@ export const Banners: React.FC = () => {
   const handleOpenCreate = () => {
     setFormData({
       title: '',
-      subtitle: '',
       imageUrl: '',
       badge: '特惠',
-      linkUrl: '/pages/goods/list?tag=校园特惠',
-      targetUrl: '/pages/goods/list?tag=校园特惠',
+      linkUrl: '',
+      targetUrl: '',
       sort: 10
     });
     setBannerPreview('');
@@ -101,7 +122,7 @@ export const Banners: React.FC = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title?.trim()) {
-      toast('请输入轮播主标题', 'error');
+      toast('请输入标题', 'error');
       return;
     }
     if (!formData.imageUrl?.trim()) {
@@ -115,6 +136,7 @@ export const Banners: React.FC = () => {
     try {
       await AdminApi.saveBanner({
         ...formData,
+        subtitle: '',
         targetUrl: formData.targetUrl || formData.linkUrl || ''
       });
       toast(`轮播 [${formData.title}] 保存成功`, 'success');
@@ -141,7 +163,11 @@ export const Banners: React.FC = () => {
     if (!file) return;
     setBannerUploading(true);
     try {
-      const compressed = await compressImage(file, 750, 'image/jpeg');
+      const src = await readFileAsDataURL(file);
+      const result = await openCrop(src, 750 / 320);
+      if (result === null) return; // 取消
+      const sourceFile = blobToFile(result, file.name);
+      const compressed = await compressImage(sourceFile, 750, 'image/jpeg');
       const { fileID, url } = await AdminApi.uploadBannerImage(compressed);
       setFormData(prev => ({ ...prev, imageUrl: fileID || url }));
       setBannerPreview(url);
@@ -158,7 +184,11 @@ export const Banners: React.FC = () => {
     if (!file) return;
     setPromoUploading(true);
     try {
-      const compressed = await compressImage(file, 400, 'image/jpeg');
+      const src = await readFileAsDataURL(file);
+      const result = await openCrop(src, 1);
+      if (result === null) return; // 取消
+      const sourceFile = blobToFile(result, file.name);
+      const compressed = await compressImage(sourceFile, 400, 'image/jpeg');
       const { fileID, url } = await AdminApi.uploadBannerImage(compressed);
       setPromoImageUrl(fileID || url);
       setPromoPreview(url);
@@ -183,7 +213,7 @@ export const Banners: React.FC = () => {
   const handleSavePromo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!promoImageUrl.trim()) {
-      toast('请上传卡片图片（或填写图片链接）', 'error');
+      toast('请上传卡片图片', 'error');
       return;
     }
     if (!isValidImage(promoImageUrl)) {
@@ -305,7 +335,7 @@ export const Banners: React.FC = () => {
             <thead style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
               <tr style={{ color: '#64748B' }}>
                 <th style={{ padding: '14px 18px' }}>活动大图预览</th>
-                <th style={{ padding: '14px 18px' }}>标题与副标题</th>
+                <th style={{ padding: '14px 18px' }}>标题</th>
                 <th style={{ padding: '14px 18px' }}>营销角标</th>
                 <th style={{ padding: '14px 18px' }}>跳转路径</th>
                 <th style={{ padding: '14px 18px' }}>排序</th>
@@ -326,15 +356,19 @@ export const Banners: React.FC = () => {
                   </td>
                   <td style={{ padding: '14px 18px' }}>
                     <div style={{ fontWeight: 700, color: '#0F172A' }}>{b.title}</div>
-                    <div style={{ fontSize: '12px', color: '#64748B' }}>{b.subtitle}</div>
                   </td>
                   <td style={{ padding: '14px 18px' }}>
                     <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', backgroundColor: '#FFF0EB', color: '#FF5500', fontWeight: 600 }}>
                       {b.badge}
                     </span>
                   </td>
-                  <td style={{ padding: '14px 18px', color: '#64748B', fontFamily: 'monospace' }}>
-                    {b.linkUrl || '默认首页'}
+                  <td style={{ padding: '14px 18px', color: '#64748B' }}>
+                    {(() => {
+                      const cid = categoryIdFromUrl(b.targetUrl || b.linkUrl);
+                      if (!cid) return '不跳转';
+                      const cat = categoryOptions.find(c => c.id === cid);
+                      return cat ? `分类 · ${cat.name}` : (b.targetUrl || b.linkUrl || '不跳转');
+                    })()}
                   </td>
                   <td style={{ padding: '14px 18px', fontWeight: 600, color: '#334155' }}>
                     {b.sort}
@@ -488,7 +522,7 @@ export const Banners: React.FC = () => {
         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-              主标题
+              标题
             </label>
             <input
               type="text"
@@ -496,19 +530,6 @@ export const Banners: React.FC = () => {
               value={formData.title || ''}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               placeholder="例如: 校园新学期 · 潮流运动特辑"
-              style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px' }}
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-              副标题描述
-            </label>
-            <input
-              type="text"
-              value={formData.subtitle || ''}
-              onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })}
-              placeholder="例如: 全场精选好物 限时领券立减 80 元"
               style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px' }}
             />
           </div>
@@ -581,23 +602,6 @@ export const Banners: React.FC = () => {
             </div>
           </div>
 
-          <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-              图片链接 URL（可选，直接粘贴 https 链接）
-            </label>
-            <input
-              type="text"
-              value={typeof formData.imageUrl === 'string' && formData.imageUrl.startsWith('http') ? formData.imageUrl : ''}
-              onChange={(e) => {
-                const v = e.target.value.trim();
-                setFormData({ ...formData, imageUrl: v });
-                setBannerPreview(v);
-              }}
-              placeholder="https://..."
-              style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px' }}
-            />
-          </div>
-
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
@@ -626,15 +630,25 @@ export const Banners: React.FC = () => {
 
           <div>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-              小程序页面跳转链接 (Path)
+              小程序页面跳转（跳转到一级分类）
             </label>
-            <input
-              type="text"
-              value={formData.linkUrl || ''}
-              onChange={(e) => setFormData({ ...formData, linkUrl: e.target.value })}
-              placeholder="/pages/goods/list?tag=校园特惠"
-              style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px' }}
-            />
+            <select
+              value={categoryIdFromUrl(formData.targetUrl || formData.linkUrl)}
+              onChange={(e) => {
+                const cid = e.target.value;
+                const url = cid ? `/pages/category/index?categoryId=${cid}` : '';
+                setFormData({ ...formData, linkUrl: url, targetUrl: url });
+              }}
+              style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px', backgroundColor: '#FFF' }}
+            >
+              <option value="">不跳转（仅展示轮播）</option>
+              {categoryOptions.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <p style={{ fontSize: '12px', color: '#64748B', marginTop: '6px' }}>
+              选择后，用户点击轮播将跳转到分类页并定位到对应一级分类。
+            </p>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
@@ -730,23 +744,6 @@ export const Banners: React.FC = () => {
             </div>
           </div>
 
-          <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-              图片链接 URL（可选，直接粘贴 https 链接）
-            </label>
-            <input
-              type="text"
-              value={typeof promoImageUrl === 'string' && promoImageUrl.startsWith('http') ? promoImageUrl : ''}
-              onChange={(e) => {
-                const v = e.target.value.trim();
-                setPromoImageUrl(v);
-                setPromoPreview(v);
-              }}
-              placeholder="https://..."
-              style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px' }}
-            />
-          </div>
-
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
@@ -806,6 +803,7 @@ export const Banners: React.FC = () => {
           </div>
         </form>
       </Modal>
+      {cropper}
     </div>
   );
 };

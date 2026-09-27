@@ -5,6 +5,8 @@ import { Badge } from '../components/Badge';
 import { Modal } from '../components/Modal';
 import { useToast } from '../components/Toast';
 import { formatCents } from '../utils/format';
+import { compressImage, readFileAsDataURL, blobToFile } from '../utils/image';
+import { useImageCropper } from '../components/ImageCropper';
 import {
   Search,
   Plus,
@@ -43,10 +45,10 @@ export const Products: React.FC = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadingDetail, setUploadingDetail] = useState(false);
-  const [detailUrlInput, setDetailUrlInput] = useState('');
   const [newTagInput, setNewTagInput] = useState('');
   const coverInputRef = React.useRef<HTMLInputElement>(null);
   const detailInputRef = React.useRef<HTMLInputElement>(null);
+  const { openCrop, cropper } = useImageCropper();
 
   // Preview Modal State
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -179,7 +181,6 @@ export const Products: React.FC = () => {
       deliveryTypes: ['DELIVERY'],
       detailImages: []
     });
-    setDetailUrlInput('');
     setNewTagInput('');
     setEditModalOpen(true);
     if (firstLevel1) handleSelectLevel1(firstLevel1.id);
@@ -202,7 +203,6 @@ export const Products: React.FC = () => {
       totalStock: (p.totalStock !== undefined && p.totalStock !== null) ? p.totalStock : '',
       deliveryTypes: p.deliveryTypes && p.deliveryTypes.length > 0 ? p.deliveryTypes : ['DELIVERY']
     });
-    setDetailUrlInput('');
     setNewTagInput('');
     setEditModalOpen(true);
   };
@@ -237,7 +237,12 @@ export const Products: React.FC = () => {
     setUploadingCover(true);
     try {
       toast('正在上传封面图至云端存储...', 'info');
-      const url = await AdminApi.uploadProductImage(file);
+      const src = await readFileAsDataURL(file);
+      const result = await openCrop(src, 1);
+      if (result === null) return; // 取消
+      const sourceFile = blobToFile(result, file.name);
+      const compressed = await compressImage(sourceFile, 1000, 'image/jpeg', 0.8);
+      const url = await AdminApi.uploadProductImage(compressed);
       setFormData(prev => ({ ...prev, cover: url }));
       toast('封面图上传成功！', 'success');
     } catch (err: any) {
@@ -256,7 +261,12 @@ export const Products: React.FC = () => {
       toast(`正在上传 ${files.length} 张详情图至云端...`, 'info');
       const newUrls: string[] = [];
       for (let i = 0; i < files.length; i++) {
-        const url = await AdminApi.uploadProductImage(files[i]);
+        const src = await readFileAsDataURL(files[i]);
+        const result = await openCrop(src, 1);
+        if (result === null) continue; // 取消当前这张
+        const sourceFile = blobToFile(result, files[i].name);
+        const compressed = await compressImage(sourceFile, 1000, 'image/jpeg', 0.8);
+        const url = await AdminApi.uploadProductImage(compressed);
         if (url) newUrls.push(url);
       }
       setFormData(prev => ({
@@ -270,15 +280,6 @@ export const Products: React.FC = () => {
       setUploadingDetail(false);
       if (e.target) e.target.value = '';
     }
-  };
-
-  const handleAddDetailUrl = () => {
-    if (!detailUrlInput.trim()) return;
-    setFormData(prev => ({
-      ...prev,
-      detailImages: [...(prev.detailImages || []), detailUrlInput.trim()]
-    }));
-    setDetailUrlInput('');
   };
 
   const handleRemoveDetailImage = (index: number) => {
@@ -1070,19 +1071,6 @@ export const Products: React.FC = () => {
                 </div>
               )}
               <div style={{ flex: 1 }}>
-                <input
-                  type="text"
-                  value={formData.cover || ''}
-                  onChange={(e) => setFormData({ ...formData, cover: e.target.value })}
-                  placeholder="可点击右上方「本地上传封面图」，或粘贴图片直链 (https://...)"
-                  style={{
-                    width: '100%',
-                    padding: '9px 12px',
-                    borderRadius: '8px',
-                    border: '1px solid #CBD5E1',
-                    fontSize: '13px'
-                  }}
-                />
                 <p style={{ fontSize: '11px', color: '#94A3B8', marginTop: '4px' }}>
                   建议尺寸：800x800 正方形，支持 JPG, PNG, WebP。点击按钮选择本地电脑图片即可自动上传。
                 </p>
@@ -1243,38 +1231,6 @@ export const Products: React.FC = () => {
                 >
                   <Upload size={13} />
                   {uploadingDetail ? '正在上传...' : '本地批量上传详情图'}
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-                <input
-                  type="text"
-                  value={detailUrlInput}
-                  onChange={(e) => setDetailUrlInput(e.target.value)}
-                  placeholder="或输入图片 URL 直链 (https://...)"
-                  style={{
-                    flex: 1,
-                    padding: '7px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid #CBD5E1',
-                    fontSize: '13px'
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={handleAddDetailUrl}
-                  style={{
-                    padding: '7px 14px',
-                    backgroundColor: '#F1F5F9',
-                    border: '1px solid #CBD5E1',
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    color: '#334155'
-                  }}
-                >
-                  添加链接
                 </button>
               </div>
 
@@ -1705,6 +1661,7 @@ export const Products: React.FC = () => {
           </div>
         </div>
       </Modal>
+      {cropper}
     </div>
   );
 };

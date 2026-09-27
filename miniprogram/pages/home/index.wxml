@@ -30,7 +30,6 @@
           <view class="banner-overlay">
             <text wx:if="{{item.badge}}" class="banner-badge">{{item.badge}}</text>
             <text class="banner-title">{{item.title}}</text>
-            <text class="banner-subtitle">{{item.subtitle}}</text>
           </view>
         </view>
       </swiper-item>

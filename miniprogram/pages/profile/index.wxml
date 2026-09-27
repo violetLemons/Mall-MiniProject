@@ -13,6 +13,10 @@
         <text class="user-id">{{userInfo.userId}}</text>
         <text class="copy-uid-tag">复制</text>
       </view>
+      <view class="user-balance-row">
+        <text class="user-balance-value">¥{{userInfo.balanceYuan}}</text>
+        <text class="user-balance-label">购物额度</text>
+      </view>
     </view>
   </view>
 

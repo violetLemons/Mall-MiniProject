@@ -1,0 +1,15 @@
+<view class="mlogin">
+  <view class="mlogin-logo">🏪</view>
+  <view class="mlogin-title">商户中心</view>
+  <view class="mlogin-sub">一键登录，用手机号验证商户身份</view>
+  <button
+    class="mlogin-btn"
+    open-type="getPhoneNumber"
+    bindgetphonenumber="onGetPhone"
+    loading="{{loading}}"
+    disabled="{{loading}}"
+  >
+    微信手机号一键登录
+  </button>
+  <view class="mlogin-tip">登录即表示同意平台校验您的商户身份</view>
+</view>

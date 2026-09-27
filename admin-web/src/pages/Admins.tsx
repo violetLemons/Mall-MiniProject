@@ -33,6 +33,7 @@ export const Admins: React.FC = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [subMchId, setSubMchId] = useState('');
+  const [phone, setPhone] = useState('');
 
   const loadData = async () => {
     setLoading(true);
@@ -57,6 +58,7 @@ export const Admins: React.FC = () => {
     setPassword('');
     setConfirmPassword('');
     setSubMchId('');
+    setPhone('');
     setModalOpen(true);
   };
 
@@ -80,11 +82,16 @@ export const Admins: React.FC = () => {
       toast('商户号格式不正确（需为 8-32 位数字）', 'error');
       return;
     }
+    if (role === 'MERCHANT' && phone.trim() && !/^1\d{10}$/.test(phone.trim())) {
+      toast('手机号格式不正确（需为 11 位大陆手机号）', 'error');
+      return;
+    }
 
     try {
       await AdminApi.saveAdmin({
         ...formData,
         subMchId: role === 'MERCHANT' ? subMchId.trim() : '',
+        phone: role === 'MERCHANT' ? phone.trim() : '',
         password,
         permissions: ROLE_PERMISSIONS[role]
       } as any);
@@ -187,7 +194,7 @@ export const Admins: React.FC = () => {
             {admins.map((adm) => (
               <tr key={adm.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
                 <td style={{ padding: '14px 18px' }}>
-                  <div style={{ fontWeight: 700, color: '#0F172A' }}>{adm.name}</div>
+                  <div style={{ fontWeight: 700, color: '#0F172A' }}>{adm.name || '未命名商户'}</div>
                   <div style={{ fontSize: '12px', color: '#64748B' }}>@{adm.username}</div>
                 </td>
                 <td style={{ padding: '14px 18px' }}>
@@ -302,6 +309,25 @@ export const Admins: React.FC = () => {
               <option value="SUPER_ADMIN">超级管理员 (拥有全部权限与物理清除权)</option>
             </select>
           </div>
+
+          {formData.role === 'MERCHANT' && (
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                绑定手机号 (用于商户小程序一键登录)
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="11 位大陆手机号，需为商户本人微信绑定手机号"
+                style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px' }}
+              />
+              <p style={{ fontSize: '12px', color: '#64748B', marginTop: '6px' }}>
+                商户小程序端按此手机号做一键登录校验，须与商户本人微信绑定的手机号一致。
+              </p>
+            </div>
+          )}
 
           {formData.role === 'MERCHANT' && (
             <div>

@@ -1,0 +1,80 @@
+<view class="m-page">
+  <custom-navbar title="库存流水" background="#111111" textColor="#FFFFFF" showBack="{{true}}" />
+
+  <merchant-login wx:if="{{!isLoggedIn}}" bind:success="onMerchantLogin" />
+
+  <block wx:else>
+    <!-- 概览 -->
+    <view class="overview">
+      <view class="ov-item">
+        <text class="ov-value">{{overview.totalProducts}}</text>
+        <text class="ov-label">商品数</text>
+      </view>
+      <view class="ov-item">
+        <text class="ov-value">{{overview.totalStock}}</text>
+        <text class="ov-label">总库存</text>
+      </view>
+      <view class="ov-item">
+        <text class="ov-value ov-warn">{{overview.lowStock}}</text>
+        <text class="ov-label">低库存</text>
+      </view>
+    </view>
+
+    <view class="bar">
+      <text class="bar-title">库存流水</text>
+      <text class="btn-adjust" bindtap="onOpenAdjust">＋ 人工调账</text>
+    </view>
+
+    <view class="logs">
+      <empty-state wx:if="{{!loading && logs.length === 0}}" title="暂无流水" description="库存变动会记录在这里" />
+      <view wx:for="{{logs}}" wx:key="id" class="log-card">
+        <view class="log-head">
+          <text class="log-sku">{{item.skuId}}</text>
+          <text class="log-delta {{item.delta > 0 ? 'delta-up' : 'delta-down'}}">{{item.deltaText}}</text>
+        </view>
+        <view class="log-line">{{item.beforeStock}} → {{item.afterStock}}</view>
+        <view class="log-meta">
+          <text>{{item.remark}}</text>
+          <text class="log-time">{{item.createdAt}}</text>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <!-- 调账弹层 -->
+  <view wx:if="{{showAdjust}}" class="form-mask" bindtap="onCloseAdjust"></view>
+  <view wx:if="{{showAdjust}}" class="form-panel">
+    <view class="form-head">
+      <text class="form-title">人工调账</text>
+      <text class="form-close" bindtap="onCloseAdjust">✕</text>
+    </view>
+    <view class="form-body">
+      <view class="f-item">
+        <text class="f-label">选择商品</text>
+        <picker mode="selector" range="{{adjustProducts}}" range-key="name" value="{{adjustProductIndex}}" bindchange="onAdjustProductChange">
+          <view class="f-picker">{{adjustProducts[adjustProductIndex].name || '请选择商品'}}</view>
+        </picker>
+      </view>
+
+      <view class="f-item">
+        <text class="f-label">选择规格</text>
+        <picker mode="selector" range="{{adjustSkus}}" range-key="label" value="{{adjustSkuIndex}}" bindchange="onAdjustSkuChange">
+          <view class="f-picker">{{adjustSkus.length ? adjustSkus[adjustSkuIndex].label : '请先选择商品'}}</view>
+        </picker>
+      </view>
+
+      <view class="f-item">
+        <text class="f-label">目标库存</text>
+        <input class="f-input" type="number" placeholder="请输入新的库存数量" value="{{adjustTarget}}" data-field="adjustTarget" bindinput="onAdjustInput" />
+      </view>
+
+      <view class="f-item">
+        <text class="f-label">调整原因</text>
+        <input class="f-input" placeholder="如：盘点、补货、报损" value="{{adjustRemark}}" data-field="adjustRemark" bindinput="onAdjustInput" />
+      </view>
+    </view>
+    <view class="form-foot">
+      <button class="btn-save" loading="{{adjustLoading}}" disabled="{{adjustLoading}}" bindtap="onAdjustSubmit">确认调账</button>
+    </view>
+  </view>
+</view>

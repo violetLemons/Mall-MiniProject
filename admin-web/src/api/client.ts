@@ -1,4 +1,4 @@
-import { AdminUser, Product, Order, Category, Banner, InventoryLog, OperationLog, SkuItem, ProductAuditTicket } from '../types';
+import { AdminUser, Product, Order, Category, Banner, InventoryLog, OperationLog, SkuItem, ProductAuditTicket, CardKey } from '../types';
 
 const TOKEN_KEY = 'sneaker_admin_token';
 const USER_KEY = 'sneaker_admin_user';
@@ -52,6 +52,9 @@ export const AdminApi = {
       token: string;
       adminId: string;
       username: string;
+      name?: string;
+      phone?: string;
+      address?: string;
       role: any;
       permissions: string[];
       merchantId?: string | null;
@@ -61,7 +64,9 @@ export const AdminApi = {
     const user: AdminUser = {
       id: data.adminId,
       username: data.username,
-      name: data.username === 'superadmin' ? '系统超级管理员' : data.username,
+      name: data.role === 'MERCHANT' ? (data.name || '') : (data.name || (data.username === 'superadmin' ? '系统超级管理员' : data.username)),
+      phone: data.phone || '',
+      address: data.address || '',
       role: data.role || 'OPERATOR',
       permissions: data.permissions || [],
       merchantId: data.merchantId || null,
@@ -90,6 +95,17 @@ export const AdminApi = {
     }
   },
 
+  updateCurrentUser: (patch: Partial<AdminUser>): void => {
+    try {
+      const raw = localStorage.getItem(USER_KEY);
+      if (!raw) return;
+      const user = JSON.parse(raw);
+      localStorage.setItem(USER_KEY, JSON.stringify({ ...user, ...patch }));
+    } catch {
+      /* ignore */
+    }
+  },
+
   // ---------------- 商品与 SKU ----------------
   getProducts: async (filters?: { keyword?: string; categoryId?: string; status?: string }): Promise<Product[]> => {
     const res = await requestCloud<{ list: any[]; total: number }>('adminProducts', 'list', {
@@ -106,6 +122,10 @@ export const AdminApi = {
       categoryId: p.categoryId,
       cover: p.cover || '',
       images: p.images || [p.cover || ''],
+      subtitle: p.subtitle || '',
+      description: p.description || '',
+      detailImages: p.detailImages || [],
+      deliveryTypes: p.deliveryTypes || [],
       minPrice: Number(p.minPrice) || 0,
       maxPrice: Number(p.maxPrice) || Number(p.minPrice) || 0,
       platformFee: Number(p.platformFee) || 0,
@@ -137,6 +157,10 @@ export const AdminApi = {
       categoryId: p.categoryId,
       cover: p.cover || '',
       images: p.images || [p.cover || ''],
+      subtitle: p.subtitle || '',
+      description: p.description || '',
+      detailImages: p.detailImages || [],
+      deliveryTypes: p.deliveryTypes || [],
       minPrice: Number(p.minPrice) || 0,
       maxPrice: Number(p.maxPrice) || Number(p.minPrice) || 0,
       platformFee: Number(p.platformFee) || 0,
@@ -252,8 +276,7 @@ export const AdminApi = {
           });
           resolve(res.url || base64);
         } catch (e) {
-          console.warn('[uploadProductImage] CloudBase upload fallback to base64:', e);
-          resolve(reader.result as string);
+          reject(e instanceof Error ? e : new Error('图片上传失败，请重试'));
         }
       };
       reader.onerror = reject;
@@ -291,13 +314,15 @@ export const AdminApi = {
   },
 
   // ---------------- 订单管理与校园自提 ----------------
-  getOrders: async (filters?: { status?: string; deliveryType?: string; keyword?: string }): Promise<Order[]> => {
+  getOrders: async (filters?: { status?: string; deliveryType?: string; keyword?: string; merchantId?: string; statuses?: string[]; pageSize?: number }): Promise<Order[]> => {
     const res = await requestCloud<{ list: any[] }>('adminOrders', 'list', {
       status: filters?.status,
+      statuses: filters?.statuses,
       deliveryType: filters?.deliveryType,
       orderNo: filters?.keyword,
+      merchantId: filters?.merchantId,
       page: 1,
-      pageSize: 50
+      pageSize: filters?.pageSize || 50
     });
     return (res.list || []).map(o => ({
       id: o._id || o.id,
@@ -320,6 +345,8 @@ export const AdminApi = {
       payAmount: Number(o.payAmount) || 0,
       deliveryType: o.deliveryType,
       status: o.status,
+      merchantId: o.merchantId || null,
+      merchantName: o.merchantName || '',
       isTest: Boolean(o.isTest),
       trackingNo: o.trackingNo,
       logisticsCompany: o.logisticsCompany,
@@ -332,6 +359,11 @@ export const AdminApi = {
       createdAt: o.createdAt ? new Date(o.createdAt).toLocaleString() : '',
       paidAt: o.paidAt ? new Date(o.paidAt).toLocaleString() : ''
     }));
+  },
+
+  getMerchants: async (): Promise<{ merchantId: string; name: string }[]> => {
+    const res = await requestCloud<any[]>('adminOrders', 'merchants', {});
+    return Array.isArray(res) ? res : [];
   },
 
   shipSubOrder: async (orderId: string, trackingNo: string, logisticsCompany?: string): Promise<void> => {
@@ -512,7 +544,9 @@ export const AdminApi = {
     return list.map((a: any) => ({
       id: a._id || a.id,
       username: a.username,
-      name: a.name || (a.username === 'superadmin' ? '系统超级管理员' : a.username),
+      name: a.role === 'MERCHANT' ? (a.name || '') : (a.name || (a.username === 'superadmin' ? '系统超级管理员' : a.username)),
+      phone: a.phone || '',
+      address: a.address || '',
       role: a.role,
       permissions: a.permissions || [],
       merchantId: a.merchantId || null,
@@ -530,6 +564,10 @@ export const AdminApi = {
 
   setSubMchId: async (subMchId: string, adminId?: string): Promise<{ subMchIdMask: string }> => {
     return requestCloud<{ subMchIdMask: string }>('adminUsers', 'setSubMchId', { subMchId, adminId });
+  },
+
+  updateMerchantProfile: async (params: { name?: string; address?: string; phone?: string }): Promise<{ name: string; address: string; phone: string }> => {
+    return requestCloud<{ name: string; address: string; phone: string }>('adminUsers', 'updateProfile', params);
   },
 
   toggleAdminStatus: async (adminId: string, status: 'ACTIVE' | 'DISABLED'): Promise<void> => {
@@ -600,5 +638,40 @@ export const AdminApi = {
 
   deletePickupPoint: async (id: string): Promise<any> => {
     return await requestCloud('pickupPoints', 'delete', { id });
+  },
+
+  // ---------------- 卡密管理 (购物额度) ----------------
+  generateCardKeys: async (params: { count: number; valueYuan: number; expireAt: string }): Promise<{ batchId: string; codes: { code: string; value: number; expireAt: string }[] }> => {
+    const res = await requestCloud<{ batchId: string; codes: any[] }>('activation', 'generate', {
+      count: params.count,
+      value: Math.round(params.valueYuan * 100),
+      expireAt: params.expireAt,
+      type: 'BALANCE'
+    });
+    return { batchId: res.batchId, codes: res.codes || [] };
+  },
+
+  listCardKeys: async (params?: { sortBy?: string; sortOrder?: 'asc' | 'desc'; page?: number; pageSize?: number }): Promise<{ list: CardKey[]; total: number }> => {
+    const res = await requestCloud<{ list: any[]; total: number }>('activation', 'list', { type: 'BALANCE', ...params });
+    return {
+      list: (res.list || []).map(c => ({
+        id: c.id || c._id,
+        code: c.code,
+        status: c.status,
+        type: c.type || 'BALANCE',
+        benefit: c.benefit || '',
+        value: Number(c.value) || 0,
+        expireAt: c.expireAt || null,
+        batchId: c.batchId || '',
+        redeemedBy: c.redeemedBy || '',
+        redeemedAt: c.redeemedAt || null,
+        createdAt: c.createdAt || null
+      })),
+      total: res.total || 0
+    };
+  },
+
+  getCardKeyStats: async (): Promise<{ total: number; used: number; expired: number; active: number }> => {
+    return requestCloud<{ total: number; used: number; expired: number; active: number }>('activation', 'stats', { type: 'BALANCE' });
   }
 };

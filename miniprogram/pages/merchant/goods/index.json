@@ -1,0 +1,11 @@
+{
+  "usingComponents": {
+    "custom-navbar": "../../../components/custom-navbar/index",
+    "merchant-login": "../../../components/merchant-login/index",
+    "empty-state": "../../../components/empty-state/index",
+    "loading-skeleton": "../../../components/loading-skeleton/index"
+  },
+  "navigationStyle": "custom",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
+}
