@@ -31,6 +31,19 @@ Component({
           this.setData({ loading: false });
           wx.showToast({ title: err?.message || '商户登录失败', icon: 'none' });
         });
+    },
+
+    onDevLogin() {
+      this.setData({ loading: true });
+      MerchantService.devLogin()
+        .then((info: MerchantInfo) => {
+          this.setData({ loading: false });
+          this.triggerEvent('success', info);
+        })
+        .catch((err: any) => {
+          this.setData({ loading: false });
+          wx.showToast({ title: err?.message || '开发登录失败', icon: 'none' });
+        });
     }
   }
 });

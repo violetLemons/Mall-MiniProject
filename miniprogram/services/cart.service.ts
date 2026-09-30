@@ -11,8 +11,6 @@ export interface CartItemModel {
   image: string;
   count: number;
   selected: boolean;
-  stock?: number;
-  inStock?: boolean;
   isOnSale?: boolean;
 }
 

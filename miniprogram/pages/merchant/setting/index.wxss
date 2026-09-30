@@ -20,7 +20,7 @@
 }
 
 .f-item {
-  margin-bottom: 28rpx;
+  margin-bottom: 44rpx;
 }
 
 .f-label {
@@ -34,8 +34,12 @@
 .f-input {
   background: #F5F6F8;
   border-radius: 12rpx;
-  padding: 20rpx 24rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  padding: 0 24rpx;
   font-size: 28rpx;
+  color: #111111;
+  box-sizing: border-box;
 }
 
 .f-textarea {
@@ -43,9 +47,15 @@
   border-radius: 12rpx;
   padding: 20rpx 24rpx;
   font-size: 28rpx;
+  color: #111111;
   width: 100%;
   box-sizing: border-box;
   min-height: 120rpx;
+  line-height: 1.6;
+}
+
+.ph {
+  color: #B0B3B8;
 }
 
 .f-tip {

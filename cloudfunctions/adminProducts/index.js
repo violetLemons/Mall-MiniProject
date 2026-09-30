@@ -98,6 +98,52 @@ function requirePermission(admin, permission) {
   throw error('PERMISSION_DENIED', `无权执行此操作 (需要权限: ${permission})`);
 }
 
+function getEnvId() {
+  try { return cloud.getWXContext().ENV || process.env.TCB_ENV || ''; }
+  catch { return process.env.TCB_ENV || ''; }
+}
+
+// 云存储临时链接 → 永久 fileID（cloud://）。仅转换 tcb.qcloud.la 的临时链接；fileID/dataURL/外部图原样保留。
+function toFileID(value) {
+  if (typeof value !== 'string' || !value) return value;
+  if (value.startsWith('cloud://')) return value.replace(/\.tcb\.qcloud\.la(?=\/)/, '');
+  if (value.startsWith('data:image/')) return value;
+  if (!/\.tcb\.qcloud\.la\//.test(value)) return value;
+  try {
+    const u = new URL(value);
+    const host = u.hostname.replace(/\.tcb\.qcloud\.la$/, '');
+    const path = u.pathname.replace(/^\/+/, '');
+    const env = getEnvId();
+    if (!host || !path || !env) return value;
+    return `cloud://${env}.${host}/${path}`;
+  } catch { return value; }
+}
+
+// 把文档指定图片字段里的 cloud:// fileID 批量换成临时链接（仅浏览器端展示需要，实时生成）
+async function fileIDsToTempURLs(docs, keys) {
+  const ids = new Set();
+  for (const doc of docs) {
+    for (const k of keys) {
+      const v = doc[k];
+      if (typeof v === 'string' && v.startsWith('cloud://')) ids.add(v);
+      else if (Array.isArray(v)) v.forEach(x => { if (typeof x === 'string' && x.startsWith('cloud://')) ids.add(x); });
+    }
+  }
+  if (ids.size === 0) return;
+  try {
+    const res = await cloud.getTempFileURL({ fileList: Array.from(ids) });
+    const map = {};
+    (res.fileList || []).forEach(f => { if (f.status === 0 && f.tempFileURL) map[f.fileID] = f.tempFileURL; });
+    for (const doc of docs) {
+      for (const k of keys) {
+        const v = doc[k];
+        if (typeof v === 'string') { if (map[v]) doc[k] = map[v]; }
+        else if (Array.isArray(v)) doc[k] = v.map(x => map[x] || x);
+      }
+    }
+  } catch (_) { /* 转换失败则原样返回 fileID，不抛错 */ }
+}
+
 function fields(p) {
   const out = {};
   for (const k of ['name', 'subtitle', 'description', 'categoryId', 'cover', 'brand']) {
@@ -116,7 +162,7 @@ function fields(p) {
   for (const url of [out.cover, ...(out.images || []), ...(out.detailImages || [])].filter(Boolean)) {
     if (!/^(https:\/\/|cloud:\/\/|data:image\/|\/\/)/.test(url)) throw error('INVALID_PARAMS', '图片须使用HTTPS、云存储地址或DataURL');
   }
-  for (const k of ['sort', 'originalPrice', 'minPrice', 'maxPrice', 'totalStock']) {
+  for (const k of ['sort', 'originalPrice', 'minPrice', 'maxPrice', 'sales']) {
     if (p[k] !== undefined && p[k] !== null && p[k] !== '') {
       out[k] = integer(p[k], k);
     }
@@ -126,14 +172,17 @@ function fields(p) {
       out[k] = Boolean(p[k]);
     }
   }
+  if (out.cover) out.cover = toFileID(out.cover);
+  for (const k of ['images', 'detailImages']) {
+    if (Array.isArray(out[k])) out[k] = out[k].map(toFileID);
+  }
   return out;
 }
 
-// 无规格时用商品的基准价/总库存自动生成单一隐藏默认 SKU（颜色=默认、规格=1）
+// 无规格时用商品的基准价自动生成单一隐藏默认 SKU（颜色=默认、规格=1）
 function buildDefaultSkuInput(product) {
   const price = Number(product.minPrice) > 0 ? Number(product.minPrice) : 1;
-  const stock = Number(product.totalStock) >= 0 ? Number(product.totalStock) : 0;
-  return { colorName: '默认', size: 1, price, stock };
+  return { colorName: '默认', size: 1, price };
 }
 
 async function saveSkus(tx, product, inputs, old, admin) {
@@ -148,12 +197,11 @@ async function saveSkus(tx, product, inputs, old, admin) {
     if (ids.has(id)) throw error('DUPLICATE_SKU', '规格ID重复'); ids.add(id);
     const previous = await getDoc(tx, 'product_skus', id);
     if (previous && previous.productId !== product._id) throw error('PERMISSION_DENIED', '规格不属于此商品');
-    const stock = integer(s.stock, '库存'), lockedStock = previous?.lockedStock || 0, price = integer(s.price, '价格分', 1);
-    if (stock < lockedStock) throw error('LOCKED_STOCK', '库存不得低于已锁数量');
+    const price = integer(s.price, '价格分', 1);
     if (s.status && !['ACTIVE', 'DISABLED'].includes(s.status)) throw error('INVALID_PARAMS', '规格状态无效');
     const row = {
       productId: product._id, skuCode: id, colorId: s.colorId || key(colorName), colorName, size, price,
-      colorImage: s.colorImage || product.cover, stock, lockedStock, status: s.status || 'ACTIVE',
+      colorImage: s.colorImage || product.cover, status: s.status || 'ACTIVE',
       createdAt: previous?.createdAt || new Date(), updatedAt: new Date()
     };
     if (!/^(https:\/\/|cloud:\/\/|data:image\/)/.test(row.colorImage)) throw error('INVALID_PARAMS', '规格图片地址不安全');
@@ -169,7 +217,6 @@ async function saveSkus(tx, product, inputs, old, admin) {
   const aggregate = {
     minPrice: active.length ? Math.min(...active.map(s => s.price)) : 0,
     maxPrice: active.length ? Math.max(...active.map(s => s.price)) : 0,
-    totalStock: all.reduce((sum, s) => sum + s.stock, 0),
     skuCount: inputs.length,
     skuVersion: (product.skuVersion || 0) + 1,
     updatedAt: new Date()
@@ -229,8 +276,46 @@ async function submitTicket(db, admin, action, params, id) {
 exports.main = async event => {
   try {
     const admin = await requireAdmin(event, db), { action, params = {} } = event;
-    const supportedActions = new Set(['list', 'get', 'create', 'update', 'updateSkus', 'updateStatus', 'delete', 'softDelete', 'restore', 'uploadImage', 'listTickets', 'reviewTicket', 'reseedDefaultSkus']);
+    const supportedActions = new Set(['list', 'get', 'create', 'update', 'updateSkus', 'updateStatus', 'delete', 'softDelete', 'restore', 'uploadImage', 'listTickets', 'reviewTicket', 'reseedDefaultSkus', 'migrateImages']);
     if (!supportedActions.has(action)) throw error('ACTION_NOT_FOUND', `未知指令: ${action}`);
+
+    // 历史数据迁移：把已过期的云存储临时链接统一转回永久 fileID（cloud://）
+    if (action === 'migrateImages') {
+      if (admin.role !== 'SUPER_ADMIN') throw error('PERMISSION_DENIED', '仅平台超级管理员可执行');
+      const targets = [
+        { coll: 'products', keys: ['cover', 'images', 'detailImages'] },
+        { coll: 'product_skus', keys: ['colorImage'] }
+      ];
+      let scanned = 0, fixed = 0;
+      for (const t of targets) {
+        let skip = 0;
+        for (;;) {
+          const batch = await db.collection(t.coll).skip(skip).limit(100).get();
+          const list = batch.data || [];
+          if (list.length === 0) break;
+          for (const doc of list) {
+            scanned++;
+            const update = {};
+            for (const k of t.keys) {
+              const v = doc[k];
+              if (typeof v === 'string') {
+                const nv = toFileID(v);
+                if (nv !== v) update[k] = nv;
+              } else if (Array.isArray(v)) {
+                const nv = v.map(toFileID);
+                if (JSON.stringify(nv) !== JSON.stringify(v)) update[k] = nv;
+              }
+            }
+            if (Object.keys(update).length > 0) {
+              await db.collection(t.coll).doc(doc._id).update({ data: update });
+              fixed++;
+            }
+          }
+          skip += list.length;
+        }
+      }
+      return success({ scanned, fixed });
+    }
 
     // 上传图片（封面/详情大图）
     if (action === 'uploadImage') {
@@ -242,7 +327,8 @@ exports.main = async event => {
       const filename = params.filename || 'cover.jpg';
       if (!base64Data) throw error('INVALID_PARAMS', '请提供图片数据');
       const buffer = Buffer.from(base64Data.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-      const ext = filename.split('.').pop() || 'jpg';
+      const rawExt = (filename.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const ext = ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(rawExt) ? rawExt : 'jpg';
       const cloudPath = `products/${Date.now()}_${crypto.randomBytes(4).toString('hex')}.${ext}`;
       try {
         const uploadRes = await cloud.uploadFile({ cloudPath, fileContent: buffer });
@@ -271,6 +357,7 @@ exports.main = async event => {
         db.collection('products').where(query).orderBy('createdAt', 'desc').skip((page - 1) * pageSize).limit(pageSize).get(),
         db.collection('products').where(query).count()
       ]);
+      await fileIDsToTempURLs(listRes.data, ['cover', 'images', 'detailImages']);
       return success({ list: listRes.data, total: countRes.total, page, pageSize });
     }
 
@@ -329,7 +416,6 @@ exports.main = async event => {
             status: merchantActive ? 'ON_SALE' : 'OFF_SALE',
             deletedAt: null,
             sales: 0,
-            totalStock: prodData.totalStock || 0,
             minPrice: prodData.minPrice || 0,
             maxPrice: prodData.maxPrice || prodData.minPrice || 0,
             sort: prodData.sort || 0,
@@ -356,7 +442,7 @@ exports.main = async event => {
       return success(txResult);
     }
 
-    // 重置所有商品的 SKU：删除现有全部 SKU，并按每个商品的基准价/总库存重建单一隐藏默认 SKU
+    // 重置所有商品的 SKU：删除现有全部 SKU，并按每个商品的基准价重建单一隐藏默认 SKU
     if (action === 'reseedDefaultSkus') {
       if (admin.role !== 'SUPER_ADMIN') throw error('PERMISSION_DENIED', '仅平台超级管理员可重置 SKU');
       let total = 0, created = 0, skip = 0;
@@ -386,6 +472,12 @@ exports.main = async event => {
         db.collection('product_skus').where({ productId: id }).limit(100).get()
       ]);
       if (admin.merchantId && prod && (prod.merchantId || null) !== admin.merchantId) throw error('PERMISSION_DENIED', '无权查看其他商家的商品');
+      if (prod) {
+        prod.coverFileID = prod.cover;
+        prod.imagesFileIDs = prod.images;
+        prod.detailImagesFileIDs = prod.detailImages;
+        await fileIDsToTempURLs([prod], ['cover', 'images', 'detailImages']);
+      }
       return success({ product: prod, skus: skusRes.data });
     }
 
@@ -418,7 +510,6 @@ exports.main = async event => {
             status: 'OFF_SALE',
             deletedAt: null,
             sales: 0,
-            totalStock: data.totalStock || 0,
             minPrice: data.minPrice || 0,
             maxPrice: data.maxPrice || data.minPrice || 0,
             sort: data.sort || 0,

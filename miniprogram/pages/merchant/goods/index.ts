@@ -1,5 +1,7 @@
 import { MerchantService, MerchantInfo, MerchantProduct, formatYuan } from '../../../services/merchant.service';
 
+const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
+
 Page({
   data: {
     isLoggedIn: false,
@@ -13,19 +15,25 @@ Page({
     ],
     keyword: '',
     products: [] as any[],
-    categories: [] as { id: string; name: string }[],
+    categories: [] as any[],
+    level1Categories: [] as any[],
+    level2Categories: [] as any[],
+    parentCategoryIndex: 0,
+    categoryIndex: 0,
     // 表单
     showForm: false,
     formMode: 'create' as 'create' | 'edit',
     formId: '',
     form: {
       name: '',
+      subtitle: '',
+      description: '',
       cover: '',
-      categoryIndex: 0,
+      categoryId: '',
       price: '',
-      stock: '',
       tags: [] as string[],
-      deliveryTypes: ['DELIVERY'] as string[]
+      deliveryTypes: ['DELIVERY'] as string[],
+      detailImages: [] as string[]
     },
     tagInput: '',
     saving: false
@@ -58,14 +66,43 @@ Page({
   async loadCategories() {
     try {
       const cats = await MerchantService.getCategories();
-      const list = [{ id: '', name: '未分类' }].concat(
-        (Array.isArray(cats) ? cats : []).map((c: any) => ({ id: c.id || c._id, name: c.name }))
-      );
-      this.setData({ categories: list });
+      const list = Array.isArray(cats) ? cats : [];
+      const level1 = list.filter((c: any) => !c.parentId);
+      this.setData({ categories: list, level1Categories: level1 });
+      this.rebuildLevel2((level1[0] && (level1[0].id || level1[0]._id)) || '');
     } catch (err) {
       console.warn('[goods] load categories failed', err);
-      this.setData({ categories: [{ id: '', name: '未分类' }] });
+      this.setData({ categories: [], level1Categories: [], level2Categories: [] });
     }
+  },
+
+  rebuildLevel2(parentId: string) {
+    const level2 = this.data.categories.filter((c: any) => c.parentId === parentId);
+    this.setData({ level2Categories: level2 });
+    return level2;
+  },
+
+  resolveCategorySelection(categoryId: string): { parentIndex: number; childIndex: number } {
+    const cat = this.data.categories.find((c: any) => (c.id || c._id) === categoryId);
+    if (!cat) return { parentIndex: 0, childIndex: 0 };
+    if (cat.parentId) {
+      const parentIndex = Math.max(0, this.data.level1Categories.findIndex((c: any) => (c.id || c._id) === cat.parentId));
+      const level2 = this.data.categories.filter((c: any) => c.parentId === cat.parentId);
+      const childIndex = Math.max(0, level2.findIndex((c: any) => (c.id || c._id) === categoryId));
+      return { parentIndex, childIndex };
+    }
+    const parentIndex = Math.max(0, this.data.level1Categories.findIndex((c: any) => (c.id || c._id) === categoryId));
+    return { parentIndex, childIndex: 0 };
+  },
+
+  resolveCategoryId(): string {
+    const level2 = this.data.level2Categories;
+    if (level2.length > 0) {
+      const c = level2[this.data.categoryIndex] || level2[0];
+      return c ? (c.id || c._id) : '';
+    }
+    const c = this.data.level1Categories[this.data.parentCategoryIndex];
+    return c ? (c.id || c._id) : '';
   },
 
   async loadProducts(reset: boolean = false) {
@@ -81,7 +118,6 @@ Page({
         name: p.name,
         cover: p.cover || '',
         minPriceYuan: formatYuan(p.minPrice),
-        totalStock: Number(p.totalStock) || 0,
         sales: Number(p.sales) || 0,
         status: p.status
       }));
@@ -115,9 +151,23 @@ Page({
       showForm: true,
       formMode: 'create',
       formId: '',
-      form: { name: '', cover: '', categoryIndex: 0, price: '', stock: '', tags: [], deliveryTypes: ['DELIVERY'] },
+      parentCategoryIndex: 0,
+      categoryIndex: 0,
+      form: {
+        name: '',
+        subtitle: '',
+        description: '',
+        cover: '',
+        categoryId: '',
+        price: '',
+        tags: [],
+        deliveryTypes: ['DELIVERY'],
+        detailImages: []
+      },
       tagInput: ''
     });
+    const level1 = this.data.level1Categories;
+    this.rebuildLevel2((level1[0] && (level1[0].id || level1[0]._id)) || '');
   },
 
   async onOpenEdit(e: any) {
@@ -126,22 +176,30 @@ Page({
     try {
       const res = await MerchantService.getProduct(id);
       const p = res.product || {};
-      const catIndex = Math.max(0, this.data.categories.findIndex((c: any) => c.id === p.categoryId));
+      const sel = this.resolveCategorySelection(p.categoryId);
       this.setData({
         showForm: true,
         formMode: 'edit',
         formId: id,
+        parentCategoryIndex: sel.parentIndex,
+        categoryIndex: sel.childIndex,
         form: {
           name: p.name || '',
-          cover: p.cover || '',
-          categoryIndex: catIndex,
+          subtitle: p.subtitle || '',
+          description: p.description || '',
+          cover: p.coverFileID || p.cover || '',
+          categoryId: p.categoryId || '',
           price: p.minPrice ? (Number(p.minPrice) / 100).toFixed(2) : '',
-          stock: p.totalStock != null ? String(p.totalStock) : '',
           tags: Array.isArray(p.tags) ? p.tags : [],
-          deliveryTypes: Array.isArray(p.deliveryTypes) && p.deliveryTypes.length ? p.deliveryTypes : ['DELIVERY']
+          deliveryTypes: Array.isArray(p.deliveryTypes) && p.deliveryTypes.length ? p.deliveryTypes : ['DELIVERY'],
+          detailImages: Array.isArray(p.detailImagesFileIDs) && p.detailImagesFileIDs.length
+            ? p.detailImagesFileIDs
+            : (Array.isArray(p.detailImages) ? p.detailImages : [])
         },
         tagInput: ''
       });
+      const parentId = (this.data.level1Categories[sel.parentIndex] && (this.data.level1Categories[sel.parentIndex].id || this.data.level1Categories[sel.parentIndex]._id)) || '';
+      this.rebuildLevel2(parentId);
       wx.hideLoading();
     } catch (err: any) {
       wx.hideLoading();
@@ -158,8 +216,16 @@ Page({
     this.setData({ [`form.${field}`]: e.detail.value });
   },
 
+  onParentCategoryChange(e: any) {
+    const idx = Number(e.detail.value) || 0;
+    const level1 = this.data.level1Categories;
+    const parentId = (level1[idx] && (level1[idx].id || level1[idx]._id)) || '';
+    this.setData({ parentCategoryIndex: idx, categoryIndex: 0 });
+    this.rebuildLevel2(parentId);
+  },
+
   onCategoryChange(e: any) {
-    this.setData({ 'form.categoryIndex': Number(e.detail.value) || 0 });
+    this.setData({ categoryIndex: Number(e.detail.value) || 0 });
   },
 
   onTagInput(e: any) {
@@ -192,6 +258,28 @@ Page({
     this.setData({ 'form.deliveryTypes': next });
   },
 
+  // 读取本地图片 → base64 上传到云存储，返回永久 fileID（cloud://）
+  uploadToCloud(tempPath: string, prefix: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const rawExt = (tempPath.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const ext = IMAGE_EXTS.includes(rawExt) ? rawExt : 'jpg';
+      wx.getFileSystemManager().readFile({
+        filePath: tempPath,
+        encoding: 'base64',
+        success: async (readRes: any) => {
+          try {
+            const base64 = `data:image/${ext};base64,${readRes.data}`;
+            const up = await MerchantService.uploadImage(base64, `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.${ext}`);
+            resolve(up.fileID || up.url || base64);
+          } catch (err) {
+            reject(err);
+          }
+        },
+        fail: reject
+      });
+    });
+  },
+
   onChooseCover() {
     wx.chooseMedia({
       count: 1,
@@ -199,27 +287,54 @@ Page({
       success: (res: any) => {
         const file = res.tempFiles && res.tempFiles[0];
         if (!file || !file.tempFilePath) return;
-        const tempPath = file.tempFilePath;
-        const ext = (tempPath.split('.').pop() || 'jpg').toLowerCase();
-        wx.getFileSystemManager().readFile({
-          filePath: tempPath,
-          encoding: 'base64',
-          success: async (readRes: any) => {
-            const base64 = `data:image/${ext};base64,${readRes.data}`;
-            wx.showLoading({ title: '上传中...' });
-            try {
-              const up = await MerchantService.uploadImage(base64, `cover_${Date.now()}.${ext}`);
-              this.setData({ 'form.cover': up.url || base64 });
-              wx.hideLoading();
-              wx.showToast({ title: '封面已上传', icon: 'success' });
-            } catch (e: any) {
-              wx.hideLoading();
-              wx.showToast({ title: e?.message || '上传失败', icon: 'none' });
-            }
-          }
-        });
+        wx.showLoading({ title: '上传中...' });
+        this.uploadToCloud(file.tempFilePath, 'cover')
+          .then((fileID) => {
+            this.setData({ 'form.cover': fileID });
+            wx.hideLoading();
+            wx.showToast({ title: '封面已上传', icon: 'success' });
+          })
+          .catch((err: any) => {
+            wx.hideLoading();
+            wx.showToast({ title: err?.message || '上传失败', icon: 'none' });
+          });
       }
     });
+  },
+
+  onChooseDetailImages() {
+    const remain = 9 - this.data.form.detailImages.length;
+    if (remain <= 0) {
+      wx.showToast({ title: '最多上传 9 张详情图', icon: 'none' });
+      return;
+    }
+    wx.chooseMedia({
+      count: remain,
+      mediaType: ['image'],
+      success: async (res: any) => {
+        const files = res.tempFiles || [];
+        if (!files.length) return;
+        wx.showLoading({ title: '上传中...' });
+        try {
+          const ids: string[] = [];
+          for (const f of files) {
+            if (!f.tempFilePath) continue;
+            ids.push(await this.uploadToCloud(f.tempFilePath, 'detail'));
+          }
+          this.setData({ 'form.detailImages': [...this.data.form.detailImages, ...ids] });
+          wx.hideLoading();
+          wx.showToast({ title: `已上传 ${ids.length} 张`, icon: 'success' });
+        } catch (err: any) {
+          wx.hideLoading();
+          wx.showToast({ title: err?.message || '上传失败', icon: 'none' });
+        }
+      }
+    });
+  },
+
+  onRemoveDetailImage(e: any) {
+    const idx = Number(e.currentTarget.dataset.idx);
+    this.setData({ 'form.detailImages': this.data.form.detailImages.filter((_: string, i: number) => i !== idx) });
   },
 
   async onSave() {
@@ -227,6 +342,11 @@ Page({
     const name = (f.name || '').trim();
     if (!name) {
       wx.showToast({ title: '请填写商品名称', icon: 'none' });
+      return;
+    }
+    const subtitle = (f.subtitle || '').trim();
+    if (!subtitle) {
+      wx.showToast({ title: '请填写商品副标题', icon: 'none' });
       return;
     }
     if (!f.cover) {
@@ -238,19 +358,22 @@ Page({
       wx.showToast({ title: '请填写有效价格', icon: 'none' });
       return;
     }
-    const stock = parseInt(f.stock || '0', 10);
-    if (isNaN(stock) || stock < 0) {
-      wx.showToast({ title: '请填写有效库存', icon: 'none' });
+    const categoryId = this.resolveCategoryId();
+    if (!categoryId) {
+      wx.showToast({ title: '请选择商品分类', icon: 'none' });
       return;
     }
-    const categoryId = this.data.categories[this.data.form.categoryIndex]?.id || '';
 
     const payload: any = {
       name,
+      subtitle,
+      description: f.description || '',
       cover: f.cover,
       categoryId,
       minPrice: priceFen,
-      totalStock: stock,
+      maxPrice: priceFen,
+      images: f.detailImages.length ? f.detailImages : [f.cover],
+      detailImages: f.detailImages,
       tags: f.tags,
       deliveryTypes: f.deliveryTypes
     };

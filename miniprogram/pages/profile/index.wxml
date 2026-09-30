@@ -56,6 +56,18 @@
     </view>
   </view>
 
+  <!-- 看广告得额度入口 -->
+  <view class="profile-card activation-card press-active" bindtap="onTapAdReward">
+    <view class="activation-entry-icon">📺</view>
+    <view class="activation-entry-meta">
+      <text class="activation-entry-title">看广告得额度</text>
+      <text class="activation-entry-desc">看完视频广告领取购物额度</text>
+    </view>
+    <view class="menu-right">
+      <view class="arrow-right"></view>
+    </view>
+  </view>
+
   <!-- 常用功能列表 -->
   <view class="profile-card menu-card">
     <view

@@ -1,6 +1,6 @@
 /**
  * 订单交易核心云函数 (orders)
- * 纯自包含生产级实现，严格服务端核价与库存事务锁定
+ * 纯自包含生产级实现，严格服务端核价
  */
 const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
@@ -86,7 +86,7 @@ exports.main = async (event, context) => {
     const userId = wxContext.OPENID;
     if (!userId) throw err('AUTH_REQUIRED', '请先登录');
 
-    // 1. 创建订单 (服务端严格核价与库存锁定)
+    // 1. 创建订单 (服务端严格核价)
     if (action === 'create') {
       const startTime = Date.now();
       console.log(`[ORDER-01] orders.create 启动, t=0ms`);
@@ -111,6 +111,10 @@ exports.main = async (event, context) => {
       });
 
       const orderId = key(userId, requestId);
+
+      // 余额抵扣需定位 users 文档 _id（users._id 非 openid，需按 _openid 反查）
+      const userRes = await db.collection('users').where({ _openid: userId }).limit(1).get().catch(() => ({ data: [] }));
+      const userDocId = (userRes.data && userRes.data[0] && userRes.data[0]._id) || null;
 
       // 支持事务或安全原子更新
       const executeCreate = async (tx) => {
@@ -146,17 +150,13 @@ exports.main = async (event, context) => {
         }
         console.log(`[ORDER-03] 履约方式 (${deliveryType}) 与自提/地址解析完成, t=${Date.now() - startTime}ms`);
 
-        // 服务端根据数据库真实售价重新计算金额并校验库存
+        // 服务端根据数据库真实售价重新计算金额
         const snapshots = [];
         for (const input of inputs) {
           const sku = await safeDocGet(tx, 'product_skus', input.skuId);
           if (!sku || sku.status !== 'ACTIVE') throw err('SKU_NOT_FOUND', '规格不存在或已停售');
           const p = await safeDocGet(tx, 'products', sku.productId);
           if (!p || p.status !== 'ON_SALE' || p.deletedAt) throw err('PRODUCT_OFF_SALE', '商品已下架');
-
-          const currentLocked = sku.lockedStock || 0;
-          const availableStock = sku.stock - currentLocked;
-          if (availableStock < input.count) throw err('OUT_OF_STOCK', `商品【${p.name}】规格库存不足`);
 
           const platformFee = integer(p.platformFee || 0, '平台抽成', 0);
           const unitPrice = integer(sku.price, '商品单价', 1) + platformFee;
@@ -175,23 +175,26 @@ exports.main = async (event, context) => {
             totalAmount,
             merchantId: p.merchantId || null
           });
-
-          // 校验同时直接更新锁库，避免第二轮冗余查询
-          await tx.collection('product_skus').doc(input.skuId).update({
-            data: {
-              lockedStock: currentLocked + input.count,
-              updatedAt: new Date()
-            }
-          });
         }
-        console.log(`[ORDER-04] 商品与规格核验及锁库完成 (${snapshots.length} 项), t=${Date.now() - startTime}ms`);
+        console.log(`[ORDER-04] 商品与规格核验完成 (${snapshots.length} 项), t=${Date.now() - startTime}ms`);
 
-        // 计算整数分
-        const payAmount = integer(snapshots.reduce((sum, item) => sum + item.totalAmount, 0), '订单金额', 1);
+        // 计算整数分：productTotal 为商品全价，payAmount 为微信实付（余额抵扣后，可为 0）
+        const productTotal = integer(snapshots.reduce((sum, item) => sum + item.totalAmount, 0), '订单金额', 1);
         const orderNo = `SL${Date.now()}${orderId.slice(0, 8)}`;
         const merchantIds = [...new Set(snapshots.map(s => s.merchantId).filter(Boolean))];
 
         const now = new Date();
+
+        // 购物额度自动抵扣商品价格（不抵运费；当前无运费字段，故抵扣 = min(余额, 商品全价)）
+        const userDoc = userDocId ? await safeDocGet(tx, 'users', userDocId) : null;
+        const curBalance = Math.max(0, Number(userDoc && userDoc.balance) || 0);
+        const balanceUsed = Math.min(curBalance, productTotal);
+        if (balanceUsed > 0 && userDocId) {
+          await tx.collection('users').doc(userDocId).update({
+            data: { balance: curBalance - balanceUsed, updatedAt: now }
+          });
+        }
+        const payAmount = productTotal - balanceUsed;
         const order = {
           _id: orderId,
           userId,
@@ -201,8 +204,9 @@ exports.main = async (event, context) => {
           items: snapshots,
           merchantIds,
           refundedAmount: 0,
-          totalAmount: payAmount,
+          totalAmount: productTotal,
           payAmount,
+          balanceAmount: balanceUsed,
           deliveryType,
           // 快递地址快照 (保留完整无脱敏手机号)
           addressId: params.addressId ? String(params.addressId).trim() : (shippingAddress?._id || shippingAddress?.id || ''),
@@ -238,6 +242,8 @@ exports.main = async (event, context) => {
           paidAt: null,
           payTime: null,
           paymentInitiated: false,
+          // 与 common/commerce.js 的订单记账模型一致，标记为 v2 以便共享取消/退款链路兼容
+          inventoryVersion: 2,
           createdAt: now,
           createTime: now,
           updatedAt: now,
@@ -261,11 +267,24 @@ exports.main = async (event, context) => {
           if (!groups.has(item.productId)) groups.set(item.productId, []);
           groups.get(item.productId).push(item);
         }
-        for (const [productId, groupItems] of groups) {
+        const groupEntries = [...groups.entries()];
+        let allocatedBalance = 0;
+        for (let gi = 0; gi < groupEntries.length; gi++) {
+          const [productId, groupItems] = groupEntries[gi];
           const subOrderId = key(orderId, productId);
           const subOrderNo = `MO${Date.now()}${subOrderId.slice(0, 8)}`;
           const subTotal = groupItems.reduce((sum, it) => sum + it.totalAmount, 0);
           const subMerchantId = groupItems[0].merchantId || null;
+          // 余额抵扣按子订单金额占比分摊；最后一份拿剩余整数，避免舍入丢失
+          let subBalance = 0;
+          if (balanceUsed > 0) {
+            if (gi === groupEntries.length - 1) {
+              subBalance = balanceUsed - allocatedBalance;
+            } else {
+              subBalance = Math.floor(balanceUsed * subTotal / productTotal);
+              allocatedBalance += subBalance;
+            }
+          }
           const subOrderData = {
             merchantId: subMerchantId,
             parentOrderId: orderId,
@@ -274,6 +293,7 @@ exports.main = async (event, context) => {
             userId,
             items: groupItems.map(it => ({ ...it, merchantId: subMerchantId })),
             totalAmount: subTotal,
+            balanceAmount: subBalance,
             deliveryType,
             shippingAddress,
             status: 'PENDING_PAYMENT',
@@ -297,7 +317,7 @@ exports.main = async (event, context) => {
         }
 
         console.log(`[ORDER-06] orders.create 执行完成准备 return, 总耗时=${Date.now() - startTime}ms`);
-        return { orderId, orderNo, payAmount };
+        return { orderId, orderNo, payAmount, balanceAmount: balanceUsed };
       };
 
       if (typeof db.runTransaction === 'function') {
@@ -409,28 +429,30 @@ exports.main = async (event, context) => {
       return success({ ...sub, id: sub._id || sub.id, orderNo: sub.subOrderNo || sub.orderNo, payAmount: sub.totalAmount || sub.payAmount || 0 });
     }
 
-    // 4. 取消子订单并释放锁定的库存 (合并支付下取消即整笔支付单取消)
+    // 4. 取消子订单 (合并支付下取消即整笔支付单取消)
     if (action === 'cancel') {
       const sub = await findUserSubOrder(db, params);
       if (sub.status === 'CANCELLED') return success({ status: 'CANCELLED' });
       if (sub.status !== 'PENDING_PAYMENT') throw err('INVALID_ORDER_STATUS', '仅待付款订单支持取消');
       const parentOrderId = sub.parentOrderId || sub._id;
 
+      // 取消待付款订单需退还下单时已抵扣的购物额度
+      const cancelUserRes = await db.collection('users').where({ _openid: userId }).limit(1).get().catch(() => ({ data: [] }));
+      const cancelUserDocId = (cancelUserRes.data && cancelUserRes.data[0] && cancelUserRes.data[0]._id) || null;
+
       const executeCancel = async (tx) => {
         const cur = await safeDocGet(tx, 'merchant_orders', sub._id);
         if (cur && cur.status === 'CANCELLED') return { status: 'CANCELLED' };
         if (cur && cur.status !== 'PENDING_PAYMENT') throw err('INVALID_ORDER_STATUS', '订单状态已变更');
 
-        // 释放该支付单下全部锁定库存
         const parent = await safeDocGet(tx, 'orders', parentOrderId);
-        const items = (parent && parent.items) || (cur && cur.items) || [];
-        for (const item of items) {
-          const sku = await safeDocGet(tx, 'product_skus', item.skuId);
-          if (sku) {
-            const currentLocked = sku.lockedStock || 0;
-            const newLocked = Math.max(0, currentLocked - item.count);
-            await tx.collection('product_skus').doc(item.skuId).update({
-              data: { lockedStock: newLocked, updatedAt: new Date() }
+        // 退还下单时已抵扣的购物额度（取消待付款订单，余额原路退回）
+        const parentBalance = Number(parent && parent.balanceAmount) || 0;
+        if (parentBalance > 0 && cancelUserDocId) {
+          const u = await safeDocGet(tx, 'users', cancelUserDocId);
+          if (u) {
+            await tx.collection('users').doc(cancelUserDocId).update({
+              data: { balance: (Number(u.balance) || 0) + parentBalance, updatedAt: new Date() }
             });
           }
         }

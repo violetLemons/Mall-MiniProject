@@ -22,6 +22,19 @@ const EXPORT_STATUS_OPTIONS = [
   { label: '已取消', value: 'CANCELLED' }
 ];
 
+function formatAddress(addr?: Order['shippingAddress']): string {
+  if (!addr) return '';
+  return `${addr.province || ''}${addr.city || ''}${addr.district || ''}${addr.detail || ''}`;
+}
+
+function toDayStartIso(d: string): string {
+  return d ? new Date(d + 'T00:00:00').toISOString() : '';
+}
+
+function toDayEndIso(d: string): string {
+  return d ? new Date(d + 'T23:59:59.999').toISOString() : '';
+}
+
 export const Orders: React.FC = () => {
   const { toast } = useToast();
   const isMerchant = AdminApi.getCurrentUser()?.role === 'MERCHANT';
@@ -38,6 +51,8 @@ export const Orders: React.FC = () => {
   const [merchants, setMerchants] = useState<{ merchantId: string; name: string }[]>([]);
   const [exportStatuses, setExportStatuses] = useState<string[]>([]);
   const [exporting, setExporting] = useState(false);
+  const [exportStartDate, setExportStartDate] = useState('');
+  const [exportEndDate, setExportEndDate] = useState('');
 
   // Shipping Modal
   const [shipModalOpen, setShipModalOpen] = useState(false);
@@ -152,6 +167,33 @@ export const Orders: React.FC = () => {
     }
   };
 
+  const handleExportByTime = async () => {
+    if (!exportStartDate && !exportEndDate) {
+      toast('请先选择开始或结束日期', 'error');
+      return;
+    }
+    setExporting(true);
+    try {
+      const list = await AdminApi.getOrders({
+        statuses: exportStatuses.length > 0 ? exportStatuses : undefined,
+        merchantId: merchantFilter,
+        startTime: toDayStartIso(exportStartDate),
+        endTime: toDayEndIso(exportEndDate),
+        pageSize: 1000
+      });
+      if (list.length === 0) {
+        toast('该时间范围内暂无订单', 'error');
+        return;
+      }
+      exportOrdersExcel(list);
+      toast(`已导出 ${list.length} 条订单`, 'success');
+    } catch (e: any) {
+      toast(e.message || '导出失败', 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   // 批量同步微信发货状态
   const handleSyncWithWechat = async () => {
     setSyncingWechat(true);
@@ -230,7 +272,7 @@ export const Orders: React.FC = () => {
     if (!window.confirm(`确认将测试订单 [${order.orderNo}] 标记为测试已付款？`)) return;
     try {
       await AdminApi.testPayOrder(order.id);
-      toast(`测试订单 [${order.orderNo}] 已付款，库存已按交易规则扣减`, 'success');
+      toast(`测试订单 [${order.orderNo}] 已付款，销量已按交易规则累加`, 'success');
       await loadOrders();
     } catch (e: any) {
       toast(e.message || '测试付款失败', 'error');
@@ -241,7 +283,7 @@ export const Orders: React.FC = () => {
     if (!window.confirm(`确认对测试订单 [${order.orderNo}] 发起测试退款？`)) return;
     try {
       await AdminApi.testRefundOrder(order.id);
-      toast(`测试订单 [${order.orderNo}] 已退款，库存已恢复`, 'success');
+      toast(`测试订单 [${order.orderNo}] 已退款，销量已回退`, 'success');
       await loadOrders();
     } catch (e: any) {
       toast(e.message || '测试退款失败', 'error');
@@ -262,10 +304,10 @@ export const Orders: React.FC = () => {
 
   // 平台执行真实退款 (整子订单)
   const handleExecuteRefund = async (order: Order) => {
-    if (!window.confirm(`确认对订单 [${order.orderNo}] 执行微信部分退款？库存与销量将回退。`)) return;
+    if (!window.confirm(`确认对订单 [${order.orderNo}] 执行微信部分退款？销量将回退。`)) return;
     try {
       await AdminApi.executeRefund(order.id);
-      toast(`订单 [${order.orderNo}] 已退款，库存已恢复`, 'success');
+      toast(`订单 [${order.orderNo}] 已退款，销量已回退`, 'success');
       await loadOrders();
     } catch (e: any) {
       toast(e.message || '执行退款失败', 'error');
@@ -513,6 +555,42 @@ export const Orders: React.FC = () => {
           ))}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <input
+              type="date"
+              value={exportStartDate}
+              onChange={(e) => setExportStartDate(e.target.value)}
+              style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px', color: '#334155' }}
+            />
+            <span style={{ fontSize: '13px', color: '#64748B' }}>至</span>
+            <input
+              type="date"
+              value={exportEndDate}
+              onChange={(e) => setExportEndDate(e.target.value)}
+              style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13px', color: '#334155' }}
+            />
+          </div>
+          <button
+            onClick={handleExportByTime}
+            disabled={exporting}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '8px',
+              border: '1px solid #FF5500',
+              backgroundColor: '#FFF',
+              color: '#FF5500',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: exporting ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              opacity: exporting ? 0.6 : 1
+            }}
+          >
+            <Download size={14} />
+            按时间导出
+          </button>
           <button
             onClick={handleExportAll}
             style={{
@@ -613,6 +691,11 @@ export const Orders: React.FC = () => {
                   <td style={{ padding: '14px 18px' }}>
                     <div style={{ fontWeight: 600, color: '#0F172A' }}>{o.customerName || '微信买家'}</div>
                     <div style={{ fontSize: '12px', color: '#64748B' }}>{o.customerPhone || '未填写手机号'}</div>
+                    {formatAddress(o.shippingAddress) && (
+                      <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '2px', maxWidth: '200px', lineHeight: '1.4' }}>
+                        {formatAddress(o.shippingAddress)}
+                      </div>
+                    )}
                   </td>
 
                   <td style={{ padding: '14px 18px' }}>
@@ -1009,6 +1092,7 @@ export const Orders: React.FC = () => {
                 <div style={{ fontSize: '13px', color: '#475569', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <div>买家：{activeOrderDetail.customerName || '微信买家'}</div>
                   <div>手机：{activeOrderDetail.customerPhone || '未填写'}</div>
+                  <div>地址：{formatAddress(activeOrderDetail.shippingAddress) || '未填写'}</div>
                   <div>配送方式：极速快递</div>
                   {activeOrderDetail.trackingNo && <div>运单号：{activeOrderDetail.trackingNo} ({activeOrderDetail.logisticsCompany})</div>}
                 </div>

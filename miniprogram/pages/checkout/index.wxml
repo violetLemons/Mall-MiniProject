@@ -50,10 +50,26 @@
     </view>
   </view>
 
+  <!-- 金额明细：商品合计 / 购物额度抵扣 / 实付 -->
+  <view class="checkout-card fee-card">
+    <view class="fee-row">
+      <text class="fee-label">商品合计</text>
+      <c-price price="{{totalPrice}}" size="md" />
+    </view>
+    <view class="fee-row" wx:if="{{balanceDeduction > 0}}">
+      <text class="fee-label">购物额度抵扣</text>
+      <view class="fee-deduct">-<c-price price="{{balanceDeduction}}" size="md" /></view>
+    </view>
+    <view class="fee-row fee-row-total">
+      <text class="fee-label">实付</text>
+      <c-price price="{{payAmount}}" size="lg" accent="{{true}}" />
+    </view>
+  </view>
+
   <view class="checkout-bottom safe-bottom">
     <view>
-      <text class="total-label">合计</text>
-      <c-price price="{{totalPrice}}" size="lg" accent="{{true}}" />
+      <text class="total-label">实付</text>
+      <c-price price="{{payAmount}}" size="lg" accent="{{true}}" />
     </view>
     <button class="submit-btn" loading="{{submitting || paying}}" disabled="{{submitting || paying}}" bindtap="submitOrder">提交订单</button>
   </view>

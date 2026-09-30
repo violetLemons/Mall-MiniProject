@@ -3,6 +3,7 @@ import { OrderService, OrderModel } from '../../services/order.service';
 import { CartService } from '../../services/cart.service';
 import { AddressService, CloudAddress } from '../../services/address.service';
 import { ActivationService, ActivationRedeemResult } from '../../services/activation.service';
+import { AdService } from '../../services/ad.service';
 import { STORE_CONFIG } from '../../config/store';
 
 const STORAGE_FAV_KEY = 'sneaker_mall_favorites';
@@ -311,6 +312,58 @@ Page({
       wx.showToast({ title: err?.message || '兑换失败', icon: 'none' });
     } finally {
       this.setData({ actLoading: false });
+    }
+  },
+
+  // -------------------------
+  // 看广告得购物额度交互
+  // -------------------------
+  onTapAdReward() {
+    this.playRewardedAd();
+  },
+
+  async playRewardedAd() {
+    try {
+      const info = await AdService.getAdInfo();
+      if (!info.enabled || !info.adUnitId) {
+        wx.showToast({ title: '广告位暂未开放，敬请期待', icon: 'none' });
+        return;
+      }
+      if (Number(info.remainingToday) <= 0) {
+        wx.showToast({ title: '今日观看次数已达上限', icon: 'none' });
+        return;
+      }
+
+      const rewardedAd = wx.createRewardedVideoAd({ adUnitId: info.adUnitId });
+      rewardedAd.onClose((res: any) => {
+        if (res && res.isEnded) {
+          this.claimAdReward();
+        } else {
+          wx.showToast({ title: '完整观看才能获得购物额度', icon: 'none' });
+        }
+      });
+      rewardedAd.onError((err: any) => {
+        console.warn('[ad] rewarded video error:', err);
+        wx.showToast({ title: '广告加载失败，请稍后重试', icon: 'none' });
+      });
+      rewardedAd.show().catch(() => {
+        rewardedAd.load()
+          .then(() => rewardedAd.show())
+          .catch(() => wx.showToast({ title: '广告加载失败，请稍后重试', icon: 'none' }));
+      });
+    } catch (err: any) {
+      wx.showToast({ title: err?.message || '广告暂不可用', icon: 'none' });
+    }
+  },
+
+  async claimAdReward() {
+    try {
+      const res = await AdService.reward();
+      const yuan = (Number(res.rewardAmount) / 100).toFixed(2);
+      wx.showToast({ title: `已到账 ¥${yuan} 购物额度`, icon: 'success' });
+      await this.syncUserData();
+    } catch (err: any) {
+      wx.showToast({ title: err?.message || '领取失败，请稍后重试', icon: 'none' });
     }
   },
 
@@ -719,7 +772,7 @@ Page({
   onClearCache() {
     wx.showLoading({ title: '清理缓存中...' });
     setTimeout(() => {
-      // 保留当前登录身份；订单、库存和支付状态始终从云端读取
+      // 保留当前登录身份；订单和支付状态始终从云端读取
       const user = wx.getStorageSync('sneaker_mall_user');
       wx.clearStorageSync();
       if (user) wx.setStorageSync('sneaker_mall_user', user);

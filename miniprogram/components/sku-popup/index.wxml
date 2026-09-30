@@ -9,7 +9,6 @@
       <image class="sku-thumb" src="{{selectedColor ? selectedColor.image : product.cover}}" mode="aspectFill" />
       <view class="header-info">
         <c-price price="{{product.price}}" originalPrice="{{product.originalPrice}}" size="lg" accent="{{true}}" />
-        <view class="stock-tip">库存: {{selectedSize ? selectedSize.stockCount + ' 件' : '充足'}}</view>
         <view class="selected-summary ellipsis-1">{{selectedText}}</view>
       </view>
       <!-- 关闭按钮 -->
@@ -48,12 +47,11 @@
           <view
             wx:for="{{dynamicSizes && dynamicSizes.length > 0 ? dynamicSizes : product.sizes}}"
             wx:key="size"
-            class="size-box press-active {{!item.inStock ? 'is-disabled' : ''}} {{selectedSize.size === item.size ? 'is-selected' : ''}}"
+            class="size-box press-active {{selectedSize.size === item.size ? 'is-selected' : ''}}"
             data-size="{{item}}"
             bindtap="onSelectSize"
           >
             <text class="size-num">{{item.size}}</text>
-            <text wx:if="{{!item.inStock}}" class="oos-tag">缺货</text>
           </view>
         </view>
       </view>

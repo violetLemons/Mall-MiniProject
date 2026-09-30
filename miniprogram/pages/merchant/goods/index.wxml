@@ -39,7 +39,6 @@
           <text class="goods-name">{{item.name}}</text>
           <view class="goods-meta-row">
             <text class="goods-price">¥{{item.minPriceYuan}}</text>
-            <text class="goods-stock">库存 {{item.totalStock}}</text>
             <text class="goods-sales">已售 {{item.sales}}</text>
           </view>
           <view class="goods-actions">
@@ -65,7 +64,12 @@
     <scroll-view scroll-y class="form-body">
       <view class="f-item">
         <text class="f-label">商品名称</text>
-        <input class="f-input" placeholder="请输入商品名称" value="{{form.name}}" data-field="name" bindinput="onFormInput" />
+        <input class="f-input" placeholder-class="ph" placeholder="请输入商品名称" value="{{form.name}}" data-field="name" bindinput="onFormInput" />
+      </view>
+
+      <view class="f-item">
+        <text class="f-label">商品副标题</text>
+        <input class="f-input" placeholder-class="ph" placeholder="一句话卖点介绍，如「产地直采 · 鲜甜多汁」" value="{{form.subtitle}}" data-field="subtitle" bindinput="onFormInput" />
       </view>
 
       <view class="f-item">
@@ -78,20 +82,18 @@
 
       <view class="f-item">
         <text class="f-label">所属分类</text>
-        <picker mode="selector" range="{{categories}}" range-key="name" value="{{form.categoryIndex}}" bindchange="onCategoryChange">
-          <view class="f-picker">{{categories[form.categoryIndex].name}}</view>
+        <picker mode="selector" range="{{level1Categories}}" range-key="name" value="{{parentCategoryIndex}}" bindchange="onParentCategoryChange">
+          <view class="f-picker">{{level1Categories[parentCategoryIndex].name || '请选择一级分类'}}</view>
         </picker>
+        <picker wx:if="{{level2Categories.length > 0}}" mode="selector" range="{{level2Categories}}" range-key="name" value="{{categoryIndex}}" bindchange="onCategoryChange">
+          <view class="f-picker f-picker-sub">{{level2Categories[categoryIndex].name}}</view>
+        </picker>
+        <text wx:else class="f-tip-sub">该一级分类下暂无二级分类，将直接作为品类</text>
       </view>
 
-      <view class="f-row">
-        <view class="f-item f-half">
-          <text class="f-label">价格 (元)</text>
-          <input class="f-input" type="digit" placeholder="0.00" value="{{form.price}}" data-field="price" bindinput="onFormInput" />
-        </view>
-        <view class="f-item f-half">
-          <text class="f-label">库存 (件)</text>
-          <input class="f-input" type="number" placeholder="0" value="{{form.stock}}" data-field="stock" bindinput="onFormInput" />
-        </view>
+      <view class="f-item">
+        <text class="f-label">价格 (元)</text>
+        <input class="f-input" placeholder-class="ph" type="digit" placeholder="0.00" value="{{form.price}}" data-field="price" bindinput="onFormInput" />
       </view>
 
       <view class="f-item">
@@ -105,11 +107,27 @@
       <view class="f-item">
         <text class="f-label">商品标签</text>
         <view class="tag-input-row">
-          <input class="f-input" placeholder="输入标签后点添加" value="{{tagInput}}" bindinput="onTagInput" bindconfirm="onAddTag" />
+          <input class="f-input" placeholder-class="ph" placeholder="输入标签后点添加" value="{{tagInput}}" bindinput="onTagInput" bindconfirm="onAddTag" />
           <text class="btn-tag" bindtap="onAddTag">添加</text>
         </view>
         <view class="tag-list">
           <text wx:for="{{form.tags}}" wx:key="*this" class="tag-item" data-tag="{{item}}" bindtap="onRemoveTag">{{item}} ✕</text>
+        </view>
+      </view>
+
+      <view class="f-item">
+        <text class="f-label">商品详情 (选填)</text>
+        <textarea class="f-textarea" placeholder-class="ph" placeholder="输入商品背景、细节介绍、使用建议等" value="{{form.description}}" data-field="description" bindinput="onFormInput" />
+      </view>
+
+      <view class="f-item">
+        <text class="f-label">详情图集 (选填)</text>
+        <view class="detail-grid">
+          <view wx:for="{{form.detailImages}}" wx:key="*this" class="detail-img-item">
+            <image class="detail-img" src="{{item}}" mode="aspectFill" />
+            <text class="detail-img-del" data-idx="{{index}}" bindtap="onRemoveDetailImage">✕</text>
+          </view>
+          <view wx:if="{{form.detailImages.length < 9}}" class="detail-img-add" bindtap="onChooseDetailImages">＋</view>
         </view>
       </view>
 

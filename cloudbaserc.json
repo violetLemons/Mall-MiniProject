@@ -9,6 +9,7 @@
     { "name": "adminCategories", "timeout": 20, "handler": "index.main", "memorySize": 256 },
     { "name": "adminGateway", "timeout": 20, "handler": "index.main", "memorySize": 256 },
     { "name": "auth", "timeout": 20, "handler": "index.main", "memorySize": 256 },
+    { "name": "cart", "timeout": 20, "handler": "index.main", "memorySize": 256 },
     { "name": "paymentCallback", "timeout": 20, "handler": "index.main", "memorySize": 256 },
     { "name": "products", "timeout": 20, "handler": "index.main", "memorySize": 256 },
     { "name": "adminProducts", "timeout": 20, "handler": "index.main", "memorySize": 256 },
@@ -19,6 +20,7 @@
     { "name": "orders", "timeout": 20, "handler": "index.main", "memorySize": 256 },
     { "name": "payment", "timeout": 20, "handler": "index.main", "memorySize": 256 },
     { "name": "orderTimeoutJob", "timeout": 30, "handler": "index.main", "memorySize": 256 },
-    { "name": "initDb", "timeout": 60, "handler": "index.main", "memorySize": 256 }
+    { "name": "initDb", "timeout": 60, "handler": "index.main", "memorySize": 256 },
+    { "name": "ads", "timeout": 20, "handler": "index.main", "memorySize": 256 }
   ]
 }

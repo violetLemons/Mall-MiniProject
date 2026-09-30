@@ -1,4 +1,4 @@
-export type AdminRole = 'SUPER_ADMIN' | 'OPERATOR' | 'WAREHOUSE' | 'MERCHANT';
+export type AdminRole = 'SUPER_ADMIN' | 'OPERATOR' | 'MERCHANT';
 
 export interface AdminUser {
   id: string;
@@ -41,8 +41,6 @@ export interface SkuItem {
   size: number;
   price: number;
   costPrice?: number;
-  stock: number;
-  lockedStock?: number;
   status: 'ACTIVE' | 'DISABLED';
 }
 
@@ -66,7 +64,6 @@ export interface Product {
   basePrice?: number;
   merchantId?: string | null;
   sales: number;
-  totalStock: number;
   status: 'ON_SALE' | 'OFF_SALE' | 'DELETED';
   tags: string[];
   isNew: boolean;
@@ -173,20 +170,6 @@ export interface Banner {
   createdAt: string;
 }
 
-export interface InventoryLog {
-  id: string;
-  productId: string;
-  productName: string;
-  skuId: string;
-  colorName: string;
-  size: number;
-  delta: number;
-  reason: 'MANUAL_ADJUST' | 'ORDER_LOCK' | 'ORDER_CANCEL' | 'RESTOCK';
-  operatorName: string;
-  remark: string;
-  createdAt: string;
-}
-
 export interface OperationLog {
   id: string;
   adminId: string;
@@ -211,4 +194,20 @@ export interface CardKey {
   redeemedBy: string;
   redeemedAt: string | null;
   createdAt: string | null;
+}
+
+export interface AdConfig {
+  name: string;
+  adUnitId: string;
+  rewardAmount: number; // 分
+  dailyLimit: number; // 每用户每日上限
+  enabled: boolean;
+  updatedAt?: string | null;
+}
+
+export interface AdStats {
+  totalCount: number; // 累计观看次数
+  totalRewarded: number; // 累计发放额度（分）
+  todayCount: number; // 今日观看次数
+  todayRewarded: number; // 今日发放额度（分）
 }

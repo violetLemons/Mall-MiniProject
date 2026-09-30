@@ -55,10 +55,13 @@ function orderStatusText(status?: string): string {
 }
 
 export function exportOrdersExcel(orders: Order[], fileName = '订单导出.xlsx'): void {
-  const header = ['订单号', '商户名称', '下单时间', '商品', '数量', '买家', '手机号', '配送方式', '状态', '实付金额(元)'];
+  const header = ['订单号', '商户名称', '下单时间', '商品', '数量', '买家', '手机号', '收货地址', '配送方式', '状态', '实付金额(元)'];
   const rows = orders.map(o => {
     const productSummary = (o.items || []).map(i => `${i.productName || ''}${i.colorName ? ' ' + i.colorName : ''}${i.size ? ' ' + i.size : ''}`).join('；');
     const countSum = (o.items || []).reduce((s, i) => s + (Number(i.count) || 0), 0);
+    const addr = o.shippingAddress
+      ? `${o.shippingAddress.province || ''}${o.shippingAddress.city || ''}${o.shippingAddress.district || ''}${o.shippingAddress.detail || ''}`
+      : '';
     return [
       o.orderNo,
       o.merchantName || '',
@@ -67,6 +70,7 @@ export function exportOrdersExcel(orders: Order[], fileName = '订单导出.xlsx
       countSum,
       o.customerName || '微信买家',
       o.customerPhone || '',
+      addr,
       o.deliveryType === 'PICKUP' ? '到店自提' : '极速快递',
       orderStatusText(o.status),
       (Number(o.payAmount || 0) / 100).toFixed(2)
@@ -74,7 +78,7 @@ export function exportOrdersExcel(orders: Order[], fileName = '订单导出.xlsx
   });
 
   const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-  ws['!cols'] = [{ wch: 22 }, { wch: 14 }, { wch: 18 }, { wch: 40 }, { wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+  ws['!cols'] = [{ wch: 22 }, { wch: 14 }, { wch: 18 }, { wch: 40 }, { wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 40 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '订单');
   XLSX.writeFile(wb, fileName);

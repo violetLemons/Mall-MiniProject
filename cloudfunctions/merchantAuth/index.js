@@ -13,6 +13,26 @@ function getCommon(name) {
 const { success, fail } = getCommon('response');
 const { createToken, permissionVersion, maskSecret } = getCommon('crypto');
 
+function issueMerchantToken(adm, fallbackPhone = '') {
+  if (!process.env.ADMIN_JWT_SECRET || process.env.ADMIN_JWT_SECRET.length < 32) {
+    process.env.ADMIN_JWT_SECRET = '636353631d78ee1619556dc0a92cd2f4111317b5820e821a6d307de9947b6bbf';
+  }
+  const token = createToken({ adminId: adm._id, version: permissionVersion(adm) }, 12 * 3600);
+  return success({
+    token,
+    adminId: adm._id,
+    username: adm.username,
+    name: adm.name || '',
+    phone: adm.phone || fallbackPhone,
+    address: adm.address || '',
+    role: adm.role,
+    permissions: adm.permissions || [],
+    merchantId: adm.merchantId || null,
+    subMchIdMask: adm.subMchIdEnc ? maskSecret(adm.subMchIdEnc) : '',
+    expiresIn: 12 * 3600
+  }, '商户登录成功');
+}
+
 exports.main = async (event, context) => {
   const { action, params = {} } = event;
 
@@ -45,24 +65,24 @@ exports.main = async (event, context) => {
       const adm = res.data[0];
       if (!adm) return fail('NOT_MERCHANT', '该手机号未关联商户账号，请先到商户后台绑定手机号');
 
-      if (!process.env.ADMIN_JWT_SECRET || process.env.ADMIN_JWT_SECRET.length < 32) {
-        process.env.ADMIN_JWT_SECRET = '636353631d78ee1619556dc0a92cd2f4111317b5820e821a6d307de9947b6bbf';
-      }
-      const token = createToken({ adminId: adm._id, version: permissionVersion(adm) }, 12 * 3600);
+      return issueMerchantToken(adm, phone);
+    }
 
-      return success({
-        token,
-        adminId: adm._id,
-        username: adm.username,
-        name: adm.name || '',
-        phone: adm.phone || phone,
-        address: adm.address || '',
-        role: adm.role,
-        permissions: adm.permissions || [],
-        merchantId: adm.merchantId || null,
-        subMchIdMask: adm.subMchIdEnc ? maskSecret(adm.subMchIdEnc) : '',
-        expiresIn: 12 * 3600
-      }, '商户登录成功');
+    /**
+     * 开发/预览专用登录：跳过微信手机号授权，直接按 username 或 merchantId 登录 MERCHANT 账号。
+     * 仅用于本地预览商户端；上线前需移除或加环境开关。
+     */
+    if (action === 'devLogin') {
+      const username = params.username ? String(params.username).trim() : '';
+      const merchantId = params.merchantId ? String(params.merchantId).trim() : '';
+      if (!username && !merchantId) return fail('INVALID_PARAMS', '缺少 username 或 merchantId');
+      const where = { role: 'MERCHANT', status: 'ACTIVE' };
+      if (username) where.username = username;
+      else where.merchantId = merchantId;
+      const res = await db.collection('admins').where(where).limit(1).get();
+      const adm = res.data[0];
+      if (!adm) return fail('NOT_MERCHANT', '未找到可用商户账号');
+      return issueMerchantToken(adm, '');
     }
 
     return fail('ACTION_NOT_FOUND', `未知指令: ${action}`);

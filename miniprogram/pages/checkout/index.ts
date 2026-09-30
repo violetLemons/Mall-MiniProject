@@ -2,6 +2,7 @@
 import { AddressService, CloudAddress } from '../../services/address.service';
 import { OrderService } from '../../services/order.service';
 import { PickupPoint, PickupService } from '../../services/pickup.service';
+import { AuthService } from '../../services/auth.service';
 
 const CHECKOUT_KEY = 'sneaker_checkout_items';
 const LAST_USED_ADDR_KEY = 'sneaker_last_used_address_id';
@@ -18,6 +19,9 @@ Page({
   data: {
     items: [] as CartItemModel[],
     totalPrice: 0,
+    balance: 0,             // 可用购物额度（分）
+    balanceDeduction: 0,    // 本单抵扣额度（分）
+    payAmount: 0,           // 实付金额（分，= totalPrice - balanceDeduction）
     deliveryType: 'DELIVERY' as 'DELIVERY' | 'PICKUP',
     
     // 地址相关数据
@@ -74,8 +78,9 @@ Page({
       requestId,
       deliveryType: defaultDelivery,
       lastSelectedAddressId: lastAddrId
-    }, () => this.calculateTotal());
+    });
 
+    await this.loadBalance();
     await this.loadPickupPoints(prePointId);
 
     if (defaultDelivery === 'DELIVERY') {
@@ -91,9 +96,27 @@ Page({
   },
 
   calculateTotal() {
-    this.setData({
-      totalPrice: this.data.items.reduce((sum, item) => sum + item.price * item.count, 0)
-    });
+    const totalPrice = this.data.items.reduce((sum, item) => sum + item.price * item.count, 0);
+    const balance = Math.max(0, Number(this.data.balance) || 0);
+    const balanceDeduction = Math.min(balance, totalPrice);
+    const payAmount = totalPrice - balanceDeduction;
+    this.setData({ totalPrice, balanceDeduction, payAmount });
+  },
+
+  /**
+   * 读取用户购物额度，并刷新本单抵扣与实付金额（后端下单时按库内余额权威计算，此处仅做展示预估）
+   */
+  async loadBalance() {
+    const cached = AuthService.getCurrentUser();
+    this.setData({ balance: Math.max(0, Number(cached?.balance) || 0) }, () => this.calculateTotal());
+    try {
+      const authRes = await AuthService.login().catch(() => null);
+      if (authRes?.user) {
+        this.setData({ balance: Math.max(0, Number(authRes.user.balance) || 0) }, () => this.calculateTotal());
+      }
+    } catch (_) {
+      // 网络异常时沿用本地缓存余额预估
+    }
   },
 
   async loadPickupPoints(preferredId?: string) {
@@ -508,7 +531,7 @@ Page({
         console.log(`[CHECKOUT-04] 支付流程返回, status: ${payRes?.status}, code: ${payRes?.code}, 总耗时: ${Date.now() - checkoutStart}ms`);
 
         if (payRes && payRes.status === 'PAID') {
-          wx.showToast({ title: '支付成功！', icon: 'success' });
+          wx.showToast({ title: payRes.noPayment ? '已用购物额度抵扣完成' : '支付成功！', icon: 'success' });
           setTimeout(() => {
             wx.redirectTo({ url: `/pages/order/list/index` });
           }, 1200);

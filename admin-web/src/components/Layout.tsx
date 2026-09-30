@@ -3,7 +3,6 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   ShoppingBag,
-  Boxes,
   ClipboardList,
   Layers,
   Image as ImageIcon,
@@ -14,7 +13,8 @@ import {
   LogOut,
   ExternalLink,
   Flame,
-  KeyRound
+  KeyRound,
+  Clapperboard
 } from 'lucide-react';
 import { AdminApi } from '../api/client';
 
@@ -52,7 +52,6 @@ export const Layout: React.FC = () => {
         { label: '运营大盘', path: '/', icon: LayoutDashboard },
         { label: '商品管理', path: '/products', icon: ShoppingBag },
         { label: '商品审核工单', path: '/audit', icon: ClipboardCheck },
-        { label: '库存流水', path: '/inventory', icon: Boxes },
         { label: '订单管理', path: '/orders', icon: ClipboardList },
         { label: '商户设置', path: '/merchant-settings', icon: Store }
       ]
@@ -62,14 +61,14 @@ export const Layout: React.FC = () => {
         ...(user?.role === 'SUPER_ADMIN'
           ? [{ label: '商品审核工单', path: '/audit', icon: ClipboardCheck }]
           : []),
-        { label: '库存流水', path: '/inventory', icon: Boxes },
         { label: '订单管理', path: '/orders', icon: ClipboardList },
         { label: '类目中心', path: '/categories', icon: Layers },
         { label: '轮播营销', path: '/banners', icon: ImageIcon },
         ...(user?.role === 'SUPER_ADMIN'
           ? [
               { label: '管理员权限', path: '/admins', icon: ShieldCheck },
-              { label: '卡密管理', path: '/card-keys', icon: KeyRound }
+              { label: '卡密管理', path: '/card-keys', icon: KeyRound },
+              { label: '广告管理', path: '/ads', icon: Clapperboard }
             ]
           : []),
         { label: '审计日志', path: '/logs', icon: FileText }

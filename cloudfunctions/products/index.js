@@ -77,7 +77,6 @@ function formatProductDTO(p) {
     maxPrice: baseMax + platformFee,
     originalPrice,
     sales: Number(p.sales) || 0,
-    totalStock: Number(p.totalStock) || 0,
     tags: Array.isArray(p.tags) ? p.tags : [],
     isHot: Boolean(p.isHot),
     isNew: Boolean(p.isNew),
@@ -217,13 +216,11 @@ exports.main = async (event, context) => {
         const skus = skusRes.data || [];
         const platformFee = Number(product.platformFee) || 0;
 
-        // 提取颜色列表与规格列表，计算 2D 矩阵与可用库存
+        // 提取颜色列表与规格列表，计算 2D 矩阵
         const colorMap = new Map();
         const sizeSet = new Set();
 
         const formattedSkus = skus.map(sku => {
-          // 计算可用库存: 物理库存扣减锁定库存
-          const availableStock = Math.max((sku.stock || 0) - (sku.lockedStock || 0), 0);
           const colorName = sku.colorName || '默认配色';
           const colorId = sku.colorId || colorName;
 
@@ -252,19 +249,12 @@ exports.main = async (event, context) => {
             basePrice: sku.price,
             platformFee,
             price: sku.price + platformFee,
-            originalPrice: (sku.originalPrice || product.originalPrice || sku.price) + platformFee,
-            stock: sku.stock,
-            lockedStock: sku.lockedStock || 0,
-            availableStock,
-            inStock: availableStock > 0
+            originalPrice: (sku.originalPrice || product.originalPrice || sku.price) + platformFee
           };
         });
 
         // 排序规格
-        const sortedSizes = Array.from(sizeSet).sort((a, b) => a - b).map(s => ({
-          size: s,
-          inStock: formattedSkus.some(sku => sku.size === s && sku.inStock)
-        }));
+        const sortedSizes = Array.from(sizeSet).sort((a, b) => a - b).map(s => ({ size: s }));
 
         return success(formatProductDTO({
           ...product,

@@ -42,6 +42,14 @@
   border: none;
 }
 
+.mlogin-dev {
+  margin-top: 24rpx;
+  background: #F4F5F7;
+  color: #61646B;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
 .mlogin-tip {
   font-size: 22rpx;
   color: #B0B3B8;

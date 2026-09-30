@@ -13,7 +13,6 @@
     "pages/activation/index",
     "pages/merchant/dashboard/index",
     "pages/merchant/goods/index",
-    "pages/merchant/stock/index",
     "pages/merchant/order/index",
     "pages/merchant/setting/index"
   ],

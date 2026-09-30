@@ -47,38 +47,17 @@ function address(input) {
   return a;
 }
 function stockCheck(sku) {
-  integer(sku.stock, '实物库存'); integer(sku.lockedStock || 0, '锁定库存');
-  if ((sku.lockedStock || 0) > sku.stock) throw error('INVENTORY_INCONSISTENT', '库存需要人工核对');
+  // 库存已从业务移除，保留函数避免外部引用破坏
 }
-// Financial state, stock and deterministic ledger documents commit together.
+// 库存字段已从业务中移除；本函数仅保留销量(sales)记账，不再做任何库存锁定/扣减/流水。
 async function inventory(tx, order, operation) {
+  if (operation !== 'PAYMENT_CONFIRMED' && operation !== 'REFUND_RESTORE') return;
   for (const item of order.items) {
-    const sku = await get(tx, 'product_skus', item.skuId);
-    if (!sku) throw error('SKU_NOT_FOUND', '历史订单规格不存在，请核对库存');
-    stockCheck(sku);
-    let stock = sku.stock, lockedStock = sku.lockedStock || 0;
-    if (operation === 'LOCK') {
-      if (stock - lockedStock < item.count) throw error('OUT_OF_STOCK', '所选规格库存不足');
-      lockedStock += item.count;
-    } else if (operation === 'PAYMENT_CONFIRMED' || operation === 'ORDER_CANCEL') {
-      if (lockedStock < item.count) throw error('INVENTORY_INCONSISTENT', '订单锁定库存不足');
-      lockedStock -= item.count;
-      if (operation === 'PAYMENT_CONFIRMED') stock -= item.count;
-    } else if (operation === 'REFUND_RESTORE') stock += item.count;
-    integer(stock, '库存');
-    await tx.collection('product_skus').doc(item.skuId).update({ data: { stock, lockedStock, updatedAt: new Date() } });
-    await tx.collection('inventory_logs').doc(key(order._id, item.skuId, operation)).set({ data: {
-      idempotencyKey: `${order._id}_${item.skuId}_${operation}`, orderId: order._id, productId: item.productId, skuId: item.skuId,
-      reason: operation, beforeStock: sku.stock, afterStock: stock, delta: stock - sku.stock,
-      beforeLockedStock: sku.lockedStock || 0, afterLockedStock: lockedStock, isTest: order.isTest, createdAt: new Date()
+    const p = await get(tx, 'products', item.productId);
+    if (p) await tx.collection('products').doc(item.productId).update({ data: {
+      sales: Math.max(0, (p.sales || 0) + (operation === 'PAYMENT_CONFIRMED' ? item.count : -item.count)),
+      updatedAt: new Date()
     } });
-    if (operation === 'PAYMENT_CONFIRMED' || operation === 'REFUND_RESTORE') {
-      const p = await get(tx, 'products', item.productId);
-      if (p) await tx.collection('products').doc(item.productId).update({ data: {
-        sales: Math.max(0, (p.sales || 0) + (operation === 'PAYMENT_CONFIRMED' ? item.count : -item.count)),
-        totalStock: Math.max(0, (p.totalStock || 0) + stock - sku.stock), updatedAt: new Date()
-      } });
-    }
   }
 }
 async function createOrder(db, userId, params) {
@@ -144,7 +123,9 @@ async function createOrder(db, userId, params) {
     return { orderId: id, orderNo: order.orderNo, payAmount };
   });
 }
-function assertVersion(order) { if (order.inventoryVersion !== 2) throw error('MIGRATION_REQUIRED', '历史订单需核对库存后迁移'); }
+function assertVersion(order) {
+  // 库存版本已无意义，不再校验
+}
 async function confirmPayment(db, e) {
   return transaction(db, async tx => {
     const order = await get(tx, 'orders', e.orderId);
@@ -197,12 +178,32 @@ async function cancelOrder(db, cloud, orderId, userId, reason = '用户取消') 
       if (close.returnCode !== 'SUCCESS' || close.resultCode !== 'SUCCESS') throw error('CLOSE_ORDER_FAILED', '微信关单失败，请稍后重试');
     }
   }
+  // 余额抵扣部分需退还：自包含订单(orders/index.js)写 balanceAmount；commerce 订单无此字段则跳过
+  const balanceUsed = Number(order.balanceAmount) || 0;
+  let refundUserDocId = null;
+  if (balanceUsed > 0) {
+    const userRes = await db.collection('users').where({ _openid: order.userId }).limit(1).get().catch(() => ({ data: [] }));
+    refundUserDocId = (userRes.data && userRes.data[0] && userRes.data[0]._id) || null;
+  }
   return transaction(db, async tx => {
     const current = await get(tx, 'orders', orderId);
     if (current.status === 'CANCELLED') return { status: 'CANCELLED' };
     if (current.status !== 'PENDING_PAYMENT' || current.paymentInitiated !== order.paymentInitiated) throw error('CONFLICT', '订单状态已变化，请刷新');
     await inventory(tx, current, 'ORDER_CANCEL');
+    if (balanceUsed > 0 && refundUserDocId) {
+      const u = await get(tx, 'users', refundUserDocId);
+      if (u) await tx.collection('users').doc(refundUserDocId).update({ data: { balance: (Number(u.balance) || 0) + balanceUsed, updatedAt: new Date() } });
+    }
     await tx.collection('orders').doc(orderId).update({ data: { status: 'CANCELLED', cancelReason: reason, cancelledAt: new Date(), updatedAt: new Date() } });
+    // 合并支付：同步该支付单下所有子订单为 CANCELLED，避免买家端仍显示待付款并二次退款（子订单集合可能尚不存在，容错处理）
+    try {
+      const subs = await tx.collection('merchant_orders').where({ parentOrderId: orderId }).get();
+      for (const s of (subs.data || [])) {
+        if (s.status !== 'CANCELLED') await tx.collection('merchant_orders').doc(s._id).update({ data: { status: 'CANCELLED', cancelReason: reason, cancelledAt: new Date(), updatedAt: new Date() } });
+      }
+    } catch (subErr) {
+      console.warn('[cancelOrder] merchant_orders sync warn:', subErr && subErr.message);
+    }
     return { status: 'CANCELLED' };
   });
 }

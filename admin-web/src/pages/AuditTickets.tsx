@@ -326,7 +326,6 @@ export const AuditTickets: React.FC = () => {
                   基准价：{formatCents(detailProduct.minPrice)}
                   {detailProduct.maxPrice !== undefined && detailProduct.maxPrice !== detailProduct.minPrice ? ` ~ ${formatCents(detailProduct.maxPrice)}` : ''}
                 </div>
-                <div>库存：{detailProduct.totalStock ?? '—'}</div>
                 {deliveryTypes.length > 0 && (
                   <div>配送方式：{deliveryTypes.map(t => t === 'DELIVERY' ? '顺丰快递包邮' : t === 'PICKUP' ? '到店自提' : t).join('、')}</div>
                 )}
@@ -365,7 +364,6 @@ export const AuditTickets: React.FC = () => {
                       <th style={{ padding: '8px 10px', textAlign: 'left', borderBottom: '1px solid #E2E8F0' }}>颜色/规格</th>
                       <th style={{ padding: '8px 10px', textAlign: 'left', borderBottom: '1px solid #E2E8F0' }}>尺码</th>
                       <th style={{ padding: '8px 10px', textAlign: 'left', borderBottom: '1px solid #E2E8F0' }}>价格</th>
-                      <th style={{ padding: '8px 10px', textAlign: 'left', borderBottom: '1px solid #E2E8F0' }}>库存</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -374,7 +372,6 @@ export const AuditTickets: React.FC = () => {
                         <td style={{ padding: '8px 10px', color: '#334155' }}>{s.colorName || '默认'}</td>
                         <td style={{ padding: '8px 10px', color: '#334155' }}>{s.size}</td>
                         <td style={{ padding: '8px 10px', color: '#FF5500', fontWeight: 700 }}>{formatCents(s.price)}</td>
-                        <td style={{ padding: '8px 10px', color: '#334155' }}>{s.stock}</td>
                       </tr>
                     ))}
                   </tbody>

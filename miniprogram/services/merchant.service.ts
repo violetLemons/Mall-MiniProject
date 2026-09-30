@@ -22,8 +22,6 @@ export interface MerchantSku {
   colorImage?: string;
   size: number | string;
   price: number; // 分
-  stock: number;
-  lockedStock?: number;
   status?: string;
 }
 
@@ -37,7 +35,6 @@ export interface MerchantProduct {
   category?: string;
   minPrice: number; // 分
   maxPrice: number;
-  totalStock: number;
   sales: number;
   status: 'ON_SALE' | 'OFF_SALE' | 'DELETED';
   tags?: string[];
@@ -76,19 +73,6 @@ export interface MerchantOrder {
   shippedAt?: string;
 }
 
-export interface MerchantInventoryLog {
-  _id?: string;
-  skuId: string;
-  productId: string;
-  delta: number;
-  beforeStock: number;
-  afterStock: number;
-  reason: string;
-  remark: string;
-  adminUsername: string;
-  createdAt?: string;
-}
-
 function formatYuan(cents: number | string | undefined | null): string {
   const n = Number(cents) || 0;
   return (n / 100).toFixed(2);
@@ -122,6 +106,16 @@ export class MerchantService {
    */
   static async loginByPhone(phoneCode: string): Promise<MerchantInfo> {
     const info = await callCloud<MerchantInfo>('merchantAuth', 'merchantLogin', { phoneCode });
+    MerchantService.saveMerchant(info);
+    return info;
+  }
+
+  /**
+   * 开发/预览专用登录：跳过微信手机号授权，直接按 username 登录 MERCHANT 账号。
+   * 上线前需移除或替换为真实手机号登录。
+   */
+  static async devLogin(username: string = 'merchant1'): Promise<MerchantInfo> {
+    const info = await callCloud<MerchantInfo>('merchantAuth', 'devLogin', { username });
     MerchantService.saveMerchant(info);
     return info;
   }
@@ -203,15 +197,6 @@ export class MerchantService {
 
   static syncWithWechat(orderId?: string): Promise<any> {
     return this.request('adminOrders', 'syncWithWechat', orderId ? { orderId } : {});
-  }
-
-  // ---------------- 库存 ----------------
-  static getInventoryLogs(params: any = {}): Promise<{ list: MerchantInventoryLog[]; total: number }> {
-    return this.request('adminInventory', 'listLogs', params);
-  }
-
-  static adjustStock(skuId: string, targetStock: number, reason: string): Promise<any> {
-    return this.request('adminInventory', 'adjustStock', { skuId, targetStock, reason });
   }
 
   // ---------------- 商户资料 ----------------

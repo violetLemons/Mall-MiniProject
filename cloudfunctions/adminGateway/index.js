@@ -9,8 +9,8 @@ const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
 const ALLOWED_FUNCTIONS = new Set([
-  'activation', 'adminAuth', 'adminBanners', 'adminCategories', 'adminInventory',
-  'adminOrders', 'adminProducts', 'adminUsers', 'pickupPoints', 'testPayment'
+  'activation', 'adminAuth', 'adminBanners', 'adminCategories',
+  'adminOrders', 'adminProducts', 'adminUsers', 'pickupPoints', 'testPayment', 'ads'
 ]);
 
 const configuredOrigins = String(process.env.ADMIN_ALLOWED_ORIGINS || '')
@@ -87,7 +87,7 @@ exports.main = async event => {
     const testCols = [
       'users', 'admins', 'products', 'product_skus', 'categories', 'carts',
       'orders', 'payment_transactions', 'refund_records', 'addresses', 'address_meta',
-      'pickup_points', 'banners', 'inventory_logs'
+      'pickup_points', 'banners'
     ];
     for (const col of testCols) {
       try {

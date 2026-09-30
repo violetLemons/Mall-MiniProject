@@ -15,11 +15,12 @@ interface ImageCropperProps {
   src: string;
   aspect?: number;
   mimeType?: string;
+  cropShape?: 'rect' | 'round';
   onConfirm: (blob: Blob) => void;
   onCancel: () => void;
 }
 
-export function ImageCropper({ src, aspect, mimeType, onConfirm, onCancel }: ImageCropperProps) {
+export function ImageCropper({ src, aspect, mimeType, cropShape = 'rect', onConfirm, onCancel }: ImageCropperProps) {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [areaPixels, setAreaPixels] = useState<AreaPixels | null>(null);
@@ -60,6 +61,9 @@ export function ImageCropper({ src, aspect, mimeType, onConfirm, onCancel }: Ima
             crop={crop}
             zoom={zoom}
             aspect={aspect}
+            cropShape={cropShape}
+            showGrid={cropShape !== 'round'}
+            objectFit={cropShape === 'round' ? 'cover' : 'contain'}
             onCropChange={setCrop}
             onZoomChange={setZoom}
             onCropComplete={(_, area) => setAreaPixels(area)}
@@ -99,10 +103,10 @@ export function ImageCropper({ src, aspect, mimeType, onConfirm, onCancel }: Ima
 export type CropResult = Blob | null;
 
 export function useImageCropper() {
-  const [state, setState] = useState<{ src: string; aspect?: number; mimeType?: string; resolve?: (r: CropResult) => void } | null>(null);
+  const [state, setState] = useState<{ src: string; aspect?: number; mimeType?: string; cropShape?: 'rect' | 'round'; resolve?: (r: CropResult) => void } | null>(null);
 
-  const openCrop = (src: string, aspect?: number, mimeType?: string): Promise<CropResult> => {
-    return new Promise((resolve) => setState({ src, aspect, mimeType, resolve }));
+  const openCrop = (src: string, aspect?: number, mimeType?: string, cropShape?: 'rect' | 'round'): Promise<CropResult> => {
+    return new Promise((resolve) => setState({ src, aspect, mimeType, cropShape, resolve }));
   };
 
   const close = (r: CropResult) => {
@@ -115,6 +119,7 @@ export function useImageCropper() {
       src={state.src}
       aspect={state.aspect}
       mimeType={state.mimeType}
+      cropShape={state.cropShape}
       onConfirm={(blob) => close(blob)}
       onCancel={() => close(null)}
     />

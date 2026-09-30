@@ -1,5 +1,5 @@
 <view class="m-page">
-  <custom-navbar title="商户中心" background="#111111" textColor="#FFFFFF" />
+  <custom-navbar title="商户中心" background="#111111" textColor="#FFFFFF" showBack="{{true}}" />
 
   <!-- 未登录：一键登录 -->
   <merchant-login wx:if="{{!isLoggedIn}}" bind:success="onMerchantLogin" />
@@ -16,11 +16,14 @@
 
     <!-- 功能入口 -->
     <view class="section-title">功能入口</view>
-    <view class="nav-grid">
-      <view wx:for="{{navItems}}" wx:key="id" class="nav-item" data-id="{{item.id}}" bindtap="onNavTap">
-        <text class="nav-icon">{{item.icon}}</text>
-        <text class="nav-title">{{item.title}}</text>
-        <text class="nav-desc">{{item.desc}}</text>
+    <view class="nav-list">
+      <view wx:for="{{navItems}}" wx:key="id" class="nav-row" data-id="{{item.id}}" bindtap="onNavTap">
+        <text class="nav-row-icon">{{item.icon}}</text>
+        <view class="nav-row-meta">
+          <text class="nav-row-title">{{item.title}}</text>
+          <text class="nav-row-desc">{{item.desc}}</text>
+        </view>
+        <view class="nav-row-arrow"></view>
       </view>
     </view>
 

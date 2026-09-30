@@ -6,6 +6,7 @@
     "loading-skeleton": "../../../components/loading-skeleton/index"
   },
   "navigationStyle": "custom",
+  "navigationBarTextStyle": "white",
   "enablePullDownRefresh": true,
-  "backgroundTextStyle": "dark"
+  "backgroundTextStyle": "light"
 }

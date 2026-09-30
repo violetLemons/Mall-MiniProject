@@ -27,7 +27,7 @@ export const Logs: React.FC = () => {
           系统审计日志 · Audit Logs
         </h1>
         <p style={{ fontSize: '14px', color: '#64748B', marginTop: '4px' }}>
-          记录管理员对商品增删改查、库存调拨、顺丰发货、校园核销等所有高价值操作轨迹。
+          记录管理员对商品增删改查、顺丰发货、校园核销等所有高价值操作轨迹。
         </p>
       </div>
 

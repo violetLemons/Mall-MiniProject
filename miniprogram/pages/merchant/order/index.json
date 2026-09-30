@@ -5,6 +5,7 @@
     "empty-state": "../../../components/empty-state/index"
   },
   "navigationStyle": "custom",
+  "navigationBarTextStyle": "white",
   "enablePullDownRefresh": true,
-  "backgroundTextStyle": "dark"
+  "backgroundTextStyle": "light"
 }

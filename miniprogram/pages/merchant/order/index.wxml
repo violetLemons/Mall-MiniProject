@@ -79,11 +79,11 @@
     <view class="form-body">
       <view class="f-item">
         <text class="f-label">物流公司</text>
-        <input class="f-input" placeholder="如：顺丰速运" value="{{shipCompany}}" data-field="shipCompany" bindinput="onShipInput" />
+        <input class="f-input" placeholder-class="ph" placeholder="如：顺丰速运" value="{{shipCompany}}" data-field="shipCompany" bindinput="onShipInput" />
       </view>
       <view class="f-item">
         <text class="f-label">物流单号</text>
-        <input class="f-input" placeholder="请输入物流单号" value="{{shipTrackingNo}}" data-field="shipTrackingNo" bindinput="onShipInput" />
+        <input class="f-input" placeholder-class="ph" placeholder="请输入物流单号" value="{{shipTrackingNo}}" data-field="shipTrackingNo" bindinput="onShipInput" />
       </view>
     </view>
     <view class="form-foot">

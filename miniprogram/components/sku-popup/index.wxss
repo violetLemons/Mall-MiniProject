@@ -69,12 +69,6 @@
   justify-content: flex-end;
 }
 
-.stock-tip {
-  font-size: 22rpx;
-  color: var(--text-secondary, #8A8D93);
-  margin-top: 6rpx;
-}
-
 .selected-summary {
   font-size: 24rpx;
   color: var(--text-primary, #18191B);
@@ -198,26 +192,6 @@
 
 .size-box.is-selected .size-num {
   color: #FFFFFF;
-}
-
-/* 缺货置灰并禁止点击 */
-.size-box.is-disabled {
-  background-color: #F0F1F3;
-  opacity: 0.5;
-  pointer-events: none;
-}
-
-.size-box.is-disabled .size-num {
-  color: var(--text-placeholder, #BCBFC4);
-  text-decoration: line-through;
-}
-
-.oos-tag {
-  position: absolute;
-  top: 2rpx;
-  right: 6rpx;
-  font-size: 16rpx;
-  color: var(--text-placeholder, #BCBFC4);
 }
 
 /* 数量步进器 */

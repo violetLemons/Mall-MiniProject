@@ -208,6 +208,56 @@ async function safeDocGet(collection, docId) {
   }
 }
 
+// 余额全额抵扣（payAmount=0，无微信实付）时直接结算订单：标记 PAID + 累加销量 + 写流水 + 同步子订单
+async function settlePaidOrder(order) {
+  const payNow = new Date();
+  const orderId = order._id;
+  await db.collection('orders').doc(orderId).update({
+    data: {
+      status: 'PAID',
+      orderStatus: 'PAID',
+      paymentStatus: 'PAID',
+      paymentTradeNo: '',
+      transactionId: '',
+      paidAt: payNow,
+      payTime: payNow,
+      updatedAt: payNow,
+      updateTime: payNow
+    }
+  });
+  for (const item of (order.items || [])) {
+    const p = await safeDocGet('products', item.productId);
+    if (p) {
+      await db.collection('products').doc(item.productId).update({
+        data: { sales: (p.sales || 0) + item.count, updatedAt: new Date() }
+      });
+    }
+  }
+  try {
+    await db.collection('payment_transactions').add({
+      data: {
+        orderId,
+        userId: order.userId,
+        outTradeNo: order.orderNo,
+        transactionId: '',
+        totalFee: order.payAmount || 0,
+        balanceAmount: order.balanceAmount || 0,
+        status: 'SUCCESS',
+        createdAt: new Date()
+      }
+    });
+  } catch (_) {}
+  try {
+    const subs = await db.collection('merchant_orders').where({ parentOrderId: orderId }).get();
+    const paidSubs = (subs.data || []).filter(s => s.status === 'PENDING_PAYMENT');
+    await Promise.all(paidSubs.map(s => db.collection('merchant_orders').doc(s._id).update({
+      data: { status: 'PAID', paidAt: payNow, updatedAt: payNow }
+    })));
+  } catch (subErr) {
+    console.warn('[settlePaidOrder] merchant_orders sync PAID warn:', subErr);
+  }
+}
+
 /**
  * 为请求生成 APIv3 Authorization 鉴权头
  */
@@ -438,7 +488,7 @@ exports.main = async (event) => {
       try {
         const v3Result = await queryV3Payment(order);
         if (v3Result.trade_state === 'SUCCESS') {
-          // 支付确认入账并扣减库存
+          // 支付确认入账并累加销量
           const payNow = new Date();
           await db.collection('orders').doc(orderId).update({
             data: {
@@ -454,21 +504,13 @@ exports.main = async (event) => {
             }
           });
 
-          // 扣减实物库存与锁定库存
+          // 累加销量（库存已移除）
           for (const item of (order.items || [])) {
-            const sku = await safeDocGet('product_skus', item.skuId);
-            if (sku) {
-              const newLocked = Math.max(0, (sku.lockedStock || 0) - item.count);
-              const newStock = Math.max(0, (sku.stock || 0) - item.count);
-              await db.collection('product_skus').doc(item.skuId).update({
-                data: { stock: newStock, lockedStock: newLocked, updatedAt: new Date() }
+            const p = await safeDocGet('products', item.productId);
+            if (p) {
+              await db.collection('products').doc(item.productId).update({
+                data: { sales: (p.sales || 0) + item.count, updatedAt: new Date() }
               });
-              const p = await safeDocGet('products', item.productId);
-              if (p) {
-                await db.collection('products').doc(item.productId).update({
-                  data: { sales: (p.sales || 0) + item.count, updatedAt: new Date() }
-                });
-              }
             }
           }
 
@@ -513,6 +555,12 @@ exports.main = async (event) => {
 
       if (order.status !== 'PENDING_PAYMENT' || new Date(order.expireAt).getTime() <= Date.now()) {
         throw err('INVALID_ORDER_STATUS', '订单已失效或已完成支付');
+      }
+
+      // 余额全额抵扣（无微信实付）：直接结算，跳过微信支付
+      if (Number(order.payAmount) === 0) {
+        await settlePaidOrder(order);
+        return success({ orderId: order._id, orderNo: order.orderNo, paid: true, noPayment: true });
       }
 
       console.log(`[PAY-05] 服务端确定金额完成 (payAmount: ${order.payAmount}分), t=${Date.now() - startTime}ms`);

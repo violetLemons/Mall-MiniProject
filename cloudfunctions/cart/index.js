@@ -100,7 +100,6 @@ exports.main = async (event) => {
       for (const row of rows) {
         const sku = await safeDocGet('product_skus', row.skuId);
         const p = sku ? await safeDocGet('products', sku.productId) : null;
-        const availableStock = sku ? Math.max(0, sku.stock - (sku.lockedStock || 0)) : 0;
         items.push({
           id: row._id,
           cartId: row._id,
@@ -112,8 +111,6 @@ exports.main = async (event) => {
           price: sku?.price || 0,
           count: row.count,
           selected: row.selected !== false,
-          availableStock,
-          inStock: availableStock >= row.count && sku?.status === 'ACTIVE',
           isOnSale: p?.status === 'ON_SALE'
         });
       }
@@ -136,8 +133,6 @@ exports.main = async (event) => {
       if (!p || p.status !== 'ON_SALE' || p.deletedAt) throw err('PRODUCT_OFF_SALE', '商品已下架');
 
       const finalCount = Math.min(5, (oldCart?.count || 0) + addCount);
-      const availableStock = Math.max(0, sku.stock - (sku.lockedStock || 0));
-      if (finalCount > availableStock) throw err('OUT_OF_STOCK', '可售库存不足');
 
       const cartData = {
         userId,
@@ -165,10 +160,6 @@ exports.main = async (event) => {
       const newCount = integer(params.count, '数量', 1, 5);
       const row = await safeDocGet('carts', cartId);
       if (!row || row.userId !== userId) throw err('PERMISSION_DENIED', '购物车项不存在');
-
-      const sku = await safeDocGet('product_skus', row.skuId);
-      const availableStock = sku ? Math.max(0, sku.stock - (sku.lockedStock || 0)) : 0;
-      if (newCount > availableStock) throw err('OUT_OF_STOCK', '可售库存不足');
 
       await db.collection('carts').doc(cartId).update({ data: { count: newCount, updatedAt: new Date() } });
       return success({ cartId, count: newCount });

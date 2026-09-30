@@ -1,7 +1,24 @@
-import { AdminUser, Product, Order, Category, Banner, InventoryLog, OperationLog, SkuItem, ProductAuditTicket, CardKey } from '../types';
+import { AdminUser, Product, Order, Category, Banner, OperationLog, SkuItem, ProductAuditTicket, CardKey, AdConfig, AdStats } from '../types';
 
 const TOKEN_KEY = 'sneaker_admin_token';
 const USER_KEY = 'sneaker_admin_user';
+const EXPIRY_KEY = 'sneaker_admin_expires_at';
+
+// 会话失效事件：requestCloud 检测到 401/AUTH_REQUIRED 后广播，App 监听并跳转登录页
+export const SESSION_EXPIRED_EVENT = 'admin:session-expired';
+
+function clearSession(): void {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(EXPIRY_KEY);
+}
+
+function isSessionExpired(): boolean {
+  const raw = localStorage.getItem(EXPIRY_KEY);
+  const exp = raw ? Number(raw) : NaN;
+  // 没有过期时间戳（老版本残留或首次）一律视为已过期，强制重新登录，避免「进去后一操作就被踢」
+  return !Number.isFinite(exp) || Date.now() >= exp;
+}
 
 // 读取 CloudBase 服务网关地址 (VITE_CLOUDBASE_URL)
 export function getCloudBaseUrl(): string {
@@ -36,8 +53,8 @@ export async function requestCloud<T>(functionName: string, action: string, para
   const json = await res.json().catch(() => ({}));
   if (!json || !json.success) {
     if (json && (json.code === 'AUTH_REQUIRED' || json.code === 'ADMIN_REQUIRED')) {
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(USER_KEY);
+      clearSession();
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
     }
     throw new Error(json?.message || `服务网关响应失败: HTTP ${res.status}`);
   }
@@ -59,6 +76,7 @@ export const AdminApi = {
       permissions: string[];
       merchantId?: string | null;
       subMchIdMask?: string;
+      expiresIn?: number;
     }>('adminAuth', 'login', { username, password });
 
     const user: AdminUser = {
@@ -77,16 +95,21 @@ export const AdminApi = {
     };
     localStorage.setItem(TOKEN_KEY, data.token);
     localStorage.setItem(USER_KEY, JSON.stringify(user));
+    const expiresIn = Number(data.expiresIn) > 0 ? Number(data.expiresIn) : 12 * 3600;
+    localStorage.setItem(EXPIRY_KEY, String(Date.now() + expiresIn * 1000));
     return { token: data.token, user };
   },
 
   logout: async (): Promise<void> => {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+    clearSession();
   },
 
   getCurrentUser: (): AdminUser | null => {
     try {
+      if (isSessionExpired()) {
+        clearSession();
+        return null;
+      }
       const raw = localStorage.getItem(USER_KEY);
       if (raw) return JSON.parse(raw);
       return null;
@@ -132,7 +155,6 @@ export const AdminApi = {
       basePrice: Number(p.basePrice) || Number(p.minPrice) || 0,
       merchantId: p.merchantId || null,
       sales: Number(p.sales) || 0,
-      totalStock: Number(p.totalStock) || 0,
       status: p.status,
       tags: p.tags || [],
       isNew: Boolean(p.isNew),
@@ -167,7 +189,6 @@ export const AdminApi = {
       basePrice: Number(p.basePrice) || Number(p.minPrice) || 0,
       merchantId: p.merchantId || null,
       sales: Number(p.sales) || 0,
-      totalStock: Number(p.totalStock) || 0,
       status: p.status,
       tags: p.tags || [],
       isNew: Boolean(p.isNew),
@@ -180,8 +201,6 @@ export const AdminApi = {
         colorImage: s.colorImage,
         size: s.size,
         price: Number(s.price) || 0,
-        stock: Number(s.stock) || 0,
-        lockedStock: Number(s.lockedStock) || 0,
         status: s.status || 'ACTIVE'
       })),
       createdAt: p.createdAt ? new Date(p.createdAt).toLocaleString() : '',
@@ -284,43 +303,16 @@ export const AdminApi = {
     });
   },
 
-  // ---------------- 库存管理与流水 ----------------
-  updateSkuStock: async (productId: string, skuId: string, newStock: number, reasonRemark: string): Promise<void> => {
-    await requestCloud('adminInventory', 'adjustStock', {
-      skuId,
-      targetStock: newStock,
-      reason: reasonRemark
-    });
-  },
-
-  getInventoryLogs: async (): Promise<InventoryLog[]> => {
-    const res = await requestCloud<{ list: any[] }>('adminInventory', 'listLogs', {
-      page: 1,
-      pageSize: 50
-    });
-    return (res.list || []).map(l => ({
-      id: l._id || l.id,
-      productId: l.productId,
-      productName: l.productName || '商品',
-      skuId: l.skuId,
-      colorName: l.colorName || '',
-      size: l.size || 0,
-      delta: Number(l.delta) || 0,
-      reason: l.reason,
-      operatorName: l.adminUsername || l.operatorName || '管理员',
-      remark: l.remark || '',
-      createdAt: l.createdAt ? new Date(l.createdAt).toLocaleString() : ''
-    }));
-  },
-
   // ---------------- 订单管理与校园自提 ----------------
-  getOrders: async (filters?: { status?: string; deliveryType?: string; keyword?: string; merchantId?: string; statuses?: string[]; pageSize?: number }): Promise<Order[]> => {
+  getOrders: async (filters?: { status?: string; deliveryType?: string; keyword?: string; merchantId?: string; statuses?: string[]; pageSize?: number; startTime?: string; endTime?: string }): Promise<Order[]> => {
     const res = await requestCloud<{ list: any[] }>('adminOrders', 'list', {
       status: filters?.status,
       statuses: filters?.statuses,
       deliveryType: filters?.deliveryType,
-      orderNo: filters?.keyword,
+      keyword: filters?.keyword,
       merchantId: filters?.merchantId,
+      startTime: filters?.startTime,
+      endTime: filters?.endTime,
       page: 1,
       pageSize: filters?.pageSize || 50
     });
@@ -673,5 +665,18 @@ export const AdminApi = {
 
   getCardKeyStats: async (): Promise<{ total: number; used: number; expired: number; active: number }> => {
     return requestCloud<{ total: number; used: number; expired: number; active: number }>('activation', 'stats', { type: 'BALANCE' });
+  },
+
+  // ---------------- 广告管理 (激励视频看广告得额度) ----------------
+  getAdConfig: async (): Promise<AdConfig> => {
+    return requestCloud<AdConfig>('ads', 'getConfig', {});
+  },
+
+  saveAdConfig: async (config: Partial<AdConfig>): Promise<AdConfig> => {
+    return requestCloud<AdConfig>('ads', 'saveConfig', config);
+  },
+
+  getAdStats: async (): Promise<AdStats> => {
+    return requestCloud<AdStats>('ads', 'stats', {});
   }
 };

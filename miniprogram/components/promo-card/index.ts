@@ -33,7 +33,7 @@ Component({
       },
       {
         id: 'new_arrivals',
-        tag: '云端库存',
+        tag: '实时上新',
         title: '新品上架',
         desc: '实时同步在售款式',
         imageUrl: 'https://images.unsplash.com/photo-1607522370275-f14206abe5d3?w=200&auto=format&fit=crop&q=80',

@@ -66,6 +66,7 @@ export interface PayOrderResult {
   status: string;
   code?: 'SUCCESS' | 'PAYMENT_CANCELLED' | 'PAYMENT_PERMISSION_DENIED' | 'PAYMENT_PREPAY_FAILED' | 'PAYMENT_SIGN_FAILED' | 'PAYMENT_PARAMETER_INVALID' | 'PAYMENT_REQUEST_FAILED' | 'PAYMENT_UNKNOWN' | 'PENDING_PAYMENT';
   message: string;
+  noPayment?: boolean; // 全额购物额度抵扣，未拉起微信支付，后端已直结订单
   rawError?: any;
 }
 
@@ -244,6 +245,17 @@ export class OrderService {
         code,
         message: msg || '发起支付失败，未获取到支付参数',
         rawError: createErr
+      };
+    }
+
+    // 全额购物额度抵扣：后端已直结订单，无需拉起微信支付
+    if (res?.noPayment) {
+      return {
+        success: true,
+        status: 'PAID',
+        code: 'SUCCESS',
+        message: '已用购物额度抵扣完成',
+        noPayment: true
       };
     }
 

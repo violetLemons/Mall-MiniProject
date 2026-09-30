@@ -39,37 +39,54 @@
   margin: 32rpx 24rpx 16rpx;
 }
 
-.nav-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20rpx;
-  padding: 0 24rpx;
-}
-
-.nav-item {
+.nav-list {
   background: #FFFFFF;
   border-radius: 20rpx;
-  padding: 28rpx;
-  display: flex;
-  flex-direction: column;
+  margin: 0 24rpx;
+  padding: 8rpx 24rpx;
   box-shadow: 0 6rpx 24rpx rgba(0, 0, 0, 0.04);
 }
 
-.nav-icon {
-  font-size: 44rpx;
+.nav-row {
+  display: flex;
+  align-items: center;
+  padding: 26rpx 0;
+  border-bottom: 1rpx solid #F2F3F5;
 }
 
-.nav-title {
+.nav-row:last-child {
+  border-bottom: none;
+}
+
+.nav-row-icon {
+  font-size: 40rpx;
+  margin-right: 20rpx;
+}
+
+.nav-row-meta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.nav-row-title {
   font-size: 30rpx;
   font-weight: 700;
   color: #111111;
-  margin-top: 12rpx;
 }
 
-.nav-desc {
+.nav-row-desc {
   font-size: 22rpx;
   color: #8A8D93;
   margin-top: 6rpx;
+}
+
+.nav-row-arrow {
+  width: 16rpx;
+  height: 16rpx;
+  border-top: 3rpx solid #C0C3C8;
+  border-right: 3rpx solid #C0C3C8;
+  transform: rotate(45deg);
 }
 
 .card {

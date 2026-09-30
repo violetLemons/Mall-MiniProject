@@ -82,7 +82,7 @@ export const Categories: React.FC = () => {
     setUploading(true);
     try {
       const src = await readFileAsDataURL(file);
-      const result = await openCrop(src, 1, 'image/png');
+      const result = await openCrop(src, 1, 'image/png', 'round');
       if (result === null) return; // 取消
       const sourceFile = blobToFile(result, file.name, 'image/png');
       const compressed = await compressImage(sourceFile);

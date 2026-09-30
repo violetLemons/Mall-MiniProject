@@ -8,7 +8,6 @@ import {
   TrendingUp,
   ShoppingBag,
   Clock,
-  AlertTriangle,
   ArrowUpRight,
   ChevronRight
 } from 'lucide-react';
@@ -40,7 +39,6 @@ export const Dashboard: React.FC = () => {
     .reduce((sum, o) => sum + (o.payAmount || 0), 0);
 
   const pendingShipmentCount = orders.filter(o => o.status === 'PAID').length;
-  const lowStockCount = products.filter(p => p.totalStock < 30).length;
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
@@ -51,7 +49,7 @@ export const Dashboard: React.FC = () => {
             运营数据大盘 · Overview
           </h1>
           <p style={{ fontSize: '14px', color: '#64748B', marginTop: '4px' }}>
-            实时监控小程序端成交金额、出货履约、库存与热销动销。
+            实时监控小程序端成交金额、出货履约与热销动销。
           </p>
         </div>
 
@@ -157,30 +155,6 @@ export const Dashboard: React.FC = () => {
           </div>
           <div style={{ marginTop: '8px', fontSize: '12px', color: '#D97706', fontWeight: 600 }}>
             需优先处理顺丰揽件
-          </div>
-        </div>
-
-        {/* Card 4 */}
-        <div
-          style={{
-            backgroundColor: '#FFFFFF',
-            borderRadius: '16px',
-            padding: '24px',
-            border: '1px solid #E2E8F0',
-            boxShadow: 'var(--shadow-sm)'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748B' }}>低库存预警商品</span>
-            <div style={{ padding: '8px', borderRadius: '10px', backgroundColor: '#FEF2F2', color: '#EF4444' }}>
-              <AlertTriangle size={20} />
-            </div>
-          </div>
-          <div style={{ fontSize: '28px', fontWeight: 800, color: '#0F172A', marginTop: '12px' }}>
-            {lowStockCount} <span style={{ fontSize: '14px', fontWeight: 500, color: '#94A3B8' }}>件</span>
-          </div>
-          <div style={{ marginTop: '8px', fontSize: '12px', color: '#EF4444', fontWeight: 600 }}>
-            {lowStockCount > 0 ? '部分热门商品亟需补货' : '目前库存健康充裕'}
           </div>
         </div>
       </div>

@@ -22,7 +22,6 @@ import {
   FileText,
   PlusCircle,
   Smartphone,
-  Truck,
   Eye,
   ShieldCheck,
   Share2,
@@ -45,7 +44,6 @@ export const Products: React.FC = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadingDetail, setUploadingDetail] = useState(false);
-  const [newTagInput, setNewTagInput] = useState('');
   const coverInputRef = React.useRef<HTMLInputElement>(null);
   const detailInputRef = React.useRef<HTMLInputElement>(null);
   const { openCrop, cropper } = useImageCropper();
@@ -57,15 +55,12 @@ export const Products: React.FC = () => {
     name: '',
     subtitle: '',
     description: '',
-    brand: '',
     category: '',
     categoryId: '',
     cover: '',
     minPrice: '',
     maxPrice: '',
-    totalStock: 100,
-    tags: ['新品'],
-    deliveryTypes: ['DELIVERY'],
+    sales: 0,
     detailImages: []
   });
 
@@ -170,18 +165,14 @@ export const Products: React.FC = () => {
       name: '',
       subtitle: '',
       description: '',
-      brand: '',
       category: '',
       categoryId: '',
       cover: 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?w=800',
       minPrice: '',
       maxPrice: '',
-      totalStock: 100,
-      tags: ['新品', '热卖'],
-      deliveryTypes: ['DELIVERY'],
+      sales: 0,
       detailImages: []
     });
-    setNewTagInput('');
     setEditModalOpen(true);
     if (firstLevel1) handleSelectLevel1(firstLevel1.id);
     else setParentCategoryId('');
@@ -196,30 +187,24 @@ export const Products: React.FC = () => {
       name: p.name || p.title || '',
       subtitle: p.subtitle || '',
       description: p.description || '',
-      tags: p.tags && p.tags.length > 0 ? p.tags : ['新品'],
       detailImages: p.detailImages && p.detailImages.length > 0 ? p.detailImages : (p.images && p.images.length > 0 ? p.images : (p.cover ? [p.cover] : [])),
       minPrice: (p.minPrice !== undefined && p.minPrice !== null) ? Number((p.minPrice / 100).toFixed(2)) : '',
       maxPrice: (p.maxPrice !== undefined && p.maxPrice !== null) ? Number((p.maxPrice / 100).toFixed(2)) : '',
-      totalStock: (p.totalStock !== undefined && p.totalStock !== null) ? p.totalStock : '',
-      deliveryTypes: p.deliveryTypes && p.deliveryTypes.length > 0 ? p.deliveryTypes : ['DELIVERY']
+      sales: p.sales ?? 0
     });
-    setNewTagInput('');
     setEditModalOpen(true);
   };
 
   const handleApplyTemplate = () => {
     setFormData(prev => ({
       ...prev,
-      subtitle: prev.subtitle?.trim() || '经典款 / 优质材质 / 潮流穿搭必备',
-      tags: prev.tags && prev.tags.length > 0
-        ? Array.from(new Set([...prev.tags, '爆款推荐', '潮流百搭', '正品保障']))
-        : ['爆款推荐', '经典复刻', '潮流百搭', '正品保障'],
+      subtitle: prev.subtitle?.trim() || '新鲜直采 / 鲜甜多汁 / 冷链锁鲜到家',
       description: prev.description?.trim() ? prev.description : `【商品详情档案】
-• 设计理念：主打实用百搭，精选优质材质，做工精细、经久耐用。
-• 使用体验：注重使用舒适度，兼顾日常通勤与多种使用场景需求。
-• 品质保障：严格品控、做工扎实，耐磨耐用，性价比高。
-• 搭配建议：适合多种风格穿搭，轻松驾驭休闲、通勤与日常场合。
-• 保养指南：请使用专业清洁剂轻柔打理，避免阳光暴晒及潮湿存放。`,
+• 产地直采：甄选优质果园，当季自然成熟，源头现摘现发，颗颗新鲜饱满。
+• 口感体验：果肉细嫩多汁、清甜爽口，酸甜平衡，入口生津回甘。
+• 品质保障：严格分级筛选、冷链锁鲜运输，坏果包赔，买得放心吃得安心。
+• 食用建议：可洗净鲜食、榨汁、做果盘或搭配酸奶，冷藏后风味更佳。
+• 储存方式：常温阴凉处或冰箱冷藏保存，建议尽快食用以保留最佳口感。`,
       detailImages: (prev.detailImages && prev.detailImages.length > 0)
         ? prev.detailImages
         : [
@@ -289,22 +274,6 @@ export const Products: React.FC = () => {
     }));
   };
 
-  const handleAddTag = () => {
-    if (!newTagInput.trim()) return;
-    const tag = newTagInput.trim();
-    if (!formData.tags?.includes(tag)) {
-      setFormData(prev => ({ ...prev, tags: [...(prev.tags || []), tag] }));
-    }
-    setNewTagInput('');
-  };
-
-  const handleRemoveTag = (tagToRemove: string) => {
-    setFormData(prev => ({
-      ...prev,
-      tags: (prev.tags || []).filter(t => t !== tagToRemove)
-    }));
-  };
-
   const handleSaveProductForm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name?.trim()) {
@@ -323,16 +292,8 @@ export const Products: React.FC = () => {
       toast('【必填项未填写】请输入有效的基准售价（必须大于0元，支持0.01元等测试金额）', 'error');
       return;
     }
-    if (formData.totalStock === '' || formData.totalStock === null || formData.totalStock === undefined || isNaN(Number(formData.totalStock)) || Number(formData.totalStock) < 0) {
-      toast('【必填项未填写】请输入有效的初始库存数量（不能为负数）', 'error');
-      return;
-    }
     if (!formData.cover?.trim()) {
       toast('【必填项未填写】请上传或填写商品封面主图', 'error');
-      return;
-    }
-    if (!formData.deliveryTypes || formData.deliveryTypes.length === 0) {
-      toast('【必填项未填写】请至少勾选配送方式（顺丰快递包邮）', 'error');
       return;
     }
 
@@ -346,8 +307,7 @@ export const Products: React.FC = () => {
         minPrice: priceInCents,
         maxPrice: priceInCents,
         price: priceInCents,
-        totalStock: Number(formData.totalStock),
-        deliveryTypes: formData.deliveryTypes,
+        sales: Number(formData.sales) || 0,
         images: formData.detailImages && formData.detailImages.length > 0 ? formData.detailImages : [formData.cover || ''],
         detailImages: formData.detailImages || []
       });
@@ -537,8 +497,7 @@ export const Products: React.FC = () => {
               <th style={{ padding: '14px 18px' }}>商品信息</th>
               <th style={{ padding: '14px 18px' }}>品牌 / 分类</th>
               <th style={{ padding: '14px 18px' }}>价格区间</th>
-              <th style={{ padding: '14px 18px' }}>总物理库存</th>
-              <th style={{ padding: '14px 18px' }}>销量</th>
+              <th style={{ padding: '14px 18px' }}>已买人数</th>
               <th style={{ padding: '14px 18px' }}>状态</th>
               <th style={{ padding: '14px 18px', textAlign: 'right' }}>操作管理</th>
             </tr>
@@ -546,7 +505,7 @@ export const Products: React.FC = () => {
           <tbody>
             {products.length === 0 ? (
               <tr>
-                <td colSpan={7} style={{ padding: '48px', textAlign: 'center', color: '#94A3B8' }}>
+                <td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: '#94A3B8' }}>
                   暂无匹配的商品数据
                 </td>
               </tr>
@@ -599,16 +558,9 @@ export const Products: React.FC = () => {
                     )}
                   </td>
 
-                  {/* Stock */}
-                  <td style={{ padding: '14px 18px' }}>
-                    <span style={{ fontWeight: 600, color: p.totalStock < 30 ? '#EF4444' : '#0F172A' }}>
-                      {p.totalStock} 件
-                    </span>
-                  </td>
-
                   {/* Sales */}
                   <td style={{ padding: '14px 18px', color: '#64748B' }}>
-                    {p.sales} 件
+                    {p.sales} 人已买
                   </td>
 
                   {/* Status */}
@@ -766,7 +718,7 @@ export const Products: React.FC = () => {
                 <Sparkles size={16} /> 商品详情页一键套用与实时真机预览
               </div>
               <div style={{ fontSize: '12px', color: '#9A3412', marginTop: '2px' }}>
-                自动预置副标题、详情设计文案、热卖标签与高清大图，可随时点击预览手机小程序效果
+                自动预置副标题、详情设计文案与高清大图，可随时点击预览手机小程序效果
               </div>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -827,7 +779,7 @@ export const Products: React.FC = () => {
               required
               value={formData.name || ''}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="例如: 经典款商品"
+              placeholder="例如: 当季新鲜水果"
               style={{
                 width: '100%',
                 padding: '9px 12px',
@@ -847,7 +799,7 @@ export const Products: React.FC = () => {
               required
               value={formData.subtitle || ''}
               onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })}
-              placeholder="例如: 经典款 · 潮流百搭 / 高性价比"
+              placeholder="例如: 产地直采 · 鲜甜多汁 / 冷链直达"
               style={{
                 width: '100%',
                 padding: '9px 12px',
@@ -858,16 +810,36 @@ export const Products: React.FC = () => {
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                所属品牌
-              </label>
-              <input
-                type="text"
-                value={formData.brand || ''}
-                onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                placeholder="例如: 品牌A / 品牌B"
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+              所属品类 *
+            </label>
+            <select
+              value={parentCategoryId}
+              onChange={(e) => handleSelectLevel1(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '9px 12px',
+                borderRadius: '8px',
+                border: '1px solid #CBD5E1',
+                fontSize: '14px',
+                marginBottom: '8px'
+              }}
+            >
+              <option value="">请选择一级分类</option>
+              {level1Categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            {level2Categories.length > 0 ? (
+              <select
+                value={formData.categoryId || ''}
+                onChange={(e) => {
+                  const c = categories.find(c => c.id === e.target.value);
+                  setFormData({ ...formData, categoryId: e.target.value, category: c?.name || '' });
+                }}
                 style={{
                   width: '100%',
                   padding: '9px 12px',
@@ -875,160 +847,71 @@ export const Products: React.FC = () => {
                   border: '1px solid #CBD5E1',
                   fontSize: '14px'
                 }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                所属品类 *
-              </label>
-              <select
-                value={parentCategoryId}
-                onChange={(e) => handleSelectLevel1(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '9px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid #CBD5E1',
-                  fontSize: '14px',
-                  marginBottom: '8px'
-                }}
               >
-                <option value="">请选择一级分类</option>
-                {level1Categories.map((c) => (
+                <option value="">请选择二级分类</option>
+                {level2Categories.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
                 ))}
               </select>
-              {level2Categories.length > 0 ? (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {level2Categories.map((c) => {
-                    const selected = formData.categoryId === c.id;
-                    return (
-                      <span
-                        key={c.id}
-                        onClick={() => setFormData({ ...formData, categoryId: c.id, category: c.name })}
-                        style={{
-                          padding: '4px 10px',
-                          borderRadius: '6px',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          backgroundColor: selected ? '#FF5500' : '#F1F5F9',
-                          color: selected ? '#FFF' : '#475569',
-                          border: selected ? '1px solid #FF5500' : '1px solid #E2E8F0'
-                        }}
-                      >
-                        {selected ? `✓ ${c.name}` : c.name}
-                      </span>
-                    );
-                  })}
-                </div>
-              ) : (
-                parentCategoryId ? (
-                  <div style={{ fontSize: '12px', color: '#64748B' }}>该一级分类下暂无二级分类，将直接作为品类。</div>
-                ) : null
-              )}
-            </div>
+            ) : (
+              parentCategoryId ? (
+                <div style={{ fontSize: '12px', color: '#64748B' }}>该一级分类下暂无二级分类，将直接作为品类。</div>
+              ) : null
+            )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                基准售价 (¥) *
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                required
-                placeholder="例如: 0.01 或 699"
-                value={formData.minPrice === '' || formData.minPrice === undefined || formData.minPrice === null ? '' : formData.minPrice}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setFormData({ ...formData, minPrice: val === '' ? '' : val });
-                }}
-                style={{
-                  width: '100%',
-                  padding: '9px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid #CBD5E1',
-                  fontSize: '14px'
-                }}
-              />
-              <p style={{ fontSize: '11px', color: '#64748B', marginTop: '4px' }}>
-                支持输入 0.01 元测试金额；可退格全部清空重新输入
-              </p>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                初始总库存 (件) *
-              </label>
-              <input
-                type="number"
-                min="0"
-                required
-                placeholder="例如: 100"
-                value={formData.totalStock === '' || formData.totalStock === undefined || formData.totalStock === null ? '' : formData.totalStock}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setFormData({ ...formData, totalStock: val === '' ? '' : val });
-                }}
-                style={{
-                  width: '100%',
-                  padding: '9px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid #CBD5E1',
-                  fontSize: '14px'
-                }}
-              />
-              <p style={{ fontSize: '11px', color: '#64748B', marginTop: '4px' }}>
-                支持完全清空
-              </p>
-            </div>
-          </div>
-
-          {/* 配送方式选项配置 */}
-          <div style={{ borderTop: '1px dashed #E2E8F0', paddingTop: '14px' }}>
+          <div>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-              配送服务与履约方式 * (可同时勾选，或自由切换勾选其中一种)
+              基准售价 (¥) *
             </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '10px',
-                  padding: '12px 14px',
-                  borderRadius: '10px',
-                  border: formData.deliveryTypes?.includes('DELIVERY') ? '2px solid #FF5500' : '1px solid #CBD5E1',
-                  backgroundColor: formData.deliveryTypes?.includes('DELIVERY') ? '#FFF7ED' : '#F8FAFC',
-                  cursor: 'pointer'
-                }}
-              >
-                <input
-                  type="checkbox"
-                  style={{ marginTop: '3px', cursor: 'pointer' }}
-                  checked={formData.deliveryTypes?.includes('DELIVERY') || false}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    const cur = formData.deliveryTypes || [];
-                    const next = checked ? Array.from(new Set([...cur, 'DELIVERY'])) : cur.filter((t: string) => t !== 'DELIVERY');
-                    setFormData({ ...formData, deliveryTypes: next });
-                  }}
-                />
-                <div>
-                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Truck size={15} color="#FF5500" /> 顺丰快递包邮
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
-                    承诺 48 小时内发货 · 顺丰极速空运
-                  </div>
-                </div>
-              </label>
-            </div>
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              required
+              placeholder="例如: 0.01 或 699"
+              value={formData.minPrice === '' || formData.minPrice === undefined || formData.minPrice === null ? '' : formData.minPrice}
+              onChange={(e) => {
+                const val = e.target.value;
+                setFormData({ ...formData, minPrice: val === '' ? '' : val });
+              }}
+              style={{
+                width: '100%',
+                padding: '9px 12px',
+                borderRadius: '8px',
+                border: '1px solid #CBD5E1',
+                fontSize: '14px'
+              }}
+            />
+            <p style={{ fontSize: '11px', color: '#64748B', marginTop: '4px' }}>
+              支持输入 0.01 元测试金额；可退格全部清空重新输入
+            </p>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+              已买人数 (销量)
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              placeholder="例如: 0"
+              value={formData.sales ?? 0}
+              onChange={(e) => setFormData({ ...formData, sales: e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0) })}
+              style={{
+                width: '100%',
+                padding: '9px 12px',
+                borderRadius: '8px',
+                border: '1px solid #CBD5E1',
+                fontSize: '14px'
+              }}
+            />
+            <p style={{ fontSize: '11px', color: '#64748B', marginTop: '4px' }}>
+              小程序端展示为「X 人已买」；下单支付成功后自动累加，可在此手动修正
+            </p>
           </div>
 
           {/* 2. 封面图（支持直接本地上传或输入URL） */}
@@ -1083,103 +966,6 @@ export const Products: React.FC = () => {
             <div style={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <FileText size={16} color="#FF5500" />
               详情页专属排版与图文介绍
-            </div>
-
-            {/* 标签 */}
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                特色标签 (可点击快捷选用或自行添加)
-              </label>
-              {/* 快捷标签库 */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
-                {['爆款推荐', '经典复刻', '潮流百搭', '优质材质', '正品保障', '学生优惠', '联名限量', '高性价比'].map(tag => {
-                  const isSelected = formData.tags?.includes(tag);
-                  return (
-                    <span
-                      key={tag}
-                      onClick={() => {
-                        if (isSelected) handleRemoveTag(tag);
-                        else setFormData({ ...formData, tags: [...(formData.tags || []), tag] });
-                      }}
-                      style={{
-                        padding: '3px 9px',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        backgroundColor: isSelected ? '#FF5500' : '#F1F5F9',
-                        color: isSelected ? '#FFF' : '#475569',
-                        transition: 'all 0.15s'
-                      }}
-                    >
-                      {isSelected ? `✓ ${tag}` : `+ ${tag}`}
-                    </span>
-                  );
-                })}
-              </div>
-
-              {/* 当前已有标签与输入 */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <input
-                  type="text"
-                  value={newTagInput}
-                  onChange={(e) => setNewTagInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(); } }}
-                  placeholder="输入自定义标签后回车或点击添加..."
-                  style={{
-                    flex: 1,
-                    padding: '7px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid #CBD5E1',
-                    fontSize: '13px'
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={handleAddTag}
-                  style={{
-                    padding: '7px 14px',
-                    backgroundColor: '#F1F5F9',
-                    border: '1px solid #CBD5E1',
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    color: '#334155'
-                  }}
-                >
-                  添加
-                </button>
-              </div>
-
-              {formData.tags && formData.tags.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
-                  {formData.tags.map(t => (
-                    <span
-                      key={t}
-                      style={{
-                        padding: '3px 8px',
-                        backgroundColor: '#FFF7ED',
-                        color: '#EA580C',
-                        border: '1px solid #FED7AA',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      {t}
-                      <X
-                        size={12}
-                        onClick={() => handleRemoveTag(t)}
-                        style={{ cursor: 'pointer', strokeWidth: 2.5 }}
-                      />
-                    </span>
-                  ))}
-                </div>
-              )}
             </div>
 
             {/* 详情文案故事 */}
@@ -1514,47 +1300,6 @@ export const Products: React.FC = () => {
                     {formData.subtitle || '【未填写副标题卖点，建议一键套用商品模板】'}
                   </div>
 
-                  {/* 特色标签 */}
-                  {formData.tags && formData.tags.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '10px' }}>
-                      {formData.tags.map((t: string) => (
-                        <span
-                          key={t}
-                          style={{
-                            fontSize: '10px',
-                            fontWeight: 700,
-                            padding: '2px 7px',
-                            borderRadius: '4px',
-                            backgroundColor: '#FFF7ED',
-                            color: '#EA580C',
-                            border: '1px solid #FED7AA'
-                          }}
-                        >
-                          {t}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* 配送服务选项卡片 */}
-                <div style={{ backgroundColor: '#FFFFFF', padding: '12px 16px', borderRadius: '12px', margin: '0 8px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '8px' }}>
-                    配送方式
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {(!formData.deliveryTypes || formData.deliveryTypes.includes('DELIVERY')) && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#0F172A' }}>
-                        <Truck size={14} color="#FF5500" />
-                        <span style={{ fontWeight: 600 }}>顺丰快递包邮</span>
-                        <span style={{ fontSize: '11px', color: '#94A3B8', marginLeft: 'auto' }}>承诺48小时内发货</span>
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', gap: '12px', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #F1F5F9', fontSize: '10px', color: '#64748B' }}>
-                    <span>✓ 正品防伪双重鉴别</span>
-                    <span>✓ 7天无理由退换</span>
-                  </div>
                 </div>
 
                 {/* 图文档案详情介绍 */}

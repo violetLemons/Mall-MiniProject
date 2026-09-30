@@ -9,13 +9,12 @@ Page({
       { key: 'gmv', label: '总流水', value: '¥0.00' },
       { key: 'orders', label: '累计订单', value: '0' },
       { key: 'pendingShip', label: '待发货', value: '0' },
-      { key: 'lowStock', label: '低库存', value: '0' }
+      { key: 'onSale', label: '在售商品', value: '0' }
     ],
     latestOrders: [] as any[],
     hotProducts: [] as any[],
     navItems: [
       { id: 'goods', title: '商品管理', desc: '上架/下架/新增商品', icon: '📦' },
-      { id: 'stock', title: '库存流水', desc: '库存盘点与调账', icon: '📊' },
       { id: 'order', title: '订单管理', desc: '发货与退款审核', icon: '📋' },
       { id: 'setting', title: '商户设置', desc: '名称/地址/商户号', icon: '⚙️' }
     ]
@@ -57,7 +56,7 @@ Page({
       const incomeStatuses = ['PAID', 'SHIPPED', 'COMPLETED', 'REFUND_PENDING', 'REFUNDING'];
       const gmvFen = orders.reduce((s, o) => s + (incomeStatuses.includes(o.status) ? (Number(o.payAmount) || 0) : 0), 0);
       const pendingShip = orders.filter(o => o.status === 'PAID').length;
-      const lowStock = products.filter(p => (Number(p.totalStock) || 0) < 10).length;
+      const onSale = products.filter(p => p.status === 'ON_SALE').length;
 
       const latestOrders = orders.slice(0, 5).map(o => ({
         id: o._id || o.id,
@@ -82,7 +81,7 @@ Page({
         'stats[0].value': `¥${formatYuan(gmvFen)}`,
         'stats[1].value': String(ordersRes.total || orders.length),
         'stats[2].value': String(pendingShip),
-        'stats[3].value': String(lowStock),
+        'stats[3].value': String(onSale),
         latestOrders,
         hotProducts,
         loading: false
@@ -97,7 +96,6 @@ Page({
     const id = e.currentTarget.dataset.id;
     const routes: Record<string, string> = {
       goods: '/pages/merchant/goods/index',
-      stock: '/pages/merchant/stock/index',
       order: '/pages/merchant/order/index',
       setting: '/pages/merchant/setting/index'
     };

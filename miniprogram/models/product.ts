@@ -4,8 +4,6 @@
 
 export interface ShoeSize {
   size: number;        // 规格
-  inStock: boolean;    // 是否有货
-  stockCount: number;  // 剩余库存
 }
 
 export interface ShoeColor {
@@ -21,7 +19,6 @@ export interface ProductSku {
   size: number;
   price: number;
   originalPrice: number;
-  stock: number;
   image: string;
 }
 

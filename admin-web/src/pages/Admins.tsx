@@ -11,12 +11,11 @@ const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
   OPERATOR: [
     'product.view', 'product.create', 'product.update', 'product.status', 'product.delete',
     'order.view', 'order.ship', 'order.cancel',
-    'category.manage', 'banner.manage', 'inventory.view'
+    'category.manage', 'banner.manage'
   ],
-  WAREHOUSE: ['inventory.view', 'inventory.update', 'order.ship'],
   MERCHANT: [
     'product.view', 'product.create', 'product.update', 'product.status', 'product.delete',
-    'order.view', 'order.ship', 'inventory.view', 'inventory.update'
+    'order.view', 'order.ship'
   ]
 };
 
@@ -208,7 +207,7 @@ export const Admins: React.FC = () => {
                       color: adm.role === 'SUPER_ADMIN' ? '#FF5500' : adm.role === 'MERCHANT' ? '#2563EB' : '#334155'
                     }}
                   >
-                    {adm.role === 'SUPER_ADMIN' ? '超级管理员' : adm.role === 'MERCHANT' ? '商家' : adm.role === 'WAREHOUSE' ? '仓库专员' : '运营人员'}
+                    {adm.role === 'SUPER_ADMIN' ? '超级管理员' : adm.role === 'MERCHANT' ? '商家' : '运营人员'}
                   </span>
                   {adm.role === 'MERCHANT' && adm.subMchIdMask && (
                     <div style={{ fontSize: '11px', color: '#64748B', marginTop: '4px' }}>
@@ -304,8 +303,7 @@ export const Admins: React.FC = () => {
               style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '14px' }}
             >
               <option value="OPERATOR">普通运营人员 (商品与订单读写)</option>
-              <option value="WAREHOUSE">仓库专员 (仅库存管理)</option>
-              <option value="MERCHANT">商家 (仅管理本商家商品/订单/库存)</option>
+              <option value="MERCHANT">商家 (仅管理本商家商品/订单)</option>
               <option value="SUPER_ADMIN">超级管理员 (拥有全部权限与物理清除权)</option>
             </select>
           </div>

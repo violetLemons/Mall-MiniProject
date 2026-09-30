@@ -76,16 +76,42 @@ exports.main = async event => {
       requirePermission(admin, 'order.view');
       const page = c.integer(params.page || 1, '页码', 1, 10000), pageSize = c.integer(params.pageSize || 20, '每页数量', 1, 1000);
 
-      const query = {};
-      if (admin.merchantId) query.merchantId = admin.merchantId;
-      else if (params.merchantId) query.merchantId = c.text(params.merchantId, '商户ID', 1, 50);
+      const conds = [];
+      if (admin.merchantId) conds.push({ merchantId: admin.merchantId });
+      else if (params.merchantId) conds.push({ merchantId: c.text(params.merchantId, '商户ID', 1, 50) });
       if (Array.isArray(params.statuses) && params.statuses.length > 0) {
-        query.status = db.command.in(params.statuses.map(s => c.text(s, '状态', 1, 30)));
+        conds.push({ status: db.command.in(params.statuses.map(s => c.text(s, '状态', 1, 30))) });
       } else if (params.status && params.status !== 'ALL') {
-        query.status = c.text(params.status, '状态', 1, 30);
+        conds.push({ status: c.text(params.status, '状态', 1, 30) });
       }
-      if (params.deliveryType && params.deliveryType !== 'ALL') query.deliveryType = c.text(params.deliveryType, '配送方式', 1, 20);
-      if (params.orderNo && params.orderNo !== 'ALL') query.subOrderNo = c.text(params.orderNo, '订单号', 1, 50);
+      if (params.deliveryType && params.deliveryType !== 'ALL') conds.push({ deliveryType: c.text(params.deliveryType, '配送方式', 1, 20) });
+
+      // 关键字模糊搜索：子/父订单号、收货人姓名、手机号
+      const keyword = (params.keyword ? String(params.keyword).trim() : '') || (params.orderNo && params.orderNo !== 'ALL' ? String(params.orderNo).trim() : '');
+      if (keyword) {
+        const rx = db.RegExp({ regexp: keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), options: 'i' });
+        conds.push(db.command.or([
+          { subOrderNo: rx },
+          { parentOrderNo: rx },
+          { 'shippingAddress.name': rx },
+          { 'shippingAddress.phone': rx }
+        ]));
+      }
+
+      // 时间范围筛选（按下单时间 createdAt）
+      const startTime = params.startTime ? new Date(params.startTime) : null;
+      const endTime = params.endTime ? new Date(params.endTime) : null;
+      const hasStart = startTime && !isNaN(startTime.getTime());
+      const hasEnd = endTime && !isNaN(endTime.getTime());
+      if (hasStart && hasEnd) {
+        conds.push({ createdAt: db.command.gte(startTime).and(db.command.lte(endTime)) });
+      } else if (hasStart) {
+        conds.push({ createdAt: db.command.gte(startTime) });
+      } else if (hasEnd) {
+        conds.push({ createdAt: db.command.lte(endTime) });
+      }
+
+      const query = conds.length === 0 ? {} : (conds.length === 1 ? conds[0] : db.command.and(conds));
 
       const nameMap = await getMerchantNameMap(db);
       const total = (await db.collection('merchant_orders').where(query).count()).total;
@@ -211,7 +237,7 @@ exports.main = async event => {
       return success({ status: 'REFUNDING' }, '已同意退款，等待平台执行');
     }
 
-    // 平台执行退款 (真实微信部分退款 + 回退库存销量)
+    // 平台执行退款 (真实微信部分退款 + 回退销量)
     if (action === 'executeRefund') {
       requirePermission(admin, 'order.ship');
       if (admin.merchantId) throw c.error('PERMISSION_DENIED', '仅平台可执行退款');
@@ -223,13 +249,23 @@ exports.main = async event => {
       // TODO: 调用微信支付 API v3 部分退款 /v3/refund/domestic/refunds
       // out_trade_no = 支付单 orderNo, out_refund_no = refund_records.outRefundNo, amount.refund = 子订单 refundFee
 
+      // 余额抵扣部分退还到用户购物额度（无需微信 API）；现金部分仍 TODO
+      const balanceRefund = Number(sub.balanceAmount) || 0;
+      let refundUserId = null;
+      if (balanceRefund > 0 && sub.userId) {
+        const uRes = await db.collection('users').where({ _openid: sub.userId }).limit(1).get().catch(() => ({ data: [] }));
+        refundUserId = (uRes.data && uRes.data[0] && uRes.data[0]._id) || null;
+      }
+
       const now = new Date();
       await c.transaction(db, async tx => {
         for (const item of (sub.items || [])) {
-          const sku = await c.get(tx, 'product_skus', item.skuId);
-          if (sku) await tx.collection('product_skus').doc(item.skuId).update({ data: { stock: (sku.stock || 0) + item.count, updatedAt: now } });
           const p = await c.get(tx, 'products', item.productId);
-          if (p) await tx.collection('products').doc(item.productId).update({ data: { sales: Math.max(0, (p.sales || 0) - item.count), totalStock: (p.totalStock || 0) + item.count, updatedAt: now } });
+          if (p) await tx.collection('products').doc(item.productId).update({ data: { sales: Math.max(0, (p.sales || 0) - item.count), updatedAt: now } });
+        }
+        if (balanceRefund > 0 && refundUserId) {
+          const u = await c.get(tx, 'users', refundUserId);
+          if (u) await tx.collection('users').doc(refundUserId).update({ data: { balance: (Number(u.balance) || 0) + balanceRefund, updatedAt: now } });
         }
         await tx.collection('merchant_orders').doc(subOrderId).update({ data: { status: 'REFUNDED', refundedAt: now, updatedAt: now } });
         if (sub.refundNo) await tx.collection('refund_records').doc(sub.refundNo).update({ data: { status: 'SUCCESS', refundedAt: now, updatedAt: now } });
