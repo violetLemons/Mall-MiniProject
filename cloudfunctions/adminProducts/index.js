@@ -147,7 +147,7 @@ function buildDefaultSkuInput(product) {
 
 async function saveSkus(tx, product, inputs, old, admin) {
   if (!Array.isArray(inputs) || inputs.length === 0) inputs = [buildDefaultSkuInput(product)];
-  if (inputs.length > 30 || old.length > 30) throw error('INVALID_PARAMS', '规格矩阵须为1~30项');
+  if (inputs.length !== 1 || inputs[0].status === 'DISABLED') throw error('INVALID_PARAMS', '每个商品必须只有一个有效SKU');
   const pairs = new Set(), ids = new Set(), all = [];
   for (const s of inputs) {
     const colorName = text(s.colorName, '颜色', 1, 40), size = integer(s.size, '规格', 1, 100000);
@@ -188,6 +188,20 @@ async function saveSkus(tx, product, inputs, old, admin) {
 exports.main = async event => {
   try {
     const admin = await requireAdmin(event, db), { action, params = {} } = event;
+    if (action === 'getStoreSettings') { requirePermission(admin,'product.view'); return success(await require('./common/storeSettings').read(db)); }
+    if (action === 'saveStoreSettings') {
+      requirePermission(admin,'product.update');
+      const settings=require('./common/storeSettings'), data=settings.validate(params);
+      await content.checkText(cloud,process.env.CONTENT_SECURITY_OPENID,[data.mallName,data.companyName,data.serviceHours,data.privacyContact].join('\n'),3);
+      await commerce.transaction(db,async tx=>{
+        const old=await settings.read(tx);
+        if((params.expectedRevision || '')!==old.revision)throw error('CONFLICT','配置已被其他管理员修改，请刷新');
+        await tx.collection('store_settings').doc(settings.ID).set({data});
+        await tx.collection('operation_logs').add({data:{adminId:admin.adminId,action:'SAVE_STORE_SETTINGS',resourceType:'STORE',resourceId:settings.ID,revision:data.revision,createdAt:new Date()}});
+      });
+      return success(data);
+    }
+    if(params.skus!==undefined && !Array.isArray(params.skus))throw error('INVALID_PARAMS','SKU须为数组');
     const supportedActions = new Set(['list', 'get', 'create', 'update', 'updateSkus', 'updateStatus', 'delete', 'softDelete', 'restore', 'uploadImage']);
     if (!supportedActions.has(action)) throw error('ACTION_NOT_FOUND', `未知指令: ${action}`);
 
@@ -261,7 +275,7 @@ exports.main = async event => {
     const safetyVersion = crypto.randomUUID();
     if (['create','update','updateSkus'].includes(action)) {
       const existing = action === 'create' ? null : await getDoc(db,'products',id);
-      await content.checkText(cloud, process.env.CONTENT_SECURITY_OPENID, [params.name || existing?.name, params.subtitle || existing?.subtitle, params.description || existing?.description, ...(params.tags || existing?.tags || [])].filter(Boolean).join('\n'), 3);
+      await content.checkText(cloud, process.env.CONTENT_SECURITY_OPENID, [params.name ?? existing?.name, params.brand ?? existing?.brand, params.subtitle ?? existing?.subtitle, params.description ?? existing?.description, ...(params.tags || existing?.tags || []), ...(params.skus || []).map(s=>s.colorName)].filter(Boolean).join('\n'), 3);
     }
     const txResult = await commerce.transaction(db, async tx => {
       let p = await getDoc(tx, 'products', id), result = null;
@@ -299,7 +313,8 @@ exports.main = async event => {
           await tx.collection('products').doc(id).update({ data: updateData });
           const merged = { ...p, ...updateData };
           const oldSkus = (await tx.collection('product_skus').where({ productId: id }).limit(100).get()).data;
-          const inputs = params.skus === undefined && oldSkus.length ? oldSkus.map(s => ({ ...s, id: s._id, price: data.minPrice ?? s.price })) : params.skus;
+          const activeSkus = oldSkus.filter(s=>s.status === 'ACTIVE');
+          const inputs = params.skus === undefined && activeSkus.length ? activeSkus.map(s => ({ ...s, id: s._id, price: data.minPrice ?? s.price })) : params.skus;
           await saveSkus(tx, merged, inputs, oldSkus, admin);
         }
       } else if (action === 'updateSkus') {
@@ -311,22 +326,23 @@ exports.main = async event => {
         if (!['DELETED', 'OFF_SALE', 'ON_SALE'].includes(status)) throw error('INVALID_PARAMS', '状态无效');
         if (status === 'ON_SALE' && p.contentSafety?.status !== 'PASS') throw error('CONTENT_REVIEW_REQUIRED', '微信内容审核通过后才能上架');
         if (status === 'ON_SALE' && (!p.minPrice || !p.skuVersion)) throw error('INVALID_PARAMS', '请先配置有效的规格和价格');
+        if (status === 'ON_SALE') {
+          const active = (await tx.collection('product_skus').where({productId:id,status:'ACTIVE'}).limit(2).get()).data;
+          if (active.length !== 1 || active[0].price !== p.minPrice || p.minPrice !== p.maxPrice) throw error('INVALID_PARAMS','商品须为单SKU且价格一致');
+        }
         await tx.collection('products').doc(id).update({ data: { status, deletedAt: status === 'DELETED' ? new Date() : null, updatedAt: new Date() } });
       }
-      return result;
-    });
-
-    if (['create','update','updateSkus'].includes(action)) {
-      const product = await getDoc(db,'products',id);
-      const skus = (await db.collection('product_skus').where({productId:id,status:'ACTIVE'}).get()).data;
-      await content.reviewAssets(cloud,db,'PRODUCT',id,safetyVersion,[product.cover,...(product.images||[]),...(product.detailImages||[]),...skus.map(s=>s.colorImage)],process.env.CONTENT_SECURITY_OPENID);
-    }
-    try {
-      await db.collection('operation_logs').doc(key(crypto.randomUUID ? crypto.randomUUID() : String(Date.now()))).set({ data: {
+      if (['create','update','updateSkus'].includes(action)) {
+        const product = await getDoc(tx,'products',id);
+        const skus = (await tx.collection('product_skus').where({productId:id,status:'ACTIVE'}).get()).data;
+        await content.reviewAssets(cloud,db,'PRODUCT',id,safetyVersion,[product.cover,...(product.images||[]),...(product.detailImages||[]),...skus.map(s=>s.colorImage)],process.env.CONTENT_SECURITY_OPENID,tx);
+      }
+      await tx.collection('operation_logs').doc(key(crypto.randomUUID ? crypto.randomUUID() : String(Date.now()))).set({ data: {
         adminId: admin.adminId, adminUsername: admin.username, action,
         resourceType: 'PRODUCT', resourceId: id, createdAt: new Date()
       } });
-    } catch (_) {}
+      return result;
+    });
 
     return success(txResult);
   } catch (e) {

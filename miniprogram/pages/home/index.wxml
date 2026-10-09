@@ -2,6 +2,7 @@
   <!-- 自定义导航栏 -->
   <custom-navbar showLogo="{{true}}" borderBottom="{{false}}" />
 
+  <view bindtap="onBusiness" style="padding:24rpx; background:#f0f6f1; color:#275e38;"><text>{{store.mallName || '水果商城'}} · 商家资质与服务 ›</text></view>
   <!-- 顶部吸顶搜索栏 (只读，点击跳转商品列表页) -->
   <view class="sticky-search">
     <search-bar readonly="{{true}}" showMessage="{{true}}" hasUnread="{{true}}" />

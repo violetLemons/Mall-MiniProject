@@ -48,6 +48,7 @@ export const Layout: React.FC = () => {
 
   const navItems = [
     { label: '运营大盘', path: '/', icon: LayoutDashboard },
+    { label: '商家与配送', path: '/store-settings', icon: Store },
     { label: '商品管理', path: '/products', icon: ShoppingBag },
     { label: '订单管理', path: '/orders', icon: ClipboardList },
     { label: '类目中心', path: '/categories', icon: Layers },
@@ -58,9 +59,9 @@ export const Layout: React.FC = () => {
   ];
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F8FAFC' }}>
+    <div className="admin-layout" style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F8FAFC' }}>
       {/* Sidebar */}
-      <aside
+      <aside className="admin-sidebar"
         style={{
           width: '240px',
           backgroundColor: '#0F172A',
@@ -199,7 +200,7 @@ export const Layout: React.FC = () => {
       {/* Main Content Area */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {/* Topbar */}
-        <header
+        <header className="admin-topbar"
           style={{
             height: '64px',
             backgroundColor: '#FFFFFF',
@@ -262,7 +263,7 @@ export const Layout: React.FC = () => {
         </header>
 
         {/* Page Content Viewport */}
-        <main style={{ flex: 1, padding: '28px', minWidth: 0 }}>
+        <main className="admin-viewport" style={{ flex: 1, padding: '28px', minWidth: 0 }}>
           <Outlet />
         </main>
       </div>

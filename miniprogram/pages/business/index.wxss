@@ -1,0 +1,5 @@
+.business-page { padding: 24rpx; color: #262c29; background: #fff; }
+.section { display: flex; flex-direction: column; gap: 20rpx; padding: 32rpx 0; border-bottom: 1rpx solid #dce4dd; font-size: 28rpx; line-height: 1.6; word-break: break-all; }
+.section .title { font-size: 34rpx; font-weight: 600; }
+.section image { width: 100%; }
+.section button { width: 100%; font-size: 28rpx; border-radius: 6rpx; }

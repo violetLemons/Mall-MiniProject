@@ -7,25 +7,29 @@
       "name": "activation",
       "timeout": 20,
       "handler": "index.main",
-      "memorySize": 256
+      "memorySize": 256,
+      "envVariables": { "ADMIN_JWT_SECRET": "{{env.ADMIN_JWT_SECRET}}" }
     },
     {
       "name": "adminAuth",
       "timeout": 20,
       "handler": "index.main",
-      "memorySize": 256
+      "memorySize": 256,
+      "envVariables": { "ADMIN_JWT_SECRET": "{{env.ADMIN_JWT_SECRET}}" }
     },
     {
       "name": "adminBanners",
       "timeout": 20,
       "handler": "index.main",
-      "memorySize": 256
+      "memorySize": 256,
+      "envVariables": { "ADMIN_JWT_SECRET": "{{env.ADMIN_JWT_SECRET}}" }
     },
     {
       "name": "adminCategories",
       "timeout": 20,
       "handler": "index.main",
-      "memorySize": 256
+      "memorySize": 256,
+      "envVariables": { "ADMIN_JWT_SECRET": "{{env.ADMIN_JWT_SECRET}}" }
     },
     {
       "name": "adminGateway",
@@ -61,19 +65,22 @@
       "name": "adminProducts",
       "timeout": 20,
       "handler": "index.main",
-      "memorySize": 256
+      "memorySize": 256,
+      "envVariables": { "ADMIN_JWT_SECRET": "{{env.ADMIN_JWT_SECRET}}" }
     },
     {
       "name": "adminUsers",
       "timeout": 20,
       "handler": "index.main",
-      "memorySize": 256
+      "memorySize": 256,
+      "envVariables": { "ADMIN_JWT_SECRET": "{{env.ADMIN_JWT_SECRET}}" }
     },
     {
       "name": "adminOrders",
       "timeout": 20,
       "handler": "index.main",
-      "memorySize": 256
+      "memorySize": 256,
+      "envVariables": { "ADMIN_JWT_SECRET": "{{env.ADMIN_JWT_SECRET}}" }
     },
     {
       "name": "orders",
@@ -89,7 +96,7 @@
     },
     {
       "name": "orderTimeoutJob",
-      "timeout": 60,
+      "timeout": 180,
       "handler": "index.main",
       "memorySize": 256
     },
@@ -97,7 +104,8 @@
       "name": "ads",
       "timeout": 20,
       "handler": "index.main",
-      "memorySize": 256
+      "memorySize": 256,
+      "envVariables": { "ADMIN_JWT_SECRET": "{{env.ADMIN_JWT_SECRET}}" }
     },
     {
       "name": "addresses",

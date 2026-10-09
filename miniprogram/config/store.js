@@ -5,7 +5,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.STORE_CONFIG = void 0;
 exports.STORE_CONFIG = {
-    mallName: '通用商城',
-    brandTitle: '通用商城',
+    mallName: '水果商城',
+    brandTitle: '水果商城',
     customerServicePhone: ''
 };

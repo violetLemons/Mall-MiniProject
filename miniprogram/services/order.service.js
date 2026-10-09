@@ -27,6 +27,14 @@ exports.ORDER_STATUS_TOKEN = {
     COMPLETED: 'COMPLETED' // 已完成
 };
 class OrderService {
+    static quote(params) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return (0, cloud_1.callCloud)('orders', 'quote', params);
+        });
+    }
+    static queryPayment(id) {
+        return __awaiter(this, void 0, void 0, function* () { return (0, cloud_1.callCloud)('payment', 'queryOrder', { orderId: id }); });
+    }
     static getSummary() {
         return __awaiter(this, void 0, void 0, function* () {
             return (0, cloud_1.callCloud)('orders', 'summary');
@@ -75,10 +83,11 @@ class OrderService {
      */
     static confirmReceive(id) {
         return __awaiter(this, void 0, void 0, function* () {
+            var _a;
             const order = yield this.getDetail(id);
             if (!order)
                 throw new Error('订单不存在');
-            if (order.status === 'SHIPPED' && order.payAmount > 0 && !order.isTest) {
+            if (order.status === 'SHIPPED' && ((_a = order.paymentTotalCash) !== null && _a !== void 0 ? _a : order.payAmount) > 0 && !order.isTest) {
                 const transactionId = order.paymentTradeNo;
                 if (!transactionId)
                     throw new Error('缺少微信交易号');
@@ -93,9 +102,9 @@ class OrderService {
     /**
      * 买家申请退款 (整单退，进入管理员审核)
      */
-    static applyRefund(id, reason) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return (0, cloud_1.callCloud)('orders', 'applyRefund', { id, reason });
+    static applyRefund(id_1, reason_1) {
+        return __awaiter(this, arguments, void 0, function* (id, reason, quality = false) {
+            return (0, cloud_1.callCloud)('orders', 'applyRefund', { id, reason, quality });
         });
     }
     /**
@@ -118,7 +127,7 @@ class OrderService {
      */
     static payOrder(orderId) {
         return __awaiter(this, void 0, void 0, function* () {
-            var _a;
+            var _a, _b, _c;
             (0, compliance_1.report)('payment_start');
             console.log(`[PAY-01] 用户点击支付, orderId: ${orderId}`);
             console.log('[PAY-02] 开始创建支付参数');
@@ -129,7 +138,7 @@ class OrderService {
                 const detail = yield this.getDetail(orderId);
                 if (detail) {
                     currentOrderNo = detail.orderNo || orderId;
-                    payAmountFen = detail.payAmount || 0;
+                    payAmountFen = (_b = (_a = detail.paymentTotalCash) !== null && _a !== void 0 ? _a : detail.payAmount) !== null && _b !== void 0 ? _b : 0;
                 }
             }
             catch (e) {
@@ -190,7 +199,7 @@ class OrderService {
                     noPayment: true
                 };
             }
-            const packageStr = ((_a = res === null || res === void 0 ? void 0 : res.payment) === null || _a === void 0 ? void 0 : _a.package) || '';
+            const packageStr = ((_c = res === null || res === void 0 ? void 0 : res.payment) === null || _c === void 0 ? void 0 : _c.package) || '';
             const hasPrepay = typeof packageStr === 'string' && packageStr.startsWith('prepay_id=') && packageStr.length > 10;
             console.log(`[PAY-08] 是否获得 prepay_id: ${hasPrepay ? 'true' : 'false'}${hasPrepay ? ` (${packageStr.slice(0, 24)}...)` : ''}`);
             if ((res === null || res === void 0 ? void 0 : res.mode) === 'test' && !res.payment) {

@@ -1,4 +1,5 @@
 {
+  "store_settings": {"read": false, "write": false},
   "users": {
     "read": false,
     "write": false

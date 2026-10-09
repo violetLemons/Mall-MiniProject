@@ -61,7 +61,7 @@
     </view>
 
     <!-- 快递配送 -->
-    <view class="detail-card delivery-card"><text>快递配送，配送信息以下单页为准</text></view>
+    <view class="detail-card delivery-card"><text>付款后2天内发货，配送区域与运费以结算为准</text></view>
 
     <!-- 商品图文详情展示 -->
     <view class="detail-card content-card">
@@ -85,15 +85,15 @@
           <text class="param-value">{{product.category}}</text>
         </view>
         <view class="param-row">
-          <text class="param-name">防伪服务</text>
-          <text class="param-value">配备独立吊牌与溯源码</text>
+          <text class="param-name">售后服务</text>
+          <text class="param-value">鲜果不适用七日无理由退货，质量问题可申请售后</text>
         </view>
       </view>
 
       <!-- 细节图片 -->
       <view class="detail-images-list">
         <image
-          wx:for="{{product.images}}"
+          wx:for="{{product.detailImages.length ? product.detailImages : product.images}}"
           wx:key="*this"
           class="detail-flow-img"
           src="{{item}}"

@@ -16,6 +16,7 @@ const cart_service_1 = require("../../services/cart.service");
 const address_service_1 = require("../../services/address.service");
 const activation_service_1 = require("../../services/activation.service");
 const ad_service_1 = require("../../services/ad.service");
+const store_service_1 = require("../../services/store.service");
 const store_1 = require("../../config/store");
 const STORAGE_FAV_KEY = 'sneaker_mall_favorites';
 const STORAGE_HISTORY_KEY = 'sneaker_mall_history';
@@ -39,7 +40,8 @@ Page({
             { id: 'fav', title: '我的收藏', badge: '' },
             { id: 'history', title: '浏览历史', badge: '' },
             { id: 'address', title: '收货地址管理', badge: '' },
-            { id: 'service', title: '官方在线客服', badge: '9:00-22:00' },
+            { id: 'service', title: '在线客服', badge: '' },
+            { id: 'business', title: '商家资质与服务', badge: '' },
             { id: 'privacy', title: '隐私保护指引', badge: '' },
             { id: 'setting', title: '通用设置', badge: '' }
         ],
@@ -80,6 +82,7 @@ Page({
         actResult: null
     },
     onShow() {
+        store_service_1.StoreService.get().then(store => this.setData({ customerServicePhone: store.customerServicePhone })).catch(() => { });
         this.initLocalData();
         this.syncUserData().catch(() => { });
     },
@@ -454,6 +457,10 @@ Page({
     // -------------------------
     onTapMenu(e) {
         const id = e.currentTarget.dataset.id;
+        if (id === 'business') {
+            wx.navigateTo({ url: '/pages/business/index' });
+            return;
+        }
         if (id === 'privacy') {
             (0, compliance_1.openPrivacy)();
             return;
@@ -757,7 +764,9 @@ Page({
         setTimeout(() => {
             // 保留当前登录身份；订单和支付状态始终从云端读取
             const user = wx.getStorageSync('sneaker_mall_user');
-            wx.clearStorageSync();
+            for (const key of [STORAGE_FAV_KEY, STORAGE_HISTORY_KEY, STORAGE_ADDR_KEY])
+                wx.removeStorageSync(key);
+            this.setData({ favoriteList: [], historyList: [] });
             if (user)
                 wx.setStorageSync('sneaker_mall_user', user);
             wx.hideLoading();
@@ -769,7 +778,7 @@ Page({
         const val = e.detail.value;
         this.setData({ notifyEnabled: val });
         wx.showToast({
-            title: val ? '已开启消息推送' : '已关闭消息推送',
+            title: '消息订阅暂未开放',
             icon: 'none'
         });
     },

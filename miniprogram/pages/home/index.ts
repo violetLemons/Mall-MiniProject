@@ -1,4 +1,5 @@
 import { BannerItem } from '../../models/banner';
+import { StoreService, PublicStore } from '../../services/store.service';
 import { ProductCategory, ProductItem } from '../../models/product';
 import { BannerService } from '../../services/banner.service';
 import { CategoryService } from '../../services/category.service';
@@ -6,6 +7,7 @@ import { ProductService } from '../../services/product.service';
 
 Page({
   data: {
+    store: null as PublicStore|null,
     banners: [] as BannerItem[],
     bannerCurrent: 0,
     categories: [] as ProductCategory[],
@@ -21,6 +23,7 @@ Page({
 
   onLoad() {
     this.initData();
+    StoreService.get().then(store=>this.setData({store})).catch(()=>{});
   },
 
   async initData() {
@@ -48,6 +51,8 @@ Page({
       this.setData({ initialLoading: false, errorMessage: err instanceof Error ? err.message : '云端数据加载失败，请重试' });
     }
   },
+
+  onBusiness(){wx.navigateTo({url:'/pages/business/index'});},
 
   onRetry() { this.initData(); },
 

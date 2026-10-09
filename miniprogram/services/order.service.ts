@@ -37,6 +37,13 @@ export interface OrderModel {
   items: OrderItemSnapshot[];
   totalAmount: number;
   payAmount: number;
+  shippingFee?: number;
+  goodsAmount?: number;
+  balanceAmount?: number;
+  groupId?: string;
+  paymentOrderNo?: string;
+  paymentTotalCash?: number;
+  isPaymentGroup?: boolean;
   status: 'PENDING_PAYMENT' | 'PAID' | 'SHIPPED' | 'CLOSING' | 'REFUND_PENDING' | 'COMPLETED' | 'CANCELLED' | 'REFUNDING' | 'REFUNDED';
   // 子订单 (合并支付拆分后) 关联字段
   shipments?: { trackingNo?: string; logisticsCompany?: string; expressCompany?: string; shippedAt?: string }[];
@@ -60,6 +67,10 @@ export interface PayOrderResult {
 }
 
 export class OrderService {
+  static async quote(params: any): Promise<{totalAmount:number;goodsAmount:number;shippingFee:number;balanceAmount:number;payAmount:number;quoteKey:string;orderCount:number}> {
+    return callCloud('orders','quote',params);
+  }
+  static async queryPayment(id:string): Promise<{status:string}> { return callCloud('payment','queryOrder',{orderId:id}); }
   static async getSummary(): Promise<Record<string, number>> {
     return callCloud<Record<string, number>>('orders', 'summary');
   }
@@ -73,7 +84,9 @@ export class OrderService {
     receiverSnapshot?: any;
     remark?: string;
     requestId?: string;
-  }): Promise<{ orderId: string; orderNo: string; payAmount: number }> {
+    quoteKey?: string;
+    useBalance?: boolean;
+  }): Promise<{ orderId: string; orderNo: string; payAmount: number; orderIds?: string[] }> {
     return callCloud<{ orderId: string; orderNo: string; payAmount: number }>(
       'orders',
       'create',
@@ -126,7 +139,7 @@ export class OrderService {
   static async confirmReceive(id: string): Promise<void> {
     const order = await this.getDetail(id);
     if (!order) throw new Error('订单不存在');
-    if (order.status === 'SHIPPED' && order.payAmount > 0 && !(order as any).isTest) {
+    if (order.status === 'SHIPPED' && (order.paymentTotalCash ?? order.payAmount) > 0 && !(order as any).isTest) {
       const transactionId = (order as any).paymentTradeNo;
       if (!transactionId) throw new Error('缺少微信交易号');
       await new Promise<void>((resolve, reject) => (wx as any).openBusinessView({
@@ -140,11 +153,11 @@ export class OrderService {
   /**
    * 买家申请退款 (整单退，进入管理员审核)
    */
-  static async applyRefund(id: string, reason?: string): Promise<void> {
+  static async applyRefund(id: string, reason?: string, quality = false): Promise<void> {
     return callCloud<void>(
       'orders',
       'applyRefund',
-      { id, reason }
+      { id, reason, quality }
     );
   }
 
@@ -181,7 +194,7 @@ export class OrderService {
       const detail = await this.getDetail(orderId);
       if (detail) {
         currentOrderNo = detail.orderNo || orderId;
-        payAmountFen = detail.payAmount || 0;
+        payAmountFen = detail.paymentTotalCash ?? detail.payAmount ?? 0;
       }
     } catch (e) {
       console.warn('[PAY] 预查订单信息提示:', e);

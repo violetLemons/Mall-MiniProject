@@ -70,6 +70,10 @@ Page({
     onCancel(e) {
         return __awaiter(this, void 0, void 0, function* () {
             const id = e.currentTarget.dataset.id;
+            const order = this.data.orders.find(o => (o._id || o.id) === id);
+            const response = yield new Promise(resolve => wx.showModal({ title: '取消付款', content: (order === null || order === void 0 ? void 0 : order.groupId) ? '将取消本次付款对应的全部待付款订单。' : '确认取消此订单？', success: resolve }));
+            if (!response.confirm)
+                return;
             try {
                 yield order_service_1.OrderService.cancelOrder(id);
                 wx.showToast({ title: '订单已取消', icon: 'success' });

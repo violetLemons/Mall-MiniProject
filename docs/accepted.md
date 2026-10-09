@@ -115,3 +115,69 @@ CloudBase 实际事务并发、索引和 OpenAPI 权限；原始 HTTP 网关边�
 当前回归36/36，小程序和后台生产构建通过；实际导出/序列化及路由smoke通过。后台依赖经过官方版本兼容升级后npm audit为0，覆盖此前第8节的6项及部署补充中的5项告警状态。新的36项基于当前实现，不能与旧基线35项混算。
 
 部署增量：ADMIN_ALLOWED_ORIGINS必须显式配置实际后台Origin；adminBanners/adminCategories新增文本安全权限，分类图片/轮播进入contentReviewJob；新增manifest复合索引必须云端创建。构建Node版本^20.19.0或>=22.12.0；SheetJS锁定官方CDN包。仍未部署、未操作真实支付退款、未提审；全部云端和真机门禁保持待验，后台大包提示仍保留。
+
+## 10. 全局工作流与日志位置更正（2026-10-09）
+
+- 用户要求：思路、计划、修改均review；每次操作简记便于交接；实现工具或通用功能前搜索网络/GitHub，优先复用合适方案。
+- 初次检查与搜索：读取OpenAI Docs技能、全局配置目录和官方AGENTS.md说明（https://learn.chatgpt.com/docs/agent-configuration/agents-md）；全局AGENTS.md原为空，无覆盖文件。
+- 初次执行：在work/global-workflow/AGENTS.md准备三条规则，经获准Copy-Item写入C:/Users/lenovo/.codex/AGENTS.md；读回内容并核对SHA256一致，当前会话收到相同指令。误按acceped.md拼写在根目录新建日志。
+- 用户更正与计划review：沿用已有docs/accepted.md，避免双份日志；读取全局规则、误建日志及本文末尾，确认历史记录可追加保留。
+- 本次修改：将误建日志信息合并到本节，删除根目录acceped.md；全局规则改为优先沿用已有accepted.md（有docs/accepted.md则使用），不存在才创建docs/accepted.md。
+- 业务澄清：每个商品只有一个SKU，无多规格业务。此前审查B01多规格购买和B09尺码展示不适用；B08历史SKU累计降为遗留数据风险。docs/业务逻辑审查报告.md尚未据此修订，不能直接沿用18项计数。
+- 验证范围：仅工作流与文档变更；不改业务代码，不运行业务测试。全局写入及最终读回结果完成后追加。
+- 最终执行与review：获准Copy-Item更新全局AGENTS.md，退出码0；读回与准备文件逐字一致，正确包含docs/accepted.md优先规则；旧acceped.md不存在，原日志存在。git diff --stat确认本文仅追加记录；当前会话已收到更正后的全局指令。
+
+## 11. 微信自营小程序上线流程与差距核查（2026-10-09）
+
+- 请求与范围review：核对官方上线流程、当前完成度及代码待完善项；用户说明营业执照即将到位且适合当前商品，每商品仅一个SKU。此次先评估和更新文档，不修改业务代码、不部署、不操作真实资金；实际商品与主体类型另行询问以核对类目，不把执照经营范围等同微信类目审核通过。
+- 本地检查：读取accepted.md第8至10节、DEPLOYMENT.md、cloudbaserc.json、miniprogram/services/cloud.ts及project.config.json，并用rg --files查找项目指引、配置与审查资料。历史验收为36/36本地回归和构建通过，实际云端、真机交易、提审仍待验；部署envId仍为占位，客户端已有另一环境ID，需核对目标。发现部署文件含明文ADMIN_JWT_SECRET，仅记录风险，不记录值、不改用户已有变更。首次PowerShell读取中文显示乱码，随后使用-Encoding UTF8正确读回。
+- 官方搜索与阅读：检索微信注册/认证/备案/隐私及微信支付准备，打开https://pay.wechatpay.cn/doc/v3/merchant/4015459512和https://pay.wechatpay.cn/static/applyment_guide/applyment_detail_miniapp.shtml；经官方链接获取腾讯客服注册和认证指引。支付指引确认认证、JSAPI权限、商户号授权绑定及交易类发货管理要求。微信开发者发货/运营规范页面抓取失败，不伪称已读取，后续补查官方来源。
+- 备案依据：搜索获得工信部工信部信管〔2023〕105号通知（https://www.miit.gov.cn/zwgk/zcwj/wjfb/tz/art/2023/art_920db564162e4312916a01bed6540ad8.html），确认小程序纳入备案、先备案后开展业务；继续核查微信办理入口及具体商品类目。
+- 用户补充与结论复核：实际售卖水果，公司主体；按新鲜整果假设核查，若含鲜切、果汁、果干等须另核对。读取商品SKU保存、commerce退款、adminOrders/orders/orderTimeoutJob、store配置、隐私适配、profile客服抽屉及rg文案结果，确认默认单SKU已支持但后端仍接受矩阵；已发货退款强制退回、COMPLETED无退款入口、旧吊牌/七天无理由承诺与水果业务待协调。
+- 补充官方检索：查阅市场监管总局《食品经营许可和备案管理办法》第4/5条（https://www.samr.gov.cn/zw/zfxxgk/fdzdgknr/fgs/art/2023/art_91a91c26ae464a2f898952d5b84f62c6.html）、《消费者权益保护法》第24/25条（https://www.samr.gov.cn/zt/ndzt/2019n/bjspjsqjxcjwljxyjsckpxc/zcfg/art/2023/art_5004b2b0f4154c76acfca499fe9c737a.html）、七日无理由退货暂行办法第20条、电子商务法第14/15条；食用农产品免食品经营许可不等于免质量责任或平台审核，鲜活易腐无理由退货例外不排除质量售后。
+- 平台与访问限制：腾讯云官方FAQ检索正文明确微信小程序备案在微信公众平台办理（https://cloud.tencent.com/document/faq/243/97691），与“腾讯云备案小程序”办理网站备案不同；腾讯云官方隐私说明和发布说明分别为https://cloud.tencent.com/document/product/1301/97930及https://cloud.tencent.com/document/product/1301/55140，仅借用微信通用要求，不把微搭流程当本项目架构。微信类目表网页抓取失败；读取computer-use技能并用内置浏览器尝试官方类目页面，34秒超时且内核重置，未获取表内容。类目拟按“商家自营/初级食用农产品”核对，不声称已审核或已核定全部材料。
+- 工程证据：git status --short确认用户原有cloudbaserc.json、cloud.ts/cloud.js变更并保留；读取payGateway核对既有支付验签和超时保护，Request-ID尚未记录；读取seed-demo-data/export-cloud-seed及rg合规入口，示例含非鲜果分类/虚拟销量，需生产内容校验。复用既有node scripts/run-tests.js，36通过、0失败；负例日志为故障注入预期。本次未构建生成JS、未连接云端、未使用真实资金，历史构建/audit结果仅按记录引用。
+- 补充读取与修改前review：读取accepted.md已确认D1至D6和审查报告R1至R6/原优先级，用rg核对种子SKU，确认示例苹果仍有两个ACTIVE SKU；不把用户无多规格解释成整店只有一个SKU。区分代码已实现与平台已验收、质量售后与无理由退货、人工售后与完成单自动退款、拟选类目与审核通过；不擅自恢复库存/自提或改额度/退款政策。
+- 文档执行：新增docs/上线流程与待完善清单.md，记录9步手续、当前阶段、15组待改项、5项业务决策及上线门槛；更新docs/业务逻辑审查报告.md的适用性说明，保留初版证据，B01/B09不适用、B08条件性风险，撤回18项当前漏洞及多规格整改计数。此次只改这两份文档及本操作日志，代码建议尚未实施；下一步检查实际diff和文件结果。
+- 修改后review与结果：完整读回上线清单及审查报告适用性更新，核对公司水果/每商品单SKU范围、官方依据和未验收边界；git diff -- docs/accepted.md确认仅追加，git diff --check退出0无空白错误（已有LF/CRLF提示）；git status --short/git diff --stat核对范围，新增文档仍未跟踪，用户原有三个配置/生成文件变更仍保留。报告说明类目表未读取，不承诺具体材料、时间或平台审核结果。请求在Codex展示上线清单，工具返回queued，仅代表排队展示；剩余工作为业务政策确认、代码整改、平台手续和真实上线验收。
+
+## 12. 按上线清单完善代码（2026-10-09）
+- 最终联动review进度：又增5项入口/弱网/发货/审核/登录测试。首次追加锚点落到文件首个闭合位置，使共享夹具先被配送配置和拆单改变，出现46/50；把新增用例移至末尾并独立重置待售商品，当前50/50。小程序收藏新代码曾引用模型不存在的_id导致tsc失败，改用既有DTO.id后构建通过。APP默认通知/广告/假退出切换入口关闭；退款批准/拒绝审计改与状态同事务。补退款异常记录巡检轮转；安全核验26集合唯一、store_settings私有、全部JWT配置为环境引用（不输出值）。巡检三阶段预算需要更长函数超时，配置60改180秒，未部署；一次PowerShell/node引号命令失败后改结构化读取定位。后台订单异步售后证据增加版本保护。后台两轮生产构建通过；手机页面截图实际表单宽384px/视口390px无横向溢出，截屏接口缩放显示异常后用fullPage截图复验正常；本地新增运费行填写8/2元仅作未保存测试，已刷新撤销，截图存work/launch-review/store-settings-preview.png。
+- 第二轮review与故障修正：新增9项资金/配送/售后回归，当前45/45。修正详情长图曾误替换主图轮播的位置；收藏和足迹接入已有本地存储，通知未实现开关关闭；清缓存仅清明确缓存，不清登录/未确认下单意图。本地网关补公开storeSettings；网关沙箱会话虽启动但浏览器无法连接，停止后获审重启同一127.0.0.1测试网关，登录与配置页面桌面截图成功；手机截图发现原侧栏挤压，已补响应式导航，待复验。删除后台登录页与真实策略不符的锁定承诺。只读取本地生成测试凭证用于本机登录，不输出、不写日志；没有连接生产。测试补丁一次锚点不匹配未写入，改用实读末尾后追加成功；diff统计包含既有换行提示和必须的22函数公共模块副本。
+- 前后台补充：新增商家与配送后台（区域层级、配送开关、首/续件运费、主体资料、配置版本冲突），订单免退货审核/异常退款证据/48小时超时提示；前台商家资质与服务入口、真实客服电话读取、鲜果售后说明、详情长图、10种购物车预校验；后台商品分页及旧请求防覆盖。种子单SKU/零销量/下架，生产候选导出排除坚果和果干。补充拆单/审核/退款查询索引。小程序tsc通过；后台tsc通过但Vite在沙箱EPERM，获审后同一构建通过，仍有既有大包提示。旧测试已改为单SKU并增加遗留多SKU拒绝断言；持久结算测试夹具补入报价和存储API，待完整回归。路径检索两次引用不存在目录，随后按实际goods/detail与types目录定位。
+- 联动实现与检查：新增store_settings私有集合/规则、公开只读入口；单件订单按原交易查询微信发货，汇总包裹/共享同步锁，全部发货标记及收货保护；巡检分阶段预算并轮转失败记录，自动查单后按原退款号补发，终态异常保留人工核实。读取前台与后台接口后补结算权威报价确认/持久幂等请求、回页付款核实、已完成质量售后、取消批次提醒和金额明细。读取DATABASE_RULES.json路径失败后定位正确cloudfunctions/database.rules.json；service替换模式不匹配未写入，校正后执行；checkout补丁因BOM匹配失败，保留首行后执行成功。首次测试11通过/函数加载失败（未打包新模块）；打包22函数后35/36，旧多SKU矩阵测试与新规则冲突，待修改成单SKU与拒绝多SKU测试。微信官方拆分发货文档搜索未取得接口正文，沿现有官方API适配，真机拆分发货必须待验。
+- 续接检查：读取git status和日志末尾，PowerShell默认编码显示异常后改用UTF-8；三次读取因外层工作目录而失败，补充repo工作目录后读取成功。继续阅读commerce/adminOrders/微信发货/巡检/schema，并复核单件退款与同笔支付边界。执行退款服务接入、免退货审核参数、汇总单隐藏/禁发货、15包裹限制、按件标记、后台配送配置API及配置并发保护；尚待回归。
+
+- 授权与计划review：用户授权按上线清单修改，验证通过项标红“已完善”，其余移到文档后部；先处理配置、单SKU、结算/支付、巡检/退款与审核可靠性，再处理水果页面和后台。公司资料、配送及退款经营规则需确认；已异步询问，未编造值。保留原有环境配置变更；不部署、不修改真实资金，不恢复库存/自提/多规格。
+- 已执行检查：重新读取accepted.md、上线清单、git status及rg文件清单；读取commerce、contentSafety/catalogSafety、商品/资料更新、orders/payment/adminOrders、巡检、后台退款页、结算和订单服务、测试入口，确认现有复用边界。
+- 搜索与复用决策：查微信退款最佳实践https://pay.wechatpay.cn/doc/v3/merchant/4014959631、CloudBase环境配置https://docs.cloudbase.net/cli-v1/config与https://docs.cloudbase.net/cli-v1/functions/configs、事务待办模式https://docs.aws.amazon.com/en_en/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html。复用现有wx-server-sdk、数据库事务和版本化审核队列，提取已有退款查单逻辑并小范围适配；AWS基础设施不适合本CloudBase项目，不引入新的消息系统。退款按原单原参数核实重试，终态异常仍须人工处理。
+- 用户新决策与复核：一次合并付款，按每件商品拆成独立订单，同商品两件也拆两单；管理员可审批免退货退款，完成单仍可申请质量售后；配送区域与不同地址运费由后台配置，付款后48小时内发货。覆盖此前整单/免运费描述，不等于微信服务商合单支付；将采用普通JSAPI的一笔支付关联按件订单，退款使用原交易总金额并限制累计退款。补查官方https://pay.wechatpay.cn/doc/v3/merchant/4012791903，确认部分退款最多50次、不同退款需间隔及原单重试；读取微信发货模块、Schema、本地DB、后台API/路由以核对联动边界。
+- 首批执行：8处部署签名密钥改为环境引用，不打印值；单SKU保存/上架约束、公开品牌文字审核、额度返还限额边界已修改。商品/头像/分类/轮播审核待办改为主体同事务，商品审计同事务，审核暂时错误退避重试；尚待测试，不标已完善。继续按新决策实现按件订单和配送配置。
+
+- 最终检查及修正：续接读取本日志和清单，检索支付时间、实际微信网关与测试；两次检索引用不存在的旧模块路径失败后按common/payGateway定位；部署手册初读根路径失败后rg定位docs/DEPLOYMENT.md。官方https://pay.wechatpay.cn/doc/v3/merchant/4012791861确认success_time为支付完成时间，修正原按通知收到时间起算48小时的问题，网关校验并传递支付时间，拆单和流水保存该时间；补延迟12小时通知回归，当前53/53。此前新增临时媒体退避和关单16条积压/退款预算测试均通过。复核发货状态冲突后补持久化人工核对标记，不覆盖微信收货/退款终态。
+- 最终构建及文档执行：再次22函数打包和npm run build通过，最新后台npm --prefix admin-web run build获审后通过（606kB入口大包警告保留）。完整读回新storeSettings/refundService/后台表单与订单/发货/结算实际diff；git status核对改动含公共模块22份必需副本及TS生成JS，保留原有环境变更。清单按具体子项标红“已完善（本地验证）”，全部未完成代码/政策/平台手续后置；保留官方流程和适用性说明，更新53测试、26集合及逐件业务规则，不把真实微信或云端验收标完成。追加部署增量，修正清单部署链接路径；未部署未提审未真实交易。待最终diff与文档结果检查后收尾。
+- 收尾review结果：发货冲突持久化后重新打包22函数并复跑53/53通过；git -c core.safecrlf=false diff --check退出0。完整读回更新清单、日志追加及支付入口/后台配置代码，核对红色仅标具体完成子项，剩余事项后置且上线门槛没有撤销；修正清单DEPLOYMENT链接实际位于docs同目录。本地3000后台/3001测试网关保留用于预览，非公网生产服务；配送测试行未保存，截图仅为布局验证。请求在Codex打开清单供查阅，展示结果不作为业务验收。
+- 2026-10-09 本地超管账号查询：读取scripts/local-admin-api.js的凭证加载路径，仅提取work/local-test/credentials.json的username，核对本地预览账号为superadmin；未输出或记录密码和签名秘密，未查询生产账号。答复区分本地测试与生产；日志追加检查通过。
+
+## 13. 远程修改核对与single-merchant合并计划（2026-10-09）
+
+- 请求及review：用户要求检查远程修改并制定合并计划，随后确认目标是现有single-merchant，不新建single、不合入main。读accepted.md尾部、git status/remote/log/branch并复核先查差异再执行的范围；本轮不改业务代码、不提交、不切分支、不合并、不推送。
+- 远程操作：git fetch origin --no-tags首次在沙箱SSH启动失败（NtCreateDirectoryObject权限错误），获审后同一fetch成功；git ls-remote --heads origin获审只读成功。for-each-ref、remote.origin.fetch、rev-list及merge-base交叉验证：远程只有main=f7b2796、single-merchant=404b1f4，HEAD与目标0/0，main与目标0/2，main已为目标祖先；截至查询无新远程提交可合并。没有将fetch成功误报为已合并。
+- 差异阅读：git log origin/main..origin/single-merchant、git show d03f3d2/404b1f4的统计与删除清单，确认已有2次提交是旧文档清理及单商户合规改造，当前本地已包含；404b1f4共427文件（含公共副本）。git diff --name-only/--shortstat/--numstat及status结构化计数：196跟踪状态变化、57未跟踪文件、暂存0；实际内容差异189文件。配置只读行数统计，未输出秘密。此轮不是全源码复审，也未重跑业务测试。
+- 计划执行：新增docs/远程修改检查与合并计划.md，记录准确目标、已有远程变更、本地保留范围、潜在冲突区、生成物策略及提交/推送前再次fetch与回归门槛。复核将main合入single-merchant无新增内容，目标单商户分支应先保存和验收本地改动；未来有新远程提交才执行merge，不使用强制覆盖，不泄露测试凭证。实际Git提交/合并/推送尚未执行，等待用户后续授权；下一步读回和diff检查文档。
+- 文档review：完整读回合并计划，核对用户目标、2个远程分支指针、0/0及0/2关系、未提交计数和计划/执行边界；纠正日志“合入main无新增”方向，正确为“将main合入single-merchant无新增”。git diff --check对日志退出0，新增计划另查尾随空白；本轮只新增计划并追加日志，业务文件和分支内容未改。
+- 检查补充：全量日志尾随空白检查发现旧历史行而退出1；保留既有Markdown历史格式，不为本任务重写。新增合并计划尾随空白检查通过，日志本次diff --check仍退出0。Codex文件展示返回queued，仅表示待展示。
+
+## 14. 再次检查远程更新（2026-10-09）
+
+- 用户要求再次查询，先读accepted.md尾部并review“仅检查不合并”范围；获审执行git fetch origin --no-tags成功，读到single-merchant从404b1f4更新为c9f342d。for-each-ref、rev-list HEAD...origin/single-merchant=0/1、git log及获审ls-remote交叉核对：远程只有2分支，main未变；首次无新增结论只适用于上次查询，现已更正。
+- 差异检查：git show --stat/--name-status/实际README、DEPLOYMENT与cloud.ts/js diff，新增提交20:32:03 +08:00，共5文件14新增5删除；只是环境配置及CreateFailed文档，不是部署脚本变化。结构化解析三版本cloudbaserc，不输出秘密：远程仅envId变化，与本地客户端相符，本地部署环境尚不同；本地8处JWT环境引用和180秒巡检超时必须保留。前端cloud.ts/js本地与远程diff为空；重叠cloudbaserc和部署文档需逐段整合。README既有退款表述需与新业务同步。
+- 文档更正：在合并计划顶部明确最新0/1状态，并追加第6节5文件变化、精确合并策略和不执行云端删除的边界，保留初次历史证据。没有提交、切换、合并、推送、运行构建/业务测试或修改业务/环境配置；下一步读回新增记录和文档校验。
+- review结果：读回计划第6节，核对提交指针、文件变化及本地保留规则；日志git diff --check退出0，计划尾随空白检查通过。当前远程已领先1提交，合并尚待执行，工作区未被fetch覆盖。
+
+## 15. 执行single-merchant合并与推送（2026-10-09）
+
+- 用户确认按计划执行，包含保存本地修改、merge、回归和推送single-merchant；不改main、不force push、不部署或操作真实资金。先读日志/计划、status及空暂存区，再获审fetch，远程仍只有c9f342d一个新增提交；无新来源变化。
+- 提交前检查：读.gitignore、全部未跟踪文件与源模块diff/stat，git check-ignore确认work/local-test凭证、预览截图、node_modules/dist不入Git；配置结构化检查8处JWT全为安全引用，变更文件私钥/常见令牌模式未发现命中，未输出凭证。首次组合PowerShell检查因缺闭括号失败，改显式循环后通过；已有换行提示不代表内容冲突。git diff --check通过，node scripts/run-tests.js当前53/53通过。检查不保证不存在所有类型秘密，仍对暂存配置与路径复核。
+- 即将保存基线：限定admin-web/src、cloudfunctions、miniprogram、scripts、docs及cloudbaserc.json已审查业务范围暂存，保留原目标环境改动和必要公共模块/JS生成物；不无差别暂存整个仓库。下一步核对暂存文件、秘密引用和diff再创建本地提交；合并仍未执行。
+- 暂存复核：git add限定路径成功，247文件7855新增/3155删除（大量公共模块副本）；cached diff --check通过，暂存路径无凭证/私钥/work/依赖/构建缓存，暂存配置8处JWT仍为环境引用，当前分支single-merchant。因Git规范化，原仅换行状态变化未作为业务提交。下一步创建本地基线提交，再以--no-commit合入远程以便复核合并结果。

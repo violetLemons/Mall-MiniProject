@@ -11,7 +11,10 @@ exports.main = async event => {
     if (action === 'login') {
       const username = c.text(params.username, '用户名', 3, 64), password = c.text(params.password, '密码', 1, 128);
       const throttleId = c.key('admin-login', username);
-      const permitted = await c.transaction(db, async tx => {
+      const res = await db.collection('admins').where({ username }).limit(1).get();
+      const admin = res.data[0];
+      const valid = admin && admin.status === 'ACTIVE' && admin.role === 'SUPER_ADMIN' && verifyPassword(password,admin.salt,admin.passwordHash);
+      const permitted = valid || await c.transaction(db, async tx => {
         const previous = await c.get(tx, 'auth_limits', throttleId);
         const fresh = !previous || previous.resetAt < Date.now();
         const count = fresh ? 1 : previous.count + 1;
@@ -20,10 +23,9 @@ exports.main = async event => {
         return true;
       });
       if (!permitted) throw c.error('RATE_LIMITED', '登录尝试过多，请15分钟后再试');
-      const res = await db.collection('admins').where({ username }).limit(1).get();
-      const admin = res.data[0];
-      if (!admin || admin.status !== 'ACTIVE' || admin.role !== 'SUPER_ADMIN' || !verifyPassword(password, admin.salt, admin.passwordHash))
+      if (!valid)
         throw c.error('AUTH_FAILED', '用户名或密码错误，或账号不可用');
+      await db.collection('auth_limits').doc(throttleId).remove();
       await db.collection('admins').doc(admin._id).update({ data: { lastLoginAt: new Date() } });
       const token = createToken({ adminId: admin._id, version: permissionVersion(admin) }, 12 * 3600);
       return success({ token, adminId: admin._id, username, name: admin.name || '', phone: admin.phone || '', address: admin.address || '', role: admin.role, permissions: admin.permissions || [], expiresIn: 12 * 3600 });

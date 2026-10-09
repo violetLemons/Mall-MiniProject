@@ -1,5 +1,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
+@media (max-width: 760px) {
+  .admin-layout { flex-direction: column; width: 100%; }
+  .admin-sidebar { width: 100% !important; height: auto !important; position: relative !important; }
+  .admin-sidebar > div { display: none !important; }
+  .admin-sidebar nav { display: flex !important; flex-direction: row !important; overflow-x: auto; padding: 8px !important; gap: 6px; }
+  .admin-sidebar nav a { flex-shrink: 0; white-space: nowrap; }
+  .admin-topbar { display: none !important; }
+  .admin-viewport { padding: 0 !important; width: 100%; }
+}
+
 :root {
   --primary: #FF5500;
   --primary-hover: #E04B00;

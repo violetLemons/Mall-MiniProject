@@ -1,0 +1,10 @@
+<view class="business-page">
+  <custom-navbar title="商家与服务" showBack="{{true}}" />
+  <view wx:if="{{loading}}">加载中...</view>
+  <view wx:if="{{error}}">{{error}}<button bindtap="load">重试</button></view>
+  <block wx:if="{{store}}">
+    <view class="section"><text class="title">{{store.mallName}}</text><text>{{store.companyName || '经营主体资料待完善'}}</text><text wx:if="{{store.creditCode}}">统一社会信用代码：{{store.creditCode}}</text><text wx:if="{{store.filingNumber}}">小程序备案号：{{store.filingNumber}}</text><image wx:if="{{store.businessLicenseUrl}}" src="{{store.businessLicenseUrl}}" mode="widthFix" bindtap="onPreview" /></view>
+    <view class="section"><text class="title">配送与售后</text><text>付款后2天内发货。可配送区域和运费按收货地址计算，以结算确认金额为准。</text><text>每件商品独立生成订单。已付款订单可申请退款，收货后仍可申请质量售后；由商家审核，可批准免退货退款。</text><text>新鲜水果属于鲜活易腐商品，不适用七日无理由退货，质量问题仍提供售后。请保留商品、包装及问题照片并联系客服。</text><text>发票及购货凭证请联系客服办理。</text></view>
+    <view class="section"><text class="title">联系商家</text><text>{{store.serviceHours}}</text><button open-type="contact">在线客服</button><button wx:if="{{store.customerServicePhone}}" bindtap="onCall">{{store.customerServicePhone}}</button><text>个人信息更正、删除等请求：{{store.privacyContact || '请联系在线客服'}}</text><button bindtap="onPrivacy">隐私保护指引</button></view>
+  </block>
+</view>

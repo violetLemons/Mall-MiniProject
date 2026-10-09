@@ -56,17 +56,7 @@
     </view>
   </view>
 
-  <!-- 看广告得额度入口 -->
-  <view class="profile-card activation-card press-active" bindtap="onTapAdReward">
-    <view class="activation-entry-icon">📺</view>
-    <view class="activation-entry-meta">
-      <text class="activation-entry-title">看广告得额度</text>
-      <text class="activation-entry-desc">看完视频广告领取购物额度</text>
-    </view>
-    <view class="menu-right">
-      <view class="arrow-right"></view>
-    </view>
-  </view>
+
 
   <!-- 常用功能列表 -->
   <view class="profile-card menu-card">
@@ -205,7 +195,7 @@
                   <text class="cic-symbol">¥</text>
                   <text class="cic-amount">{{item.amount}}</text>
                 </view>
-                <text class="cic-condition">{{item.minAmount > 0 ? '满' + item.minAmount + '元可用' : '无门槛包邮'}}</text>
+                <text class="cic-condition">{{item.minAmount > 0 ? '满' + item.minAmount + '元可用' : '无门槛'}}</text>
               </view>
               <view class="cic-right">
                 <view class="cic-title-row">
@@ -386,7 +376,7 @@
             <view class="faq-head">常见咨询 FAQ</view>
             <view class="faq-item">
               <view class="faq-q">Q: 商品不合适支持 7 天退换吗？</view>
-              <view class="faq-a">A: 保持商品完好未使用、吊牌完好且包装齐全的情况下，支持 7 天无理由退换货。</view>
+              <view class="faq-a">A: 新鲜水果不适用七日无理由退货。坏果、破损、缺重等质量问题请申请售后并联系客服，收货后仍可申请，商家可审核免退货退款。</view>
             </view>
           </view>
         </view>
@@ -399,7 +389,7 @@
             <view class="setting-row">
               <view class="sr-left">
                 <text class="sr-label">本地缓存占用</text>
-                <text class="sr-desc">包含商品离线图片、临时缓存</text>
+                <text class="sr-desc">清除本机收藏、浏览历史和地址缓存</text>
               </view>
               <view class="sr-right">
                 <text class="sr-val">{{storageSize}}</text>
@@ -407,21 +397,13 @@
               </view>
             </view>
 
-            <view class="setting-row">
-              <view class="sr-left">
-                <text class="sr-label">订单状态推送通知</text>
-                <text class="sr-desc">发货、降价提醒</text>
-              </view>
-              <view class="sr-right">
-                <switch checked="{{notifyEnabled}}" color="#FF5500" bindchange="onToggleNotify" />
-              </view>
-            </view>
+
           </view>
 
           <view class="setting-group">
             <view class="setting-row">
               <text class="sr-label">应用名称</text>
-              <text class="sr-val">通用商城</text>
+              <text class="sr-val">水果商城</text>
             </view>
             <view class="setting-row">
               <text class="sr-label">当前版本</text>
@@ -433,9 +415,7 @@
             </view>
           </view>
 
-          <view class="logout-btn-wrap">
-            <button class="btn-logout press-active" bindtap="onLogout">退出登录 / 切换账号</button>
-          </view>
+
         </view>
       </block>
 

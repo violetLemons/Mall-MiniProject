@@ -5,6 +5,7 @@ import { CartService } from '../../services/cart.service';
 import { AddressService, CloudAddress } from '../../services/address.service';
 import { ActivationService, ActivationRedeemResult } from '../../services/activation.service';
 import { AdService } from '../../services/ad.service';
+import { StoreService } from '../../services/store.service';
 import { STORE_CONFIG } from '../../config/store';
 
 const STORAGE_FAV_KEY = 'sneaker_mall_favorites';
@@ -48,7 +49,8 @@ Page({
       { id: 'fav', title: '我的收藏', badge: '' },
       { id: 'history', title: '浏览历史', badge: '' },
       { id: 'address', title: '收货地址管理', badge: '' },
-      { id: 'service', title: '官方在线客服', badge: '9:00-22:00' },
+      { id: 'service', title: '在线客服', badge: '' },
+      { id: 'business', title: '商家资质与服务', badge: '' },
       { id: 'privacy', title: '隐私保护指引', badge: '' },
       { id: 'setting', title: '通用设置', badge: '' }
     ],
@@ -98,6 +100,7 @@ Page({
   },
 
   onShow() {
+    StoreService.get().then(store=>this.setData({customerServicePhone:store.customerServicePhone})).catch(()=>{});
     this.initLocalData();
     this.syncUserData().catch(() => {});
   },
@@ -465,6 +468,7 @@ Page({
   // -------------------------
   onTapMenu(e: any) {
     const id = e.currentTarget.dataset.id;
+    if (id === 'business'){wx.navigateTo({url:'/pages/business/index'});return;}
     if (id === 'privacy') { openPrivacy(); return; }
     if (id === 'coupon') {
       wx.showToast({ title: '优惠券功能暂未开放', icon: 'none' });
@@ -771,7 +775,8 @@ Page({
     setTimeout(() => {
       // 保留当前登录身份；订单和支付状态始终从云端读取
       const user = wx.getStorageSync('sneaker_mall_user');
-      wx.clearStorageSync();
+      for(const key of [STORAGE_FAV_KEY,STORAGE_HISTORY_KEY,STORAGE_ADDR_KEY])wx.removeStorageSync(key);
+      this.setData({favoriteList:[],historyList:[]});
       if (user) wx.setStorageSync('sneaker_mall_user', user);
 
       wx.hideLoading();
@@ -784,7 +789,7 @@ Page({
     const val = e.detail.value;
     this.setData({ notifyEnabled: val });
     wx.showToast({
-      title: val ? '已开启消息推送' : '已关闭消息推送',
+      title: '消息订阅暂未开放',
       icon: 'none'
     });
   },

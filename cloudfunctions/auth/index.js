@@ -141,8 +141,12 @@ exports.main = async (event, context) => {
           if(!url.startsWith('https://')&&!url.startsWith('cloud://'))throw commerce.error('INVALID_PARAMS','头像地址无效');
           avatarVersion=crypto.randomUUID();updateData.pendingAvatarUrl=url;updateData.contentSafety={version:avatarVersion,status:'PENDING'};
         }
-        await db.collection('users').doc(user._id).update({ data: updateData });
-        if(avatarVersion)await content.reviewAssets(cloud,db,'PROFILE',user._id,avatarVersion,[updateData.pendingAvatarUrl],openid);
+        await commerce.transaction(db,async tx=>{
+          const current=await commerce.get(tx,'users',user._id);
+          if(!current||(current.contentSafety?.version||null)!==(user.contentSafety?.version||null))throw commerce.error('CONFLICT','资料已变化，请刷新');
+          await tx.collection('users').doc(user._id).update({ data: updateData });
+          if(avatarVersion)await content.reviewAssets(cloud,db,'PROFILE',user._id,avatarVersion,[updateData.pendingAvatarUrl],openid,tx);
+        });
         return success({ user: { ...user, ...updateData } }, '个人资料更新成功');
       }
 

@@ -53,8 +53,11 @@ Page({
             try {
                 const product = yield product_service_1.ProductService.getDetail(id);
                 if (product) {
+                    const existing = wx.getStorageSync('sneaker_mall_history'), history = Array.isArray(existing) ? existing : [];
+                    wx.setStorageSync('sneaker_mall_history', [{ id: product.id, title: product.title, image: product.cover, price: product.price }, ...history.filter((x) => x.id !== product.id)].slice(0, 100));
                     this.setData({
                         product,
+                        isFavorite: (wx.getStorageSync('sneaker_mall_favorites') || []).some((x) => x.id === product.id),
                         loading: false
                     });
                 }
@@ -80,7 +83,12 @@ Page({
         });
     },
     onToggleFavorite() {
-        const nextState = !this.data.isFavorite;
+        const nextState = !this.data.isFavorite, p = this.data.product, id = p.id;
+        const existing = wx.getStorageSync('sneaker_mall_favorites'), favorites = Array.isArray(existing) ? existing : [];
+        const remaining = favorites.filter((x) => x.id !== id);
+        if (nextState)
+            remaining.unshift({ id, title: p.title, image: p.cover, price: p.price, skuText: '' });
+        wx.setStorageSync('sneaker_mall_favorites', remaining.slice(0, 100));
         this.setData({
             isFavorite: nextState,
             favoriteAnimating: true

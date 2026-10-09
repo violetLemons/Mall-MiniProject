@@ -29,7 +29,7 @@ function seedDemoData() {
 const initial = fs.existsSync(filename) ? JSON.parse(fs.readFileSync(filename, 'utf8')) : seedDemoData();
 const db = createDb(initial, filename), runtime = loadRuntime(db);
 const allowedOrigins = (process.env.ADMIN_ALLOWED_ORIGINS || 'http://localhost:3000,http://127.0.0.1:3000').split(',');
-const publicActions = { products: ['list', 'recommend', 'detail', 'categories', 'banners'], adminAuth: ['login'] };
+const publicActions = { products: ['list', 'recommend', 'detail', 'categories', 'banners', 'storeSettings'], adminAuth: ['login'] };
 const blocked = ['paymentCallback', 'orderTimeoutJob'];
 const rates = new Map();
 const server = http.createServer(async (req, res) => {

@@ -77,25 +77,6 @@ export const Login: React.FC = () => {
           </p>
         </div>
 
-        {/* Security Alert Banner */}
-        <div
-          style={{
-            backgroundColor: '#FFF7ED',
-            border: '1px solid #FFEDD5',
-            borderRadius: '10px',
-            padding: '12px 14px',
-            marginBottom: '24px',
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '10px'
-          }}
-        >
-          <ShieldAlert size={18} color="#EA580C" style={{ flexShrink: 0, marginTop: '2px' }} />
-          <div style={{ fontSize: '12px', color: '#9A3412', lineHeight: 1.5 }}>
-            <strong>安全基线</strong>：管理员密码采用 PBKDF2 (10,000次迭代) + 32位随机盐存储；连续5次输错自动锁定30分钟。
-          </div>
-        </div>
-
         {errorMsg && (
           <div
             style={{

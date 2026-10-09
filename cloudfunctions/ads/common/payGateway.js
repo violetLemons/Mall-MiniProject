@@ -36,6 +36,7 @@ async function request(method, path, data) {
       let raw = '';
       res.on('data', chunk => { raw += chunk; if (raw.length > 1048576) req.destroy(failure('PAYMENT_UNCERTAIN', '微信响应过大')); });
       res.on('end', () => {
+        console.info('[wechatpay]', { requestId:res.headers['request-id'] || '', httpStatus:res.statusCode });
         try {
           verify(res.headers, raw);
           const result = raw ? JSON.parse(raw) : {};
@@ -55,7 +56,9 @@ function paymentEvidence(order, result) {
   if (result.trade_state !== 'SUCCESS') return { tradeState: result.trade_state };
   if (result.amount?.currency !== 'CNY' || !Number.isSafeInteger(result.amount.total) || !result.transaction_id || !result.payer?.openid)
     throw failure('PAYMENT_EVIDENCE_INVALID', '支付凭证缺少必填字段');
-  return { tradeState: 'SUCCESS', orderId: order._id, totalFee: result.amount.total, openid: result.payer.openid, transactionId: result.transaction_id, isTest: false };
+  if (typeof result.success_time !== 'string' || !Number.isFinite(Date.parse(result.success_time)))
+    throw failure('PAYMENT_EVIDENCE_INVALID', '支付凭证缺少有效支付时间');
+  return { tradeState: 'SUCCESS', orderId: order._id, totalFee: result.amount.total, openid: result.payer.openid, transactionId: result.transaction_id, paidAt: result.success_time, isTest: false };
 }
 async function queryPayment(cloud, order) {
   const c = config();

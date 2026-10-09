@@ -126,10 +126,10 @@ export const AdminApi = {
   },
 
   // ---------------- 商品与 SKU ----------------
-  getProducts: async (filters?: { keyword?: string; categoryId?: string; status?: string }): Promise<Product[]> => {
+  getProducts: async (filters?: { keyword?: string; categoryId?: string; status?: string; page?:number }): Promise<Product[]> => {
     const res = await requestCloud<{ list: any[]; total: number }>('adminProducts', 'list', {
       ...filters,
-      page: 1,
+      page: filters?.page || 1,
       pageSize: 50
     });
     return (res.list || []).map(p => ({
@@ -276,6 +276,7 @@ export const AdminApi = {
       pageSize: filters?.pageSize || 50
     });
     return (res.list || []).map(o => ({
+      groupId:o.groupId, paymentOrderNo:o.paymentOrderNo, shippingFee:o.shippingFee, shipDeadlineAt:o.shipDeadlineAt,
       id: o._id || o.id,
       orderNo: o.orderNo,
       userId: o.userId,
@@ -314,14 +315,14 @@ export const AdminApi = {
     await requestCloud('adminOrders', 'ship', { orderId, trackingNo, logisticsCompany });
   },
 
-  reviewRefund: async (orderId: string, decision: 'APPROVE' | 'REJECT', reason = '', returnReceived = false): Promise<void> => {
-    await requestCloud('adminOrders', 'reviewRefund', { orderId, decision, reason, returnReceived });
+  reviewRefund: async (orderId: string, decision: 'APPROVE' | 'REJECT', reason = '', returnReceived = false, waiveReturn = false, waiverReason = ''): Promise<any> => {
+    return requestCloud('adminOrders', 'reviewRefund', { orderId, decision, reason, returnReceived, waiveReturn, waiverReason });
   },
 
   queryRefund: async (orderId: string): Promise<any> => requestCloud('adminOrders','queryRefund',{orderId}),
 
-  executeRefund: async (orderId: string): Promise<void> => {
-    await requestCloud('adminOrders', 'executeRefund', { orderId });
+  executeRefund: async (orderId: string): Promise<any> => {
+    return requestCloud('adminOrders', 'executeRefund', { orderId });
   },
 
   retryShippingSync: async (orderId: string): Promise<any> => {

@@ -1,17 +1,20 @@
 const c=require('./commerce'),{call,checkText}=require('./wechat');
 const COLLECTIONS={PRODUCT:'products',PROFILE:'users',BANNER:'banners',CATEGORY:'categories'};
-async function reviewAssets(cloud,db,type,id,version,assets,openid){
+async function reviewAssets(cloud,db,type,id,version,assets,openid,transaction=null){
   if(!openid)throw c.error('CONTENT_REVIEW_REQUIRED','未配置内容审核身份');
   const urls=[...new Set(assets.filter(Boolean))];
   if(!COLLECTIONS[type]||urls.length>100)throw c.error('INVALID_PARAMS','审核类型或资源数量无效');
   if(!urls.length)throw c.error('CONTENT_REVIEW_REQUIRED','缺少待审图片');
   // Persist every slot first so an early callback cannot approve a partially scheduled batch.
-  await c.transaction(db,async tx=>{ for(const asset of urls)await tx.collection('content_reviews').doc(c.key(type,id,version,asset)).set({data:{entityType:type,entityId:id,version,asset,status:'REQUESTING',createdAt:new Date()}}); });
+  const enqueue=async tx=>{ for(const asset of urls)await tx.collection('content_reviews').doc(c.key(type,id,version,asset)).set({data:{entityType:type,entityId:id,version,asset,status:'REQUESTING',attempts:0,nextAttemptAt:new Date(0),createdAt:new Date(),updatedAt:new Date(0)}}); };
+  if(transaction)await enqueue(transaction);else await c.transaction(db,enqueue);
 }
 async function processPending(cloud,db,limit=3) {
-  const pending=(await db.collection('content_reviews').where({status:'REQUESTING'}).orderBy('createdAt','asc').limit(limit).get()).data;
+  const pending=(await db.collection('content_reviews').where({status:'REQUESTING'}).orderBy('updatedAt','asc').limit(30).get()).data;
   const results=[];
   for(const row of pending) {
+    if(results.length>=limit)break;
+    if(new Date(row.nextAttemptAt||0).getTime()>Date.now())continue;
     const leased=await c.transaction(db,async tx=>{
       const current=await c.get(tx,'content_reviews',row._id);
       if(!current||current.status!=='REQUESTING'||new Date(current.submittingUntil||0).getTime()>Date.now())return false;
@@ -31,7 +34,16 @@ async function processPending(cloud,db,limit=3) {
       if(!traceId)throw c.error('CONTENT_REVIEW_REQUIRED','审核任务未返回任务号');
       await db.collection('content_reviews').doc(row._id).update({data:{traceId,status:'PENDING',updatedAt:new Date()}});
       results.push({id:row._id,status:'PENDING'});
-    }catch(e){await c.transaction(db,async tx=>{await tx.collection('content_reviews').doc(row._id).update({data:{status:'FAILED',updatedAt:new Date()}});const coll=COLLECTIONS[row.entityType],entity=await c.get(tx,coll,row.entityId);if(entity?.contentSafety?.version===row.version)await tx.collection(coll).doc(row.entityId).update({data:{contentSafety:{version:row.version,status:'REVIEW_REQUIRED'}}});});results.push({id:row._id,status:'FAILED',code:e.code||'WECHAT_UNCERTAIN'});}
+    }catch(e){
+      const attempts=(row.attempts||0)+1,terminal=e.code==='INVALID_PARAMS'||attempts>=6;
+      await c.transaction(db,async tx=>{
+        const current=await c.get(tx,'content_reviews',row._id);
+        if(!current||current.status!=='REQUESTING')return;
+        await tx.collection('content_reviews').doc(row._id).update({data:{status:terminal?'FAILED':'REQUESTING',attempts,submittingUntil:null,lastError:e.code||'WECHAT_UNCERTAIN',nextAttemptAt:new Date(Date.now()+Math.min(3600000,60000*2**attempts)),updatedAt:new Date()}});
+        const coll=COLLECTIONS[row.entityType],entity=await c.get(tx,coll,row.entityId);
+        if(terminal&&entity?.contentSafety?.version===row.version)await tx.collection(coll).doc(row.entityId).update({data:{contentSafety:{version:row.version,status:'REVIEW_REQUIRED'}}});
+      });results.push({id:row._id,status:terminal?'FAILED':'REQUESTING',code:e.code||'WECHAT_UNCERTAIN'});
+    }
   }
   return results;
 }

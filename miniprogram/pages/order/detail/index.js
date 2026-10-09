@@ -41,8 +41,24 @@ Page({
         const identifier = (options === null || options === void 0 ? void 0 : options.orderNo) || (options === null || options === void 0 ? void 0 : options.order_no) || (options === null || options === void 0 ? void 0 : options.outTradeNo) || (options === null || options === void 0 ? void 0 : options.out_trade_no) || (options === null || options === void 0 ? void 0 : options.order_id) || (options === null || options === void 0 ? void 0 : options.orderId) || (options === null || options === void 0 ? void 0 : options.id) || '';
         this.loadOrder(identifier, options);
     },
+    onShow() {
+        return __awaiter(this, void 0, void 0, function* () {
+            var _a, _b;
+            const id = ((_a = this.data.order) === null || _a === void 0 ? void 0 : _a._id) || ((_b = this.data.order) === null || _b === void 0 ? void 0 : _b.id);
+            if (!id)
+                return;
+            if (['PENDING_PAYMENT', 'CLOSING'].includes(this.data.order.status)) {
+                try {
+                    yield order_service_1.OrderService.queryPayment(id);
+                }
+                catch (_) { }
+            }
+            yield this.loadOrder(id);
+        });
+    },
     loadOrder(idOrNo, options) {
         return __awaiter(this, void 0, void 0, function* () {
+            var _a;
             if (!idOrNo) {
                 this.setData({ loading: false, errorMessage: '未指定订单查询编号' });
                 return;
@@ -61,7 +77,7 @@ Page({
                         : []);
                 const shipments = rawShipments.map(s => (Object.assign(Object.assign({}, s), { shippedAtFormatted: formatDateTime(s.shippedAt) })));
                 this.setData({
-                    order: Object.assign(Object.assign({}, order), { statusLabel: STATUS_LABEL[order.status] || order.status, paymentStatusLabel: isPaid ? '已支付' : '待付款', isExpress, hasShipment: shipments.length > 0, shipments, payAmountYuan: (Number(order.payAmount || 0) / 100).toFixed(2), totalAmountYuan: (Number(order.totalAmount || order.payAmount || 0) / 100).toFixed(2), createdAtFormatted: formatDateTime(order.createdAt || order.createTime), paidAtFormatted: formatDateTime(order.paidAt || order.payTime), shippedAtFormatted: formatDateTime(order.shippedAt || order.shippingTime), items: (order.items || []).map(item => (Object.assign(Object.assign({}, item), { unitPriceYuan: (Number(item.unitPrice || 0) / 100).toFixed(2), totalAmountYuan: (Number(item.totalAmount || 0) / 100).toFixed(2) }))) }),
+                    order: Object.assign(Object.assign({}, order), { statusLabel: STATUS_LABEL[order.status] || order.status, paymentStatusLabel: isPaid ? '已支付' : '待付款', isExpress, hasShipment: shipments.length > 0, shipments, shippingFeeYuan: ((order.shippingFee || 0) / 100).toFixed(2), goodsAmountYuan: (((_a = order.goodsAmount) !== null && _a !== void 0 ? _a : order.totalAmount - (order.shippingFee || 0)) / 100).toFixed(2), balanceAmountYuan: ((order.balanceAmount || 0) / 100).toFixed(2), payAmountYuan: (Number(order.payAmount || 0) / 100).toFixed(2), totalAmountYuan: (Number(order.totalAmount || order.payAmount || 0) / 100).toFixed(2), createdAtFormatted: formatDateTime(order.createdAt || order.createTime), paidAtFormatted: formatDateTime(order.paidAt || order.payTime), shippedAtFormatted: formatDateTime(order.shippedAt || order.shippingTime), items: (order.items || []).map(item => (Object.assign(Object.assign({}, item), { unitPriceYuan: (Number(item.unitPrice || 0) / 100).toFixed(2), totalAmountYuan: (Number(item.totalAmount || 0) / 100).toFixed(2) }))) }),
                     loading: false,
                     errorMessage: ''
                 });
@@ -102,7 +118,10 @@ Page({
         return __awaiter(this, void 0, void 0, function* () {
             var _a, _b, _c;
             const id = ((_a = this.data.order) === null || _a === void 0 ? void 0 : _a._id) || ((_b = this.data.order) === null || _b === void 0 ? void 0 : _b.id) || ((_c = this.data.order) === null || _c === void 0 ? void 0 : _c.orderNo);
-            if (!id)
+            if (!id || this.data.submitting)
+                return;
+            const response = yield new Promise(resolve => { var _a; return wx.showModal({ title: '取消付款', content: ((_a = this.data.order) === null || _a === void 0 ? void 0 : _a.groupId) ? '将取消本次付款对应的全部待付款订单。' : '确认取消此订单？', success: resolve }); });
+            if (!response.confirm)
                 return;
             try {
                 yield order_service_1.OrderService.cancelOrder(id);
@@ -116,16 +135,16 @@ Page({
     },
     onApplyRefund() {
         return __awaiter(this, void 0, void 0, function* () {
-            var _a, _b;
+            var _a, _b, _c;
             const id = ((_a = this.data.order) === null || _a === void 0 ? void 0 : _a._id) || ((_b = this.data.order) === null || _b === void 0 ? void 0 : _b.id);
             if (!id || this.data.submitting)
                 return;
-            const response = yield new Promise(resolve => wx.showModal({ title: '申请整单退款', content: '已发货订单需要退货并由管理员确认。请输入原因。', editable: true, placeholderText: '退款原因', success: resolve }));
+            const response = yield new Promise(resolve => { var _a; return wx.showModal({ title: ((_a = this.data.order) === null || _a === void 0 ? void 0 : _a.status) === 'COMPLETED' ? '质量售后' : '申请退款', content: '此商品订单由商家审核退款。质量问题可审核免退货，请说明原因。', editable: true, placeholderText: '退款原因', success: resolve }); });
             if (!response.confirm || !String(response.content || '').trim())
                 return;
             this.setData({ submitting: true });
             try {
-                yield order_service_1.OrderService.applyRefund(id, String(response.content).trim());
+                yield order_service_1.OrderService.applyRefund(id, String(response.content).trim(), ((_c = this.data.order) === null || _c === void 0 ? void 0 : _c.status) === 'COMPLETED');
                 wx.showToast({ title: '已提交退款申请', icon: 'success' });
                 yield this.loadOrder(id);
             }

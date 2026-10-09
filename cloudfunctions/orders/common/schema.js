@@ -1,5 +1,6 @@
 // Single source of truth for collection/index setup. Client access is always private.
 module.exports = [
+  {name:'store_settings',desc:'商家公开资料与配送计费配置',indexes:[],securityRules:{read:false,write:false}},
   {
     "name": "users",
     "desc": "终端微信用户表",
@@ -200,6 +201,9 @@ module.exports = [
     "name": "orders",
     "desc": "单商户交易与快递履约订单",
     "indexes": [
+      { "name":"buyer_unit_created", "key":{"userId":1,"isPaymentGroup":1,"createdAt":-1} },
+      { "name":"unit_status_created", "key":{"isPaymentGroup":1,"status":1,"createdAt":-1} },
+      { "name":"payment_expiry_rotation", "key":{"status":1,"isChildOrder":1,"updatedAt":1,"expireAt":1} },
       {
         "name": "idx_order_no",
         "key": {
@@ -321,7 +325,7 @@ module.exports = [
   },
   {
     "name": "refund_records",
-    "desc": "整单退款申请与现金/额度流水",
+    "desc": "单件订单退款与原交易现金/额度流水",
     "indexes": [
       {
         "name": "idx_out_refund_no",
@@ -347,6 +351,7 @@ module.exports = [
         "key": {
           "status": 1,
           "isTest": 1,
+          "requiresAction": 1,
           "lastCheckedAt": 1
         }
       }
@@ -644,7 +649,7 @@ module.exports = [
         "name": "queue",
         "key": {
           "status": 1,
-          "createdAt": 1
+          "updatedAt": 1
         }
       }
     ],

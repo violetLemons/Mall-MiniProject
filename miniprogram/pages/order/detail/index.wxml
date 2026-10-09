@@ -12,7 +12,7 @@
     <view class="status-card">
       <view class="status-main">
         <text class="status-title">{{order.statusLabel}}</text>
-        <text class="status-badge {{order.status}}">极速快递</text>
+        <text class="status-badge {{order.status}}">快递配送</text>
       </view>
       <view class="status-sub-row" bindtap="onCopyOrderNo">
         <text class="status-sub">订单编号：{{order.orderNo}}</text>
@@ -25,7 +25,7 @@
     <view wx:if="{{order.isExpress}}" class="detail-card delivery-card">
       <view class="card-header">
         <text class="card-title">配送信息</text>
-        <text class="card-tag">极速快递包邮</text>
+        <text class="card-tag">付款后2天内发货</text>
       </view>
       <view class="address-box">
         <view class="contact-row">
@@ -90,12 +90,14 @@
     <view class="detail-card amount-card">
       <view class="amount-row">
         <text class="amount-label">商品总额</text>
-        <text class="amount-val">¥{{order.totalAmountYuan || order.payAmountYuan}}</text>
+        <text class="amount-val">¥{{order.goodsAmountYuan}}</text>
       </view>
       <view class="amount-row">
         <text class="amount-label">配送运费</text>
-        <text class="amount-val green-text">包邮 ¥0.00</text>
+        <text class="amount-val green-text">¥{{order.shippingFeeYuan}}</text>
       </view>
+      <view class="amount-row"><text class="amount-label">购物额度抵扣</text><text class="amount-val">¥{{order.balanceAmountYuan}}</text></view>
+      <view wx:if="{{order.groupId && order.status === 'PENDING_PAYMENT'}}" class="amount-row"><text class="amount-label">本批次现金付款</text><text class="amount-val">¥{{order.paymentTotalCash / 100}}</text></view>
       <view class="amount-row total-row">
         <text class="total-label">实付金额</text>
         <view class="total-val-wrap">
@@ -130,7 +132,7 @@
     </view>
 
     <!-- 6. 底部操作栏 -->
-    <view wx:if="{{order.status === 'PENDING_PAYMENT' || order.status === 'CLOSING' || order.status === 'PAID' || order.status === 'SHIPPED' || (order.status === 'COMPLETED' && !order.reviewed)}}" class="detail-actions">
+    <view wx:if="{{order.status === 'PENDING_PAYMENT' || order.status === 'CLOSING' || order.status === 'PAID' || order.status === 'SHIPPED' || order.status === 'COMPLETED'}}" class="detail-actions">
       <block wx:if="{{order.status === 'PENDING_PAYMENT'}}">
         <button class="pay-btn" bindtap="onPay" loading="{{submitting}}">立即支付</button>
         <button class="secondary cancel-btn" bindtap="onCancel">取消订单</button>
@@ -142,7 +144,7 @@
       <block wx:elif="{{order.status === 'COMPLETED' && !order.reviewed}}">
         <button class="review-btn" bindtap="onOpenReview">去评价</button>
       </block>
-      <button wx:if="{{order.status === 'PAID' || order.status === 'SHIPPED'}}" class="secondary" bindtap="onApplyRefund" loading="{{submitting}}">申请整单退款</button>
+      <button wx:if="{{!order.isPaymentGroup && (order.status === 'PAID' || order.status === 'SHIPPED' || order.status === 'COMPLETED')}}" class="secondary" bindtap="onApplyRefund" loading="{{submitting}}">{{order.status === 'COMPLETED' ? '质量售后' : '申请退款'}}</button>
     </view>
   </block>
 

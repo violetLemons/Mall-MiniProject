@@ -62,6 +62,9 @@ Page({
 
   async onCancel(e: any) {
     const id = e.currentTarget.dataset.id;
+    const order=this.data.orders.find(o=>(o._id || o.id)===id);
+    const response=await new Promise<any>(resolve=>wx.showModal({title:'取消付款',content:order?.groupId ? '将取消本次付款对应的全部待付款订单。' : '确认取消此订单？',success:resolve}));
+    if(!response.confirm)return;
     try { await OrderService.cancelOrder(id); wx.showToast({ title: '订单已取消', icon: 'success' }); this.loadOrders(); }
     catch (err: any) { wx.showToast({ title: err?.message || '取消失败', icon: 'none' }); }
   },

@@ -14,8 +14,8 @@
 
   <view class="checkout-card">
     <text class="checkout-title">配送方式</text>
-    <view>快递配送</view>
-    <!-- 顺丰快递包邮：收货地址展示区域 -->
+    <view>快递配送 · 付款后2天内发货</view>
+    <!-- 收货地址 -->
     <view class="address-row" bindtap="onOpenAddressPicker">
       <view wx:if="{{selectedAddress}}" class="addr-content-box">
         <view class="addr-head-row">
@@ -45,6 +45,9 @@
       <text class="fee-label">商品合计</text>
       <c-price price="{{totalPrice}}" size="md" />
     </view>
+    <view class="fee-row"><text class="fee-label">配送运费</text><c-price price="{{shippingFee}}" size="md" /></view>
+    <view wx:if="{{quoteLoading}}">正在核对配送报价...</view>
+    <view wx:if="{{quoteError}}">{{quoteError}}</view>
     <view class="fee-row" wx:if="{{balanceDeduction > 0}}">
       <text class="fee-label">购物额度抵扣</text>
       <view class="fee-deduct">-<c-price price="{{balanceDeduction}}" size="md" /></view>

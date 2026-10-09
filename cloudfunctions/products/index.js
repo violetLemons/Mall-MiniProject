@@ -93,6 +93,7 @@ exports.main = async (event, context) => {
 
   try {
     switch (action) {
+      case 'storeSettings': return success(await require('./common/storeSettings').read(db));
       /**
        * 1. 首页推荐商品 (猜你喜欢瀑布流)
        */

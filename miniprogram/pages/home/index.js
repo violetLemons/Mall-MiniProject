@@ -9,11 +9,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const store_service_1 = require("../../services/store.service");
 const banner_service_1 = require("../../services/banner.service");
 const category_service_1 = require("../../services/category.service");
 const product_service_1 = require("../../services/product.service");
 Page({
     data: {
+        store: null,
         banners: [],
         bannerCurrent: 0,
         categories: [],
@@ -28,6 +30,7 @@ Page({
     },
     onLoad() {
         this.initData();
+        store_service_1.StoreService.get().then(store => this.setData({ store })).catch(() => { });
     },
     initData() {
         return __awaiter(this, void 0, void 0, function* () {
@@ -56,6 +59,7 @@ Page({
             }
         });
     },
+    onBusiness() { wx.navigateTo({ url: '/pages/business/index' }); },
     onRetry() { this.initData(); },
     onBannerChange(e) {
         this.setData({ bannerCurrent: e.detail.current });

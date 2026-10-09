@@ -20,6 +20,9 @@ function formatDateTime(val: any): string {
 
 type OrderViewModel = OrderModel & {
   payAmountYuan?: string;
+  shippingFeeYuan?: string;
+  goodsAmountYuan?: string;
+  balanceAmountYuan?: string;
   totalAmountYuan?: string;
   statusLabel?: string;
   paymentStatusLabel?: string;
@@ -46,6 +49,13 @@ Page({
   onLoad(options: any) {
     const identifier = options?.orderNo || options?.order_no || options?.outTradeNo || options?.out_trade_no || options?.order_id || options?.orderId || options?.id || '';
     this.loadOrder(identifier, options);
+  },
+
+  async onShow() {
+    const id=this.data.order?._id || this.data.order?.id;
+    if(!id)return;
+    if(['PENDING_PAYMENT','CLOSING'].includes(this.data.order!.status)) { try { await OrderService.queryPayment(id); } catch (_) {} }
+    await this.loadOrder(id);
   },
 
   async loadOrder(idOrNo: string, options?: any) {
@@ -76,6 +86,9 @@ Page({
           isExpress,
           hasShipment: shipments.length > 0,
           shipments,
+          shippingFeeYuan: ((order.shippingFee || 0)/100).toFixed(2),
+          goodsAmountYuan: ((order.goodsAmount ?? order.totalAmount-(order.shippingFee||0))/100).toFixed(2),
+          balanceAmountYuan: ((order.balanceAmount||0)/100).toFixed(2),
           payAmountYuan: (Number(order.payAmount || 0) / 100).toFixed(2),
           totalAmountYuan: (Number(order.totalAmount || order.payAmount || 0) / 100).toFixed(2),
           createdAtFormatted: formatDateTime(order.createdAt || (order as any).createTime),
@@ -119,7 +132,9 @@ Page({
 
   async onCancel() {
     const id = this.data.order?._id || this.data.order?.id || this.data.order?.orderNo;
-    if (!id) return;
+    if (!id || this.data.submitting) return;
+    const response=await new Promise<any>(resolve=>wx.showModal({title:'取消付款',content:this.data.order?.groupId ? '将取消本次付款对应的全部待付款订单。' : '确认取消此订单？',success:resolve}));
+    if(!response.confirm)return;
     try {
       await OrderService.cancelOrder(id);
       wx.showToast({ title: '订单已取消', icon: 'success' });
@@ -132,10 +147,10 @@ Page({
   async onApplyRefund() {
     const id=this.data.order?._id || this.data.order?.id;
     if(!id||this.data.submitting)return;
-    const response=await new Promise<any>(resolve=>wx.showModal({title:'申请整单退款',content:'已发货订单需要退货并由管理员确认。请输入原因。',editable:true,placeholderText:'退款原因',success:resolve}));
+    const response=await new Promise<any>(resolve=>wx.showModal({title:this.data.order?.status==='COMPLETED'?'质量售后':'申请退款',content:'此商品订单由商家审核退款。质量问题可审核免退货，请说明原因。',editable:true,placeholderText:'退款原因',success:resolve}));
     if(!response.confirm||!String(response.content||'').trim())return;
     this.setData({submitting:true});
-    try{await OrderService.applyRefund(id,String(response.content).trim());wx.showToast({title:'已提交退款申请',icon:'success'});await this.loadOrder(id);}catch(e:any){wx.showToast({title:e.message||'申请失败',icon:'none'});}finally{this.setData({submitting:false});}
+    try{await OrderService.applyRefund(id,String(response.content).trim(),this.data.order?.status==='COMPLETED');wx.showToast({title:'已提交退款申请',icon:'success'});await this.loadOrder(id);}catch(e:any){wx.showToast({title:e.message||'申请失败',icon:'none'});}finally{this.setData({submitting:false});}
   },
 
   async onConfirmReceive() {

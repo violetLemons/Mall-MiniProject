@@ -15,8 +15,8 @@
   <!-- 购物车列表 -->
   <view wx:else class="cart-content">
     <view class="cart-tips-bar">
-      <text class="tip-badge">全场包邮</text>
-      <text class="tip-text">全场极速快递包邮 · 支持正品防伪双验</text>
+      <text class="tip-badge">快递配送</text>
+      <text class="tip-text">付款后2天内发货 · 运费按收货区域计算</text>
     </view>
 
     <view class="cart-list">

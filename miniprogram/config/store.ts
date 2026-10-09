@@ -9,7 +9,7 @@ export interface StoreConfig {
 }
 
 export const STORE_CONFIG: StoreConfig = {
-  mallName: '通用商城',
-  brandTitle: '通用商城',
+  mallName: '水果商城',
+  brandTitle: '水果商城',
   customerServicePhone: ''
 };

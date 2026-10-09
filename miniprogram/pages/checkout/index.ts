@@ -4,6 +4,7 @@ import { OrderService } from '../../services/order.service';
 import { AuthService } from '../../services/auth.service';
 
 const CHECKOUT_KEY = 'sneaker_checkout_items';
+const INTENT_KEY = 'mall_checkout_intent';
 const LAST_USED_ADDR_KEY = 'sneaker_last_used_address_id';
 
 function maskPhone(phone: string): string {
@@ -18,6 +19,11 @@ Page({
   data: {
     items: [] as CartItemModel[],
     totalPrice: 0,
+    shippingFee: 0,
+    quoteKey: '',
+    quoteError: '',
+    quoteLoading: false,
+    quoteVersion: 0,
     balance: 0,             // 可用购物额度（分）
     balanceDeduction: 0,    // 本单抵扣额度（分）
     payAmount: 0,
@@ -55,7 +61,8 @@ Page({
   },
 
   async onLoad(options?: any) {
-    const items = wx.getStorageSync(CHECKOUT_KEY);
+    const intent = wx.getStorageSync(INTENT_KEY);
+    const items = intent?.itemsSnapshot || wx.getStorageSync(CHECKOUT_KEY);
     if (!Array.isArray(items) || items.length === 0) {
       wx.showToast({ title: '没有待结算商品', icon: 'none' });
       setTimeout(() => wx.navigateBack(), 500);
@@ -64,7 +71,7 @@ Page({
 
     const lastAddrId = wx.getStorageSync(LAST_USED_ADDR_KEY) || '';
 
-    const requestId = `checkout_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+    const requestId = intent?.params?.requestId || `checkout_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
     this.setData({
       items,
       requestId,
@@ -88,8 +95,8 @@ Page({
   calculateTotal() {
     const totalPrice = this.data.items.reduce((sum, item) => sum + item.price * item.count, 0);
     const balance = Math.max(0, Number(this.data.balance) || 0);
-    const balanceDeduction = Math.min(balance, totalPrice);
-    const payAmount = totalPrice - balanceDeduction;
+    const balanceDeduction = Math.min(balance, totalPrice + this.data.shippingFee);
+    const payAmount = totalPrice + this.data.shippingFee - balanceDeduction;
     this.setData({ totalPrice, balanceDeduction, payAmount });
   },
 
@@ -117,6 +124,7 @@ Page({
     try {
       const list = (await AddressService.list()) || [];
       this.applyAddressRules(list, allowAutoPop);
+      await this.refreshQuote();
     } catch (err) {
       console.error('[checkout] load address list error:', err);
       wx.showToast({ title: '加载地址失败，请重试', icon: 'none' });
@@ -185,7 +193,7 @@ Page({
     // 情况 3: 2 个地址
     if (list.length === 2) {
       // 优先默认地址
-      let chosen = list.find(a => a.isDefault);
+      let chosen = list.find(a=>(a.id || (a as any)._id)===this.data.selectedAddressId) || list.find(a => a.isDefault);
       // 无默认地址则优先最近使用地址
       if (!chosen && lastUsedId) {
         chosen = list.find(a => (a.id || (a as any)._id) === lastUsedId);
@@ -209,7 +217,7 @@ Page({
     // 情况 4: 超过 2 个地址 (addressList.length > 2)
     if (list.length > 2) {
       // 初始候选地址
-      let chosen = list.find(a => a.isDefault);
+      let chosen = list.find(a=>(a.id || (a as any)._id)===this.data.selectedAddressId) || list.find(a => a.isDefault);
       if (!chosen && lastUsedId) {
         chosen = list.find(a => (a.id || (a as any)._id) === lastUsedId);
       }
@@ -261,6 +269,7 @@ Page({
         lastSelectedAddressId: id,
         showAddressPickerModal: false
       });
+      this.refreshQuote();
     }
   },
 
@@ -388,12 +397,30 @@ Page({
 
       wx.hideLoading();
       wx.showToast({ title: '收货地址已添加并选中', icon: 'success' });
+      await this.refreshQuote();
     } catch (saveErr: any) {
       wx.hideLoading();
       wx.showToast({ title: saveErr?.message || '保存地址失败，请重试', icon: 'none' });
     } finally {
       this.setData({ savingAddress: false });
     }
+  },
+
+  buildParams() {
+    return {items:this.data.items.map(item=>({skuId:item.skuId || '',count:item.count,cartId:item.cartId || (item.id?.startsWith('buy_')?undefined:item.id)})),addressId:this.data.selectedAddressId,requestId:this.data.requestId};
+  },
+
+  async refreshQuote() {
+    if(!this.data.selectedAddressId)return;
+    const version=this.data.quoteVersion+1;
+    this.setData({quoteVersion:version,quoteLoading:true,quoteError:'',quoteKey:''});
+    try {
+      const quote=await OrderService.quote(this.buildParams());
+      if(this.data.quoteVersion!==version)return;
+      this.setData({totalPrice:quote.goodsAmount,shippingFee:quote.shippingFee,balanceDeduction:quote.balanceAmount,payAmount:quote.payAmount,quoteKey:quote.quoteKey});
+    } catch(e:any) {
+      if(this.data.quoteVersion===version)this.setData({quoteError:e.message || '配送报价失败'});
+    } finally {if(this.data.quoteVersion===version)this.setData({quoteLoading:false});}
   },
 
   /**
@@ -404,7 +431,7 @@ Page({
 
     // 快递订单严格检查收货地址
     {
-      if (!this.data.selectedAddress || !(this.data.selectedAddress.id || (this.data.selectedAddress as any)._id)) {
+      if (!wx.getStorageSync(INTENT_KEY) && (!this.data.selectedAddress || !(this.data.selectedAddress.id || (this.data.selectedAddress as any)._id))) {
         wx.showToast({ title: '请选择收货地址', icon: 'none' });
         return;
       }
@@ -416,35 +443,19 @@ Page({
     wx.showLoading({ title: '创建订单中...' });
 
     try {
-      // 快递订单必须包含未脱敏真实手机号快照
-      const selectedAddr = this.data.selectedAddress;
-      const unmaskedPhone = selectedAddr ? selectedAddr.phone : '';
-
-      const receiverSnapshot = selectedAddr ? {
-        name: selectedAddr.name,
-        phone: unmaskedPhone, // 完整真实手机号，严禁脱敏入库
-        province: selectedAddr.province,
-        city: selectedAddr.city,
-        district: selectedAddr.district || '',
-        detail: selectedAddr.detail,
-        tag: selectedAddr.tag || ''
-      } : undefined;
-
-      const result = await OrderService.createOrder({
-        items: this.data.items.map(item => ({
-          skuId: item.skuId || '',
-          count: item.count,
-          cartId: item.cartId || (item.id?.startsWith('buy_') ? undefined : item.id),
-          productId: item.productId,
-          productName: item.title,
-          image: item.image,
-          price: item.price
-        })),
-        addressId: this.data.selectedAddressId,
-        shippingAddress: receiverSnapshot,
-        receiverSnapshot: receiverSnapshot,
-        requestId: this.data.requestId
-      });
+      let intent=wx.getStorageSync(INTENT_KEY);
+      if(!intent) {
+        const params=this.buildParams(),quote=await OrderService.quote(params);
+        this.setData({totalPrice:quote.goodsAmount,shippingFee:quote.shippingFee,balanceDeduction:quote.balanceAmount,payAmount:quote.payAmount,quoteKey:quote.quoteKey});
+        wx.hideLoading();
+        const confirmed=await new Promise<any>(resolve=>wx.showModal({title:'确认付款金额',content:`商品 ¥${(quote.goodsAmount/100).toFixed(2)}，运费 ¥${(quote.shippingFee/100).toFixed(2)}，额度抵扣 ¥${(quote.balanceAmount/100).toFixed(2)}，现金 ¥${(quote.payAmount/100).toFixed(2)}。共 ${quote.orderCount} 件，按件生成订单。`,success:resolve}));
+        if(!confirmed.confirm)return;
+        intent={params:{...params,quoteKey:quote.quoteKey},itemsSnapshot:this.data.items};
+        wx.setStorageSync(INTENT_KEY,intent);
+      }
+      // Replay the persisted request after a timeout, including across page re-entry.
+      const result = await OrderService.createOrder(intent.params);
+      wx.removeStorageSync(INTENT_KEY);
 
       console.log(`[CHECKOUT-02] 商城订单创建成功 (orderId: ${result.orderId}), 耗时: ${Date.now() - checkoutStart}ms`);
 
@@ -496,7 +507,7 @@ Page({
         });
         wx.showToast({ title: payErr?.message || '支付未完成，订单已保留在待付款', icon: 'none' });
         setTimeout(() => {
-          wx.redirectTo({ url: `/pages/order/detail/index?id=${result.orderId}` });
+          wx.redirectTo({ url: `/pages/order/detail/index?id=${result.orderIds?.[0] || result.orderId}` });
         }, 1500);
       }
     } catch (createErr: any) {
@@ -509,7 +520,9 @@ Page({
         stack: createErr?.stack,
         raw: createErr?.rawError || createErr
       });
-      wx.showToast({ title: createErr?.message || '创建订单失败，请重试', icon: 'none' });
+      const definitive=['QUOTE_CHANGED','INVALID_PARAMS','INVALID_ADDRESS','DELIVERY_UNAVAILABLE','SKU_NOT_FOUND','PRODUCT_OFF_SALE','INVALID_SKU','PERMISSION_DENIED','USER_NOT_FOUND'];
+      if(definitive.includes(createErr?.code)){wx.removeStorageSync(INTENT_KEY);await this.refreshQuote();}
+      wx.showToast({ title: createErr?.message || '下单结果未确认，请重试核对原请求', icon: 'none' });
     } finally {
       try { wx.hideLoading(); } catch (_) {}
       this.setData({ submitting: false, paying: false });

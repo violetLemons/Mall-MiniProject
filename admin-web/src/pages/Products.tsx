@@ -36,6 +36,8 @@ export const Products: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page,setPage]=useState(1);
+  const productRequest=React.useRef(0);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'ON_SALE' | 'OFF_SALE' | 'DELETED'
@@ -80,19 +82,20 @@ export const Products: React.FC = () => {
   };
 
   const loadProducts = async () => {
+    const version=++productRequest.current;
     setLoading(true);
     try {
-      const filters: any = {};
+      const filters: any = {page};
       if (statusFilter !== 'ALL') filters.status = statusFilter;
       if (categoryFilter) filters.categoryId = categoryFilter;
       if (searchKeyword.trim()) filters.keyword = searchKeyword.trim();
       const list = await AdminApi.getProducts(filters);
-      setProducts(list);
+      if(version===productRequest.current)setProducts(list);
     } catch (err: any) {
       console.error('[loadProducts] Error:', err);
       toast(err.message || '加载商品列表失败，请检查云端连接', 'error');
     } finally {
-      setLoading(false);
+      if(version===productRequest.current)setLoading(false);
     }
   };
 
@@ -102,11 +105,12 @@ export const Products: React.FC = () => {
 
   useEffect(() => {
     loadProducts();
-  }, [statusFilter, categoryFilter]);
+  }, [statusFilter, categoryFilter, page]);
+  useEffect(()=>{setPage(1);},[statusFilter,categoryFilter]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    loadProducts();
+    if(page!==1)setPage(1);else loadProducts();
   };
 
   const handleToggleStatus = async (product: Product) => {
@@ -614,6 +618,7 @@ export const Products: React.FC = () => {
         </table>
       </div>
 
+      <div style={{display:"flex",alignItems:"center",gap:12,marginTop:16}}><button disabled={loading||page<=1} onClick={()=>setPage(page-1)}>上一页</button><span>第 {page} 页</span><button disabled={loading||products.length<50} onClick={()=>setPage(page+1)}>下一页</button></div>
       {/* Edit / Create Product Modal */}
       <Modal
         isOpen={editModalOpen}

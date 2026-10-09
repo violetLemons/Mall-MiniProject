@@ -38,9 +38,9 @@ async function saveCatalog(cloud, db, admin, type, action, params) {
       if ((await tx.collection('categories').where({ parentId: id }).limit(1).get()).data.length) throw c.error('CATEGORY_HAS_CHILDREN', '已有子分类的分类不能降为二级');
     }
     await tx.collection(collection).doc(id).set({ data: row });
+    if (isImage) await safety.reviewAssets(cloud, db, type, id, version, [image], process.env.CONTENT_SECURITY_OPENID, tx);
     await tx.collection('operation_logs').add({ data: { adminId: admin.adminId, action, resourceType: type, resourceId: id, createdAt: new Date() } });
   });
-  if (isImage) await safety.reviewAssets(cloud, db, type, id, version, [image], process.env.CONTENT_SECURITY_OPENID);
   return { [type === 'CATEGORY' ? 'categoryId' : 'bannerId']: id, status: row.status };
 }
 module.exports = { saveCatalog };

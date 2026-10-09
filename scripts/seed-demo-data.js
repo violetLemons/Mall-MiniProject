@@ -33,7 +33,7 @@ const DEMO_PRODUCTS = [
     cover: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=800',
     images: ['https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=800'],
     minPrice: 3990,
-    maxPrice: 5990,
+    maxPrice: 3990,
     sales: 320,
     status: 'ON_SALE',
     tags: ['新鲜', '脆甜'],
@@ -148,7 +148,6 @@ const DEMO_PRODUCTS = [
 
 const DEMO_SKUS = [
   { _id: 'sku_apple_5', productId: 'prod_apple_fuji', skuCode: 'FRUIT-APPLE-5', colorName: '5斤装', size: 5, price: 3990, status: 'ACTIVE' },
-  { _id: 'sku_apple_10', productId: 'prod_apple_fuji', skuCode: 'FRUIT-APPLE-10', colorName: '10斤装', size: 10, price: 5990, status: 'ACTIVE' },
   { _id: 'sku_banana_3', productId: 'prod_banana_hi', skuCode: 'FRUIT-BANANA-3', colorName: '3斤装', size: 3, price: 1990, status: 'ACTIVE' },
   { _id: 'sku_orange_5', productId: 'prod_orange_gan', skuCode: 'FRUIT-ORANGE-5', colorName: '5斤装', size: 5, price: 4990, status: 'ACTIVE' },
   { _id: 'sku_blueberry_2', productId: 'prod_blueberry', skuCode: 'FRUIT-BLUEBERRY-2', colorName: '2盒装', size: 2, price: 2990, status: 'ACTIVE' },
@@ -176,6 +175,9 @@ const DEMO_BANNERS = [
     status: 'ACTIVE'
   }
 ];
+
+// Production candidates stay offline until merchant details and content checks pass.
+for (const product of DEMO_PRODUCTS) { product.sales=0; product.status='OFF_SALE'; }
 
 console.log('Demo Seed Data Ready. To import into CloudBase, use the cloud database dashboard.');
 

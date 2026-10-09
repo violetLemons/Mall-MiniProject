@@ -14,6 +14,7 @@ test('production handlers require identity and only SUPER_ADMIN login',async()=>
   assert.equal((await call('adminAuth','login',{username:'old-merchant',password:'long-test-password'})).code,'AUTH_FAILED');
   assert.equal((await call('adminUsers','create',{username:'bad',password:'long-test-password',role:'MERCHANT'})).code,'INVALID_PARAMS');
 });
+
 test('buyer order endpoints list/detail use orders and enforce ownership',async()=>{
   const create=await call('orders','create',input(),true);assert.equal(create.success,true);const id=create.data.orderId;
   assert.equal((await call('orders','detail',{id},true)).data._id,id);
@@ -81,7 +82,7 @@ function notification(type,data,id='evt'){
 test('HTTP payment callback ACK follows durable transaction, failures can retry safely',async()=>{
   const r=await call('orders','create',input(),true),id=r.data.orderId;
   await db.collection('orders').doc(id).update({data:{isTest:false}});
-  const data={appid:'wx-test',mchid:'123',out_trade_no:r.data.orderNo,trade_state:'SUCCESS',transaction_id:'REAL_TEST_TX',amount:{total:1000,currency:'CNY'},payer:{openid:'buyer'}},event=notification('TRANSACTION.SUCCESS',data,'pay-evt');
+  const data={appid:'wx-test',mchid:'123',out_trade_no:r.data.orderNo,trade_state:'SUCCESS',success_time:new Date().toISOString(),transaction_id:'REAL_TEST_TX',amount:{total:1000,currency:'CNY'},payer:{openid:'buyer'}},event=notification('TRANSACTION.SUCCESS',data,'pay-evt');
   db.injectFailure(name=>name==='payment_transactions');const failed=await runtime.call('paymentCallback',event);assert.equal(failed.statusCode,500);assert.equal((await c.get(db,'orders',id)).status,'PENDING_PAYMENT');
   db.injectFailure(null);assert.equal((await runtime.call('paymentCallback',event)).statusCode,200);assert.equal((await runtime.call('paymentCallback',event)).statusCode,200);
   assert.equal(db.snapshot().payment_transactions.filter(t=>t.transactionId==='REAL_TEST_TX').length,1);
@@ -142,27 +143,31 @@ test('banner and category edits are reviewed, protected fields and hierarchy can
   assert.equal((await call('adminCategories','create',{name:'三级',icon:'🍎',parentId:child.data.categoryId})).success,false);
   delete runtime.cloud.openapi;
 });
-test('editing product details preserves SKU identities and matrix',async()=>{
+test('single SKU edit preserves identity and rejects legacy multi-SKU updates',async()=>{
   runtime.cloud.openapi={security:{msgSecCheck:async()=>({errcode:0,result:{suggest:'pass'}})}};process.env.CONTENT_SECURITY_OPENID='buyer';
   await db.collection('product_skus').doc('s').update({data:{colorName:'默认',size:1,colorImage:'https://example.com/p.jpg'}});await db.collection('products').doc('p').update({data:{cover:'https://example.com/p.jpg',minPrice:1000,maxPrice:1000}});
-  await db.collection('product_skus').doc('s-matrix').set({data:{productId:'p',status:'ACTIVE',colorName:'另一配色',size:2,price:1500,colorImage:'https://example.com/p.jpg'}});
+  await db.collection('product_skus').doc('s-matrix').set({data:{productId:'p',status:'DISABLED',colorName:'另一配色',size:2,price:1500,colorImage:'https://example.com/p.jpg'}});
   const r=await call('adminProducts','update',{id:'p',name:'更新商品',minPrice:1200});assert.equal(r.success,true);
   const sku=await c.get(db,'product_skus','s');assert.equal(sku.status,'ACTIVE');assert.equal(sku.price,1200);
-  assert.equal(db.snapshot().product_skus.filter(s=>s.productId==='p'&&s.status==='ACTIVE').length,2);assert.equal((await c.get(db,'product_skus','s-matrix')).price,1200);
+  assert.equal(db.snapshot().product_skus.filter(s=>s.productId==='p'&&s.status==='ACTIVE').length,1);assert.equal((await c.get(db,'product_skus','s-matrix')).status,'DISABLED');
+  await db.collection('product_skus').doc('s-matrix').update({data:{status:'ACTIVE'}});
+  assert.equal((await call('adminProducts','update',{id:'p',name:'不能保存双SKU'})).code,'INVALID_PARAMS');
+  await db.collection('product_skus').doc('s-matrix').update({data:{status:'DISABLED'}});
   assert.equal((await call('adminProducts','reseedDefaultSkus')).code,'ACTION_NOT_FOUND');delete runtime.cloud.openapi;
 });
 
 test('checkout immediate purchase omits synthetic cart id and never removes cart twice',async()=>{
   const {OrderService}=require('../../miniprogram/services/order.service'),{CartService}=require('../../miniprogram/services/cart.service');
-  const previous={Page:global.Page,wx:global.wx,timeout:global.setTimeout,create:OrderService.createOrder,pay:OrderService.payOrder,remove:CartService.removeItem};let definition,payload,removed=false;
-  global.Page=p=>{definition=p;};global.wx={showLoading(){},hideLoading(){},showToast(){},removeStorageSync(){},redirectTo(){}};global.setTimeout=fn=>{fn();return 0;};
+  const previous={Page:global.Page,wx:global.wx,timeout:global.setTimeout,create:OrderService.createOrder,pay:OrderService.payOrder,remove:CartService.removeItem,quote:OrderService.quote};let definition,payload,removed=false;
+  global.Page=p=>{definition=p;};global.wx={showLoading(){},hideLoading(){},showToast(){},getStorageSync(){},setStorageSync(){},showModal(o){o.success({confirm:true});},removeStorageSync(){},redirectTo(){}};global.setTimeout=fn=>{fn();return 0;};
   try{
     delete require.cache[require.resolve('../../miniprogram/pages/checkout/index.js')];require('../../miniprogram/pages/checkout/index.js');
+    OrderService.quote=async()=>({goodsAmount:1000,shippingFee:0,balanceAmount:0,payAmount:1000,quoteKey:'test',orderCount:1});
     OrderService.createOrder=async p=>{payload=p;return {orderId:'created'};};OrderService.payOrder=async()=>({status:'PENDING_PAYMENT'});CartService.removeItem=async()=>{removed=true;};
     const page={...definition,data:{...definition.data,items:[{id:'buy_123',cartId:'',skuId:'s',count:1}],requestId:'checkout-review-test',selectedAddress:{id:'addr',name:'买家',phone:'13800138000',province:'广东',city:'深圳',district:'南山',detail:'测试地址'},selectedAddressId:'addr'},setData(p){Object.assign(this.data,p);}};
     await page.submitOrder();assert.equal(payload.items[0].cartId,undefined);assert.equal(removed,false);
     page.data.items=[{id:'real-cart',cartId:'real-cart',skuId:'s',count:1}];await page.submitOrder();assert.equal(payload.items[0].cartId,'real-cart');assert.equal(removed,false);
-  }finally{global.Page=previous.Page;global.wx=previous.wx;global.setTimeout=previous.timeout;OrderService.createOrder=previous.create;OrderService.payOrder=previous.pay;CartService.removeItem=previous.remove;}
+  }finally{global.Page=previous.Page;global.wx=previous.wx;global.setTimeout=previous.timeout;OrderService.createOrder=previous.create;OrderService.payOrder=previous.pay;CartService.removeItem=previous.remove;OrderService.quote=previous.quote;}
 });
 test('gateway accepts base64 JSON and production origin has no implicit domain trust',async()=>{
   const event={httpMethod:'POST',path:'/adminGateway/adminUsers',body:Buffer.from(JSON.stringify({action:'list'})).toString('base64'),isBase64Encoded:true,headers:{authorization:'Bearer '+token}};
@@ -206,4 +211,107 @@ test('receipt/refund race cannot report completion for a refund-pending order',a
   await db.collection('orders').doc('receipt-race').set({data:{userId:'buyer',orderNo:'SL_RECEIPT_RACE',status:'SHIPPED',payAmount:1000,isTest:false}});
   runtime.cloud.openapi={wxa:{sec:{order:{getOrder:async()=>{await db.collection('orders').doc('receipt-race').update({data:{status:'REFUND_PENDING'}});return {errcode:0,order:{order_state:3}};}}}}};
   try{const result=await call('orders','confirmReceive',{id:'receipt-race'},true);assert.equal(result.code,'CONFLICT');assert.equal((await c.get(db,'orders','receipt-race')).status,'REFUND_PENDING');}finally{delete runtime.cloud.openapi;}
+});
+
+test('successful admin login is not counted and recovers after failed username attempts',async()=>{
+  for(let i=0;i<12;i++)assert.equal((await call('adminAuth','login',{username:'superadmin',password:'long-test-password'})).success,true);
+  for(let i=0;i<10;i++)await call('adminAuth','login',{username:'superadmin',password:'wrong'});
+  assert.equal((await call('adminAuth','login',{username:'superadmin',password:'wrong'})).code,'RATE_LIMITED');
+  const login=await call('adminAuth','login',{username:'superadmin',password:'long-test-password'});
+  assert.equal(login.success,true);token=login.data.token;
+});
+test('store settings are admin-only, audited and reject stale revisions',async()=>{
+  runtime.cloud.openapi={security:{msgSecCheck:async()=>({errcode:0,result:{suggest:'pass'}})}};process.env.CONTENT_SECURITY_OPENID='buyer';
+  const current=(await call('adminProducts','getStoreSettings')).data;
+  const settings={mallName:'测试果店',expectedRevision:current.revision,shippingRules:[{province:'广东',city:'',district:'',deliverable:true,firstFee:201,additionalFee:0}]};
+  try{
+    assert.equal((await runtime.call('adminProducts',{action:'saveStoreSettings',params:settings})).success,false);
+    const result=await call('adminProducts','saveStoreSettings',settings);assert.equal(result.success,true);
+    assert.equal((await call('adminProducts','saveStoreSettings',settings)).code,'CONFLICT');
+    assert.equal((await call('products','storeSettings',{},true)).data.mallName,'测试果店');
+    assert.ok(db.snapshot().operation_logs.some(x=>x.action==='SAVE_STORE_SETTINGS'));
+  }finally{delete runtime.cloud.openapi;}
+});
+test('media enqueue failure rolls back avatar and catalog entity together',async()=>{
+  runtime.cloud.openapi={security:{msgSecCheck:async()=>({errcode:0,result:{suggest:'pass'}})}};process.env.CONTENT_SECURITY_OPENID='buyer';
+  const before=await c.get(db,'users','u'),categories=structuredClone(db.snapshot().categories||[]);
+  db.injectFailure(n=>n==='content_reviews');
+  try{
+    assert.equal((await call('auth','updateProfile',{avatarUrl:'https://example.com/new-avatar.jpg'},true)).success,false);
+    assert.deepEqual(await c.get(db,'users','u'),before);
+    assert.equal((await call('adminCategories','create',{name:'原子水果',icon:'https://example.com/category.jpg'})).success,false);
+    assert.deepEqual(db.snapshot().categories||[],categories);
+  }finally{db.injectFailure(null);delete runtime.cloud.openapi;}
+});
+test('group shipping uses one transaction and partial delivery cannot complete siblings',async()=>{
+  await db.collection('products').doc('p').update({data:{status:'ON_SALE'}});
+  const create=await call('orders','create',{...input(),items:[{skuId:'s',count:2}]},true),r=create.data;
+  assert.equal(create.success,true);assert.equal(r.orderIds.length,2);
+  assert.equal((await call('testPayment','pay',{orderId:r.orderId})).success,true);
+  const [one,two]=r.orderIds;
+  for(const id of [r.orderId,one,two])await db.collection('orders').doc(id).update({data:{isTest:false}});
+  const requests=[];let state=2;
+  runtime.cloud.openapi={wxa:{sec:{order:{uploadShippingInfo:async p=>{requests.push(p);return {errcode:0};},getOrder:async()=>({errcode:0,order:{order_state:state}})}}}};
+  const shipping=require('../../cloudfunctions/common/wxOrderShippingService');
+  try{
+    const list=(await call('orders','list',{},true)).data.list;
+    assert.equal(list.some(x=>x._id===r.orderId),false);assert.equal(list.filter(x=>x.groupId===r.orderId).length,2);
+    assert.equal((await call('adminOrders','ship',{orderId:one,trackingNo:'BATCH11111',expressCompany:'ZTO'})).success,true);
+    assert.equal(requests[0].delivery_mode,2);assert.equal(requests[0].is_all_delivered,false);
+    state=3;assert.equal((await call('orders','confirmReceive',{id:one},true)).code,'WECHAT_RECEIPT_REQUIRED');
+    assert.equal((await c.get(db,'orders',one)).status,'SHIPPED');
+    state=2;assert.equal((await call('adminOrders','ship',{orderId:two,trackingNo:'BATCH22222',expressCompany:'ZTO'})).success,true);
+    assert.equal(requests[1].shipping_list.length,2);assert.equal(requests[1].is_all_delivered,true);
+    const snapshot=await shipping.snapshot(db,await c.get(db,'orders',one));assert.equal(snapshot.root.orderNo,(await c.get(db,'orders',one)).paymentOrderNo);
+    state=3;assert.equal((await call('orders','confirmReceive',{id:one},true)).success,true);
+    assert.equal((await call('orders','confirmReceive',{id:two},true)).success,true);
+  }finally{delete runtime.cloud.openapi;}
+});
+test('checkout unknown result retains exact intent and replays it after re-entry without re-quoting',async()=>{
+  const {OrderService}=require('../../miniprogram/services/order.service');
+  const old={Page:global.Page,wx:global.wx,timeout:global.setTimeout,create:OrderService.createOrder,pay:OrderService.payOrder,quote:OrderService.quote};let definition,first,second;let quoting=0,attempt=0;const storage=new Map();
+  global.Page=p=>{definition=p;};global.wx={getStorageSync:k=>storage.get(k),setStorageSync:(k,v)=>storage.set(k,structuredClone(v)),removeStorageSync:k=>storage.delete(k),showLoading(){},hideLoading(){},showToast(){},redirectTo(){},showModal:o=>o.success({confirm:true})};global.setTimeout=fn=>{fn();return 0;};
+  try{
+    delete require.cache[require.resolve('../../miniprogram/pages/checkout/index.js')];require('../../miniprogram/pages/checkout/index.js');
+    OrderService.quote=async()=>{quoting++;return {goodsAmount:1000,shippingFee:100,balanceAmount:0,payAmount:1100,quoteKey:'confirmed',orderCount:1};};
+    OrderService.createOrder=async p=>{if(attempt++===0){first=structuredClone(p);throw Error('network timeout');}second=structuredClone(p);return {orderId:'restored',orderIds:['unit']};};
+    OrderService.payOrder=async()=>({status:'PAID'});
+    const page=data=>({...definition,data:{...definition.data,...data},setData(p){Object.assign(this.data,p);}});
+    await page({items:[{id:'buy_first',skuId:'s',count:1}],requestId:'persisted-checkout-12345',selectedAddressId:'original',selectedAddress:{id:'original'}}).submitOrder();
+    assert.equal(storage.get('mall_checkout_intent').params.requestId,first.requestId);
+    await page({items:[{id:'buy_new',skuId:'different',count:3}],requestId:'new-request-12345',selectedAddressId:'different',selectedAddress:{id:'different'}}).submitOrder();
+    assert.deepEqual(second,first);assert.equal(quoting,1);assert.equal(storage.has('mall_checkout_intent'),false);
+  }finally{global.Page=old.Page;global.wx=old.wx;global.setTimeout=old.timeout;OrderService.createOrder=old.create;OrderService.payOrder=old.pay;OrderService.quote=old.quote;}
+});
+
+
+test('temporary media API failure stays queued with backoff instead of publishing or failing permanently',async()=>{
+  const safety=require('../../cloudfunctions/common/contentSafety'),id='retry-media-test';
+  await db.collection('products').doc(id).set({data:{status:'OFF_SALE',contentSafety:{version:'retry-version',status:'PENDING'}}});
+  await safety.reviewAssets(runtime.cloud,db,'PRODUCT',id,'retry-version',['https://example.com/retry.jpg'],'buyer');
+  runtime.cloud.openapi={security:{mediaCheckAsync:async()=>{throw c.error('WECHAT_UNCERTAIN','temporary');}}};
+  try{
+    await safety.processPending(runtime.cloud,db,30);
+    const row=db.snapshot().content_reviews.find(x=>x.entityId===id);
+    assert.equal(row.status,'REQUESTING');assert.equal(row.attempts,1);assert.ok(new Date(row.nextAttemptAt).getTime()>Date.now());
+    assert.equal((await c.get(db,'products',id)).contentSafety.status,'PENDING');
+  }finally{delete runtime.cloud.openapi;}
+});
+test('timeout backlog rotates failed roots and does not starve zero-cash refund stage',async()=>{
+  const gateway=require('../../cloudfunctions/orderTimeoutJob/common/payGateway'),original={queryPayment:gateway.queryPayment,queryRefund:gateway.queryRefund,now:Date.now};
+  let now=Date.now(),attempts=[];
+  for(let i=0;i<16;i++)await db.collection('orders').doc('cron-fail-'+i).set({data:{userId:'buyer',orderNo:'CRON'+i,status:'PENDING_PAYMENT',payAmount:100,isTest:false,paymentInitiated:true,expireAt:new Date(1),updatedAt:new Date(1000+i),items:[]}});
+  await db.collection('orders').doc('cron-zero').set({data:{userId:'buyer',orderNo:'CRON_ZERO',status:'REFUNDING',payAmount:0,balanceAmount:0,isTest:false,refundNo:'cron-zero-refund',items:[]}});
+  await db.collection('refund_records').doc('cron-zero-refund').set({data:{orderId:'cron-zero',userId:'buyer',outRefundNo:'cron-zero-refund',totalFee:0,refundFee:0,balanceFee:0,status:'PROCESSING',isTest:false,lastCheckedAt:new Date(0)}});
+  gateway.queryPayment=async(_,order)=>{attempts.push(order._id);now+=30000;throw c.error('PAYMENT_UNCERTAIN','injected');};
+  gateway.queryRefund=async()=>({status:'PROCESSING'});
+  runtime.cloud.openapi={wxa:{sec:{order:{getOrder:async()=>({errcode:0,order:{order_state:2}})}}}};
+  Date.now=()=>now;
+  try{
+    const first=await runtime.call('orderTimeoutJob',{});assert.equal(first.success,true);
+    assert.equal((await c.get(db,'orders','cron-zero')).status,'REFUNDED');
+    for(let i=0;i<16;i++)await runtime.call('orderTimeoutJob',{});
+    assert.ok(attempts.includes('cron-fail-15'));assert.ok(new Set(attempts).size>=16);
+    assert.equal((await runtime.call('orderTimeoutJob',{}, {OPENID:'buyer'})).code,'FORBIDDEN_CALLER');
+  }finally{gateway.queryPayment=original.queryPayment;gateway.queryRefund=original.queryRefund;Date.now=original.now;delete runtime.cloud.openapi;}
 });

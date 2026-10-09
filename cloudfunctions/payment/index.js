@@ -7,7 +7,9 @@ async function find(params, userId) {
   const id = params.orderId || params.id;
   let order = id ? await c.get(db, 'orders', id) : null;
   if (!order) { const no = params.orderNo || params.outTradeNo || params.out_trade_no || id; if (no) order = (await db.collection('orders').where({ orderNo: no, userId }).limit(1).get()).data[0]; }
-  if (!order || order.userId !== userId) throw c.error('ORDER_NOT_FOUND', '订单不存在'); return order;
+  if (!order || order.userId !== userId) throw c.error('ORDER_NOT_FOUND', '订单不存在');
+  if(order.groupId){order=await c.get(db,'orders',order.groupId);if(!order||order.userId!==userId)throw c.error('ORDER_NOT_FOUND','支付批次不存在');}
+  return order;
 }
 exports.main = async event => {
   try {
@@ -17,6 +19,12 @@ exports.main = async event => {
     if (event.action === 'queryOrder') {
       if (order.payAmount === 0 && order.status === 'PENDING_PAYMENT') return success({ status: order.status, orderId: order._id });
       if (['PENDING_PAYMENT','CLOSING'].includes(order.status) && order.paymentInitiated && !order.isTest) {
+        const permitted=await c.transaction(db,async tx=>{
+          const latest=await c.get(tx,'orders',order._id);
+          if(new Date(latest.paymentQueryAfter||0).getTime()>Date.now())return false;
+          await tx.collection('orders').doc(order._id).update({data:{paymentQueryAfter:new Date(Date.now()+5000)}});return true;
+        });
+        if(!permitted)return success({status:(await c.get(db,'orders',order._id)).status,orderId:order._id});
         const evidence = await gateway.queryPayment(cloud, order);
         if (evidence.tradeState === 'SUCCESS') return success(await c.confirmPayment(db, evidence));
       }

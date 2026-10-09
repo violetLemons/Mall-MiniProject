@@ -12,6 +12,7 @@ import { Admins } from './pages/Admins';
 import { Logs } from './pages/Logs';
 import { CardKeys } from './pages/CardKeys';
 import { Ads } from './pages/Ads';
+import { StoreSettings } from './pages/StoreSettings';
 
 // 登录守卫 (Route Guard)
 const RequireAuth: React.FC<{ children: React.ReactElement }> = ({ children }) => {
@@ -72,6 +73,7 @@ export const App: React.FC = () => {
             <Route index element={<Dashboard />} />
             <Route path="products" element={<Products />} />
             <Route path="orders" element={<Orders />} />
+            <Route path="store-settings" element={<StoreSettings />} />
             <Route
               path="categories"
               element={
@@ -104,14 +106,7 @@ export const App: React.FC = () => {
                 </RequireSuperAdmin>
               }
             />
-            <Route
-              path="ads"
-              element={
-                <RequireSuperAdmin>
-                  <Ads />
-                </RequireSuperAdmin>
-              }
-            />
+
             <Route
               path="logs"
               element={

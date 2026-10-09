@@ -187,6 +187,10 @@ Page({
                 return;
             }
             const selectedItems = this.data.cartItems.filter(i => i.selected);
+            if (selectedItems.length > 10) {
+                wx.showToast({ title: '每次最多结算10种商品，请减少勾选', icon: 'none' });
+                return;
+            }
             wx.setStorageSync('sneaker_checkout_items', selectedItems);
             wx.navigateTo({ url: '/pages/checkout/index' });
         });
