@@ -65,7 +65,16 @@ node scripts/init-db.js 只导出清单，--apply 会拒绝伪执行。node scri
 ./scripts/deploy-cloud.ps1 -EnvId '<实际环境ID>' -CliPath '<微信开发者工具cli.bat绝对路径>'
 ```
 
-脚本自动先打包；失败停止。也可开发者工具逐个选择“上传并部署：云端安装依赖”。生产不带 IncludeTestPayment，不部署 testPayment/initDb。cloudbaserc.json 的占位环境 ID 必须按目标填写。读取每个函数的版本、状态、权限、环境变量及超时，不以上传成功代替运行验证。
+脚本自动先打包；失败停止。也可开发者工具逐个选择上述 20 个正式函数目录，执行“上传并部署：云端安装依赖”。生产不带 IncludeTestPayment，不部署 testPayment/initDb。cloudbaserc.json 当前环境为 `cloud1-d3gffg6ok96e6cf3f`，切换环境时同步修改小程序 services/cloud.ts 并重新构建。读取每个函数的版本、状态、权限、环境变量及超时，不以上传成功代替运行验证。
+
+### 上传时出现 CreateFailed
+
+`FailedOperation.UpdateFunctionCode` 且提示“当前函数处于 CreateFailed 状态”表示云端创建失败，当前更新请求被拒绝；这条错误本身不能说明最初创建失败的原因。
+
+- `adminInventory`、`pickupPoints`、`merchantAuth` 已退役，不上传、不补入口；本地若残留空目录，清理后刷新开发者工具项目树。
+- `cloudfunctions/common` 是共享源码，不是独立云函数，不单独上传；运行 `node scripts/bundle-functions.js` 后，它会复制到各个可部署函数的 `common/` 子目录。不得删除共享源。
+- 在目标环境云函数列表核对这四个同名函数；若是本次误建且状态为 CreateFailed，可删除误建条目，无需重建。删除云端函数前核对环境和函数名；本地清理不会删除云端条目。
+- 若正式部署清单中的函数也出现 CreateFailed，先查看该函数首次创建/部署失败的详情或日志，修正具体原因；确认没有需保留的配置、触发器和现有服务后，再删除失败条目并重新创建。持续失败时携带 RequestId 联系腾讯云支持，不反复执行更新掩盖首次错误。
 
 ## 5. HTTP 回调与微信官方能力
 

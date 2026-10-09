@@ -18,7 +18,7 @@ exports.initCloud = initCloud;
 exports.callCloud = callCloud;
 const compliance_1 = require("./compliance");
 // 微信云开发环境 ID (请在微信开发者工具云开发控制台查看并填入)
-exports.CLOUD_ENV_ID = 'REPLACE_WITH_TARGET_ENV_ID';
+exports.CLOUD_ENV_ID = 'cloud1-d3gffg6ok96e6cf3f';
 // Local simulator is an explicit development switch; cloud failures never change environments.
 exports.ENABLE_LOCAL_GATEWAY = false;
 const LOCAL_GATEWAY = 'http://127.0.0.1:3001';
