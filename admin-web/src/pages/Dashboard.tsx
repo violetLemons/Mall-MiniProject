@@ -35,7 +35,7 @@ export const Dashboard: React.FC = () => {
   }, []);
 
   const totalRevenue = orders
-    .filter(o => o.status !== 'CANCELLED')
+    .filter(o => ['PAID','SHIPPED','COMPLETED','REFUND_PENDING','REFUNDING'].includes(o.status))
     .reduce((sum, o) => sum + (o.payAmount || 0), 0);
 
   const pendingShipmentCount = orders.filter(o => o.status === 'PAID').length;
@@ -49,7 +49,7 @@ export const Dashboard: React.FC = () => {
             运营数据大盘 · Overview
           </h1>
           <p style={{ fontSize: '14px', color: '#64748B', marginTop: '4px' }}>
-            实时监控小程序端成交金额、出货履约与热销动销。
+            最近50单概览；已退款与未付款订单不计入现金金额。全量账务以支付退款流水对账为准。
           </p>
         </div>
 
@@ -121,7 +121,7 @@ export const Dashboard: React.FC = () => {
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748B' }}>累计成交订单</span>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748B' }}>当前页订单数量</span>
             <div style={{ padding: '8px', borderRadius: '10px', backgroundColor: '#EFF6FF', color: '#3B82F6' }}>
               <ShoppingBag size={20} />
             </div>

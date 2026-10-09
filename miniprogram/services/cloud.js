@@ -13,11 +13,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CLOUD_ENV_ID = void 0;
+exports.ENABLE_LOCAL_GATEWAY = exports.CLOUD_ENV_ID = void 0;
 exports.initCloud = initCloud;
 exports.callCloud = callCloud;
+const compliance_1 = require("./compliance");
 // 微信云开发环境 ID (请在微信开发者工具云开发控制台查看并填入)
-exports.CLOUD_ENV_ID = 'cloud1-d3gffg6ok96e6cf3f';
+exports.CLOUD_ENV_ID = 'REPLACE_WITH_TARGET_ENV_ID';
+// Local simulator is an explicit development switch; cloud failures never change environments.
+exports.ENABLE_LOCAL_GATEWAY = false;
 const LOCAL_GATEWAY = 'http://127.0.0.1:3001';
 const LOCAL_SESSION_KEY = 'sneaker_local_session';
 let isCloudInited = false;
@@ -102,12 +105,16 @@ function callLocalGateway(functionName, action, params) {
  */
 function callCloud(functionName_1, action_1) {
     return __awaiter(this, arguments, void 0, function* (functionName, action, params = {}) {
+        if ((functionName === 'addresses' && ['create', 'save', 'update'].includes(action)) || (functionName === 'auth' && action === 'updateProfile') || (functionName === 'orders' && action === 'create'))
+            yield (0, compliance_1.requirePrivacy)();
+        if (functionName === 'orders' && action === 'create')
+            (0, compliance_1.report)('order_submit');
         initCloud();
-        const isPlaceholderEnv = !exports.CLOUD_ENV_ID || /your[-_]|placeholder|sneaker-mall-env-id/i.test(exports.CLOUD_ENV_ID);
+        const isPlaceholderEnv = !exports.CLOUD_ENV_ID || /REPLACE_|your[-_]|placeholder|sneaker-mall-env-id/i.test(exports.CLOUD_ENV_ID);
         // 1. 本地模拟器模式优先尝试直连隔离网关 (127.0.0.1:3001)
         // 当云环境仍为占位符时，立即直连 local-admin-api，避免云端 404011 报错与网络挂起延迟，
         // 确保微信开发者工具与 PC 管理后台的数据毫秒级双向同步
-        if (isPlaceholderEnv) {
+        if (exports.ENABLE_LOCAL_GATEWAY && isPlaceholderEnv) {
             try {
                 return yield callLocalGateway(functionName, action, params);
             }
@@ -115,6 +122,8 @@ function callCloud(functionName_1, action_1) {
                 throw new Error((localErr === null || localErr === void 0 ? void 0 : localErr.message) || `本地模拟网关未响应`);
             }
         }
+        if (isPlaceholderEnv)
+            throw new Error('请配置目标云环境 ID');
         // 2. 尝试调用微信官方 wx.cloud.callFunction
         if (wx.cloud) {
             try {
@@ -169,6 +178,7 @@ function callCloud(functionName_1, action_1) {
                 const enhancedErr = new Error(friendlyMsg);
                 enhancedErr.functionName = functionName;
                 enhancedErr.action = action;
+                enhancedErr.code = err === null || err === void 0 ? void 0 : err.code;
                 enhancedErr.errMsg = (err === null || err === void 0 ? void 0 : err.errMsg) || (err === null || err === void 0 ? void 0 : err.message);
                 enhancedErr.errCode = err === null || err === void 0 ? void 0 : err.errCode;
                 enhancedErr.errno = err === null || err === void 0 ? void 0 : err.errno;

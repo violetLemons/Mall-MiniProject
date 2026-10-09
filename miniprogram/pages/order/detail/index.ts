@@ -1,16 +1,9 @@
 import { OrderModel, OrderService } from '../../../services/order.service';
 
 const STATUS_LABEL: Record<string, string> = {
-  PENDING_PAYMENT: '待付款', PAID: '待发货', SHIPPED: '运输中', WAITING_PICKUP: '待发货',
-  READY_FOR_PICKUP: '待收货', COMPLETED: '已完成', CANCELLED: '已取消', REFUNDING: '退款处理中', REFUNDED: '已退款'
+  CLOSING: '关单核实中', REFUND_PENDING: '退款待审核', PENDING_PAYMENT: '待付款', PAID: '待发货', SHIPPED: '运输中', COMPLETED: '已完成', CANCELLED: '已取消', REFUNDING: '退款处理中', REFUNDED: '已退款'
 };
 
-const PICKUP_STATUS_LABEL: Record<string, string> = {
-  PREPARING: '门店备货中',
-  READY: '待自提（可到店提货）',
-  PICKED: '已自提交付',
-  COMPLETED: '已自提完成'
-};
 
 function formatDateTime(val: any): string {
   if (!val) return '';
@@ -30,12 +23,10 @@ type OrderViewModel = OrderModel & {
   totalAmountYuan?: string;
   statusLabel?: string;
   paymentStatusLabel?: string;
-  pickupStatusLabel?: string;
   createdAtFormatted?: string;
   paidAtFormatted?: string;
   shippedAtFormatted?: string;
   isExpress?: boolean;
-  isPickup?: boolean;
   hasShipment?: boolean;
   shipments: { trackingNo?: string; logisticsCompany?: string; expressCompany?: string; shippedAt?: string; shippedAtFormatted?: string }[];
   items: (OrderModel['items'][number] & { totalAmountYuan?: string; unitPriceYuan?: string })[];
@@ -63,17 +54,8 @@ Page({
       const order = await OrderService.getDetail(idOrNo, options);
       if (!order) throw new Error('订单不存在');
 
-      const isExpress = order.deliveryType === 'DELIVERY' || (order.deliveryType as string) === 'express';
-      const isPickup = order.deliveryType === 'PICKUP' || (order.deliveryType as string) === 'pickup';
-      const isPaid = order.status !== 'PENDING_PAYMENT' && order.status !== 'CANCELLED';
-
-      const rawPickupStatus = order.pickupInfo?.pickupStatus || (order as any).pickupStatus || '';
-      let pickupStatusLabel = PICKUP_STATUS_LABEL[rawPickupStatus];
-      if (!pickupStatusLabel) {
-        if (order.status === 'COMPLETED') pickupStatusLabel = '已自提交付';
-        else if (order.status === 'READY_FOR_PICKUP') pickupStatusLabel = '待自提（可到店提货）';
-        else pickupStatusLabel = '门店备货中';
-      }
+      const isExpress = true;
+      const isPaid = !['PENDING_PAYMENT','CLOSING','CANCELLED'].includes(order.status);
 
       // 物流信息：优先取子订单 shipments[] 数组；兼容旧版单一 trackingNo 数据
       const rawShipments = (order.shipments && order.shipments.length > 0)
@@ -91,9 +73,7 @@ Page({
           ...order,
           statusLabel: STATUS_LABEL[order.status] || order.status,
           paymentStatusLabel: isPaid ? '已支付' : '待付款',
-          pickupStatusLabel,
           isExpress,
-          isPickup,
           hasShipment: shipments.length > 0,
           shipments,
           payAmountYuan: (Number(order.payAmount || 0) / 100).toFixed(2),
@@ -147,6 +127,15 @@ Page({
     } catch (err: any) {
       wx.showToast({ title: err?.message || '取消失败', icon: 'none' });
     }
+  },
+
+  async onApplyRefund() {
+    const id=this.data.order?._id || this.data.order?.id;
+    if(!id||this.data.submitting)return;
+    const response=await new Promise<any>(resolve=>wx.showModal({title:'申请整单退款',content:'已发货订单需要退货并由管理员确认。请输入原因。',editable:true,placeholderText:'退款原因',success:resolve}));
+    if(!response.confirm||!String(response.content||'').trim())return;
+    this.setData({submitting:true});
+    try{await OrderService.applyRefund(id,String(response.content).trim());wx.showToast({title:'已提交退款申请',icon:'success'});await this.loadOrder(id);}catch(e:any){wx.showToast({title:e.message||'申请失败',icon:'none'});}finally{this.setData({submitting:false});}
   },
 
   async onConfirmReceive() {

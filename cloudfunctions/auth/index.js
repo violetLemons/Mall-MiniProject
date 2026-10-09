@@ -6,6 +6,9 @@
 const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
+const crypto = require('crypto');
+const commerce = require('./common/commerce');
+const content = require('./common/contentSafety');
 
 function success(data = null, message = '操作成功') {
   return {
@@ -45,7 +48,7 @@ function generateUserNo() {
 }
 
 exports.main = async (event, context) => {
-  const { action, params = {} } = event;
+  const { action, params = {} } = event || {};
   const wxContext = cloud.getWXContext();
   const openid = wxContext.OPENID;
 
@@ -62,32 +65,32 @@ exports.main = async (event, context) => {
         const userRes = await db.collection('users').where({ _openid: openid }).get();
         let user = null;
 
+        if (params.nickName) await content.checkText(cloud,openid,commerce.text(params.nickName,'昵称',1,40),1);
+        if(params.avatarUrl) throw commerce.error('CONTENT_REVIEW_REQUIRED','请通过个人资料接口提交头像审核');
         const targetNickName = params.nickName && params.nickName !== '微信用户' ? params.nickName : generateNickname();
         const targetAvatarUrl = params.avatarUrl || DEFAULT_AVATAR;
-        const targetUserNo = params.userNo || generateUserNo();
+        const targetUserNo = generateUserNo();
 
         if (userRes.data.length === 0) {
-          const addRes = await db.collection('users').add({
-            data: {
+          user = await commerce.transaction(db, async tx => {
+            const existing = (await tx.collection('users').where({ _openid: openid }).limit(1).get()).data[0];
+            if (existing) return existing;
+            const id = commerce.key('USER', openid);
+            const data = {
               _openid: openid,
               userNo: targetUserNo,
               nickName: targetNickName,
               avatarUrl: targetAvatarUrl,
               phone: '',
+              balance: 0,
               status: 'ACTIVE',
               createdAt: db.serverDate(),
               updatedAt: db.serverDate(),
               lastLoginAt: db.serverDate()
-            }
+            };
+            await tx.collection('users').doc(id).set({ data });
+            return { ...data, _id: id };
           });
-          user = {
-            _id: addRes._id,
-            _openid: openid,
-            userNo: targetUserNo,
-            nickName: targetNickName,
-            avatarUrl: targetAvatarUrl,
-            status: 'ACTIVE'
-          };
         } else {
           user = userRes.data[0];
           const patch = {
@@ -131,9 +134,15 @@ exports.main = async (event, context) => {
         if (userRes.data.length === 0) return fail('USER_NOT_FOUND', '用户不存在');
         const user = userRes.data[0];
         const updateData = { updatedAt: db.serverDate() };
-        if (params.nickName) updateData.nickName = String(params.nickName).trim();
-        if (params.avatarUrl) updateData.avatarUrl = String(params.avatarUrl).trim();
+        if (params.nickName) { updateData.nickName = commerce.text(params.nickName,'昵称',1,40); await content.checkText(cloud,openid,updateData.nickName,1); }
+        let avatarVersion;
+        if (params.avatarUrl) {
+          const url=commerce.text(params.avatarUrl,'头像',1,2000);
+          if(!url.startsWith('https://')&&!url.startsWith('cloud://'))throw commerce.error('INVALID_PARAMS','头像地址无效');
+          avatarVersion=crypto.randomUUID();updateData.pendingAvatarUrl=url;updateData.contentSafety={version:avatarVersion,status:'PENDING'};
+        }
         await db.collection('users').doc(user._id).update({ data: updateData });
+        if(avatarVersion)await content.reviewAssets(cloud,db,'PROFILE',user._id,avatarVersion,[updateData.pendingAvatarUrl],openid);
         return success({ user: { ...user, ...updateData } }, '个人资料更新成功');
       }
 

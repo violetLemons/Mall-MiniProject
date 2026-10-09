@@ -17,23 +17,14 @@ Component({
                 id: 'shipping',
                 tag: '配送服务',
                 title: '全场包邮',
-                desc: '极速空运实时查询',
+                desc: '快递配送',
                 imageUrl: 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?w=200&auto=format&fit=crop&q=80',
                 color: '#FF5500',
                 bgColor: '#FFF5F0'
             },
             {
-                id: 'pickup',
-                tag: '校园服务',
-                title: '到店自提',
-                desc: '支持预约与核销',
-                imageUrl: 'https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77?w=200&auto=format&fit=crop&q=80',
-                color: '#E53935',
-                bgColor: '#FFF0F0'
-            },
-            {
                 id: 'new_arrivals',
-                tag: '云端库存',
+                tag: '实时上新',
                 title: '新品上架',
                 desc: '实时同步在售款式',
                 imageUrl: 'https://images.unsplash.com/photo-1607522370275-f14206abe5d3?w=200&auto=format&fit=crop&q=80',

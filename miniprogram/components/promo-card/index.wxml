@@ -13,7 +13,6 @@
     <view
       wx:for="{{sections}}"
       wx:key="id"
-      wx:if="{{item.id !== 'pickup'}}"
       class="promo-box"
       style="background: {{item.bgColor}};"
     >

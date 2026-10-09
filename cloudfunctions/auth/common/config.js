@@ -35,8 +35,8 @@ function getValidatedWechatPayConfig() {
     throw err;
   }
 
-  // 商户号 (直连商户号或服务商特约商户号)
-  const mchId = process.env.WECHAT_PAY_MCH_ID || process.env.WECHAT_PAY_SUB_MCH_ID;
+  // 商户号 (自有普通商户号)
+  const mchId = process.env.WECHAT_PAY_MCH_ID;
   if (!mchId || isPlaceholder(mchId)) {
     const err = new Error('[CONFIG_ERROR] WECHAT_PAY_MCH_ID 缺失或仍为占位符，严禁运行！请配置真实微信商户号。');
     err.code = 'CONFIG_ERROR';
@@ -59,7 +59,7 @@ function getValidatedWechatPayConfig() {
 }
 
 function getWechatPayMerchantId() {
-  const merchantId = process.env.WECHAT_PAY_SUB_MCH_ID || process.env.WECHAT_PAY_MCH_ID;
+  const merchantId = process.env.WECHAT_PAY_MCH_ID;
   if (!merchantId || isPlaceholder(merchantId)) {
     const err = new Error('[CONFIG_ERROR] 微信支付商户号缺失或仍为占位符');
     err.code = 'CONFIG_ERROR';

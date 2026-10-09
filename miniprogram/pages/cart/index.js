@@ -11,7 +11,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const cart_service_1 = require("../../services/cart.service");
 const address_service_1 = require("../../services/address.service");
-const pickup_service_1 = require("../../services/pickup.service");
 Page({
     data: {
         cartItems: [],
@@ -19,39 +18,13 @@ Page({
         totalPrice: 0,
         selectedCount: 0,
         loading: false,
-        deliveryType: 'DELIVERY',
         selectedAddress: null,
-        pickupPoints: [],
-        selectedPickupPoint: null
     },
     onShow() {
         return __awaiter(this, void 0, void 0, function* () {
             yield this.loadCart();
-            yield this.loadCheckoutOptions();
+            this.setData({ selectedAddress: yield address_service_1.AddressService.getDefault().catch(() => null) });
         });
-    },
-    loadCheckoutOptions() {
-        return __awaiter(this, void 0, void 0, function* () {
-            const [address, points] = yield Promise.all([
-                address_service_1.AddressService.getDefault().catch(() => null),
-                pickup_service_1.PickupService.list().catch(() => [])
-            ]);
-            this.setData({
-                selectedAddress: address,
-                pickupPoints: points.filter(point => point.status !== 'DISABLED'),
-                selectedPickupPoint: points.find(point => point.status !== 'DISABLED') || null
-            });
-        });
-    },
-    onSelectDelivery(e) {
-        const type = e.currentTarget.dataset.type;
-        if (type === 'DELIVERY' || type === 'PICKUP')
-            this.setData({ deliveryType: type });
-    },
-    onSelectPickupPoint(e) {
-        const point = this.data.pickupPoints[Number(e.currentTarget.dataset.index)];
-        if (point)
-            this.setData({ selectedPickupPoint: point });
     },
     onOpenAddress() {
         wx.switchTab({ url: '/pages/profile/index' });

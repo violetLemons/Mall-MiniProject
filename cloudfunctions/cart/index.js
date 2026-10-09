@@ -1,11 +1,12 @@
 /**
  * 购物车云函数 (cart)
- * 纯自包含实现，杜绝外部子模块路径依赖
+ * 共享事务与读取校验；依赖由 bundle-functions 打包。
  */
 const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const crypto = require('crypto');
+const commerce = require('./common/commerce');
 
 function err(code, message) {
   const e = new Error(message);
@@ -52,18 +53,7 @@ function fail(code = 'SYSTEM_ERROR', message = '系统内部错误') {
 }
 
 async function safeDocGet(collection, docId) {
-  try {
-    const res = await db.collection(collection).doc(docId).get();
-    return Array.isArray(res.data) ? res.data[0] || null : res.data || null;
-  } catch (e) {
-    return null;
-  }
-}
-
-async function ensureCollection(name) {
-  try {
-    await db.createCollection(name);
-  } catch (_) {}
+  return commerce.get(db, collection, docId);
 }
 
 exports.main = async (event) => {
@@ -91,8 +81,7 @@ exports.main = async (event) => {
             .get();
           rows = res.data || [];
         } catch (colErr) {
-          await ensureCollection('carts');
-          rows = [];
+          throw colErr;
         }
       }
 
@@ -111,7 +100,7 @@ exports.main = async (event) => {
           price: sku?.price || 0,
           count: row.count,
           selected: row.selected !== false,
-          isOnSale: p?.status === 'ON_SALE'
+          isOnSale: p?.status === 'ON_SALE' && !p.deletedAt && sku?.status === 'ACTIVE'
         });
       }
       return success(items);
@@ -123,14 +112,16 @@ exports.main = async (event) => {
       const addCount = integer(params.count, '数量', 1, 5);
       const id = key(userId, skuId);
 
+      return success(await commerce.transaction(db, async tx => {
       const [sku, oldCart] = await Promise.all([
-        safeDocGet('product_skus', skuId),
-        safeDocGet('carts', id)
+        commerce.get(tx, 'product_skus', skuId),
+        commerce.get(tx, 'carts', id)
       ]);
 
       if (!sku || sku.status !== 'ACTIVE') throw err('SKU_NOT_FOUND', '商品规格不存在或已停售');
-      const p = await safeDocGet('products', sku.productId);
+      const p = await commerce.get(tx, 'products', sku.productId);
       if (!p || p.status !== 'ON_SALE' || p.deletedAt) throw err('PRODUCT_OFF_SALE', '商品已下架');
+      if (!oldCart && (await tx.collection('carts').where({ userId }).limit(100).get()).data.length >= 100) throw err('CART_LIMIT', '购物车最多100款规格，请先清理');
 
       const finalCount = Math.min(5, (oldCart?.count || 0) + addCount);
 
@@ -145,13 +136,9 @@ exports.main = async (event) => {
       };
       delete cartData._id;
 
-      try {
-        await db.collection('carts').doc(id).set({ data: cartData });
-      } catch (writeErr) {
-        await ensureCollection('carts');
-        await db.collection('carts').doc(id).set({ data: cartData });
-      }
-      return success({ cartId: id, count: finalCount });
+      await tx.collection('carts').doc(id).set({ data: cartData });
+      return { cartId: id, count: finalCount };
+      }));
     }
 
     // 3. 更新数量
@@ -188,12 +175,12 @@ exports.main = async (event) => {
 
     // 6. 清空已选
     if (action === 'clearSelected') {
-      try {
-        const selRes = await db.collection('carts').where({ userId, selected: true }).get();
+      await commerce.transaction(db, async tx => {
+        const selRes = await tx.collection('carts').where({ userId, selected: true }).limit(100).get();
         for (const item of (selRes.data || [])) {
-          await db.collection('carts').doc(item._id).remove().catch(() => {});
+          await tx.collection('carts').doc(item._id).remove();
         }
-      } catch (_) {}
+      });
       return success({ cleared: true });
     }
 

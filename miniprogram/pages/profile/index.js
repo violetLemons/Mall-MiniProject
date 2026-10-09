@@ -9,11 +9,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const compliance_1 = require("../../services/compliance");
 const auth_service_1 = require("../../services/auth.service");
 const order_service_1 = require("../../services/order.service");
 const cart_service_1 = require("../../services/cart.service");
 const address_service_1 = require("../../services/address.service");
 const activation_service_1 = require("../../services/activation.service");
+const ad_service_1 = require("../../services/ad.service");
 const store_1 = require("../../config/store");
 const STORAGE_FAV_KEY = 'sneaker_mall_favorites';
 const STORAGE_HISTORY_KEY = 'sneaker_mall_history';
@@ -38,10 +40,10 @@ Page({
             { id: 'history', title: '浏览历史', badge: '' },
             { id: 'address', title: '收货地址管理', badge: '' },
             { id: 'service', title: '官方在线客服', badge: '9:00-22:00' },
-            { id: 'merchant', title: '商户跳转', badge: '' },
+            { id: 'privacy', title: '隐私保护指引', badge: '' },
             { id: 'setting', title: '通用设置', badge: '' }
         ],
-        customerServicePhone: store_1.STORE_CONFIG.customerServicePhone || '400-000-0000',
+        customerServicePhone: store_1.STORE_CONFIG.customerServicePhone,
         // 抽屉状态
         activeDrawer: null,
         drawerTitle: '',
@@ -117,19 +119,16 @@ Page({
                     });
                 }
                 const ordersRes = yield order_service_1.OrderService.getList({ page: 1, pageSize: 20 }).catch(() => ({ list: [] }));
+                const summary = yield order_service_1.OrderService.getSummary();
                 const rawList = ordersRes.list || [];
                 const list = rawList.map(o => (Object.assign(Object.assign({}, o), { payAmountYuan: (Number(o.payAmount || 0) / 100).toFixed(2), items: (o.items || []).map(i => (Object.assign(Object.assign({}, i), { unitPriceYuan: (Number(i.unitPrice || 0) / 100).toFixed(2) }))) })));
-                const unpaidCount = list.filter(o => o.status === 'PENDING_PAYMENT').length;
-                const unshippedCount = list.filter(o => o.status === 'PAID').length;
-                const shippedCount = list.filter(o => o.status === 'SHIPPED' || o.status === 'WAITING_PICKUP' || o.status === 'READY_FOR_PICKUP').length;
-                const refundCount = list.filter(o => o.status === 'REFUND_PENDING' || o.status === 'REFUNDING').length;
                 this.setData({
                     allOrders: list,
-                    'orderStats[0].count': list.length, // 全部订单
-                    'orderStats[1].count': unpaidCount,
-                    'orderStats[2].count': unshippedCount,
-                    'orderStats[3].count': shippedCount,
-                    'orderStats[4].count': refundCount
+                    'orderStats[0].count': summary.ALL,
+                    'orderStats[1].count': summary.PENDING_PAYMENT,
+                    'orderStats[2].count': summary.PAID,
+                    'orderStats[3].count': summary.SHIPPED,
+                    'orderStats[4].count': summary.REFUND
                 });
                 // 如果当前订单抽屉已打开，同步刷新过滤列表
                 if (this.data.activeDrawer === 'order') {
@@ -156,7 +155,7 @@ Page({
     onTapAvatar() {
         wx.showActionSheet({
             itemList: ['查看头像大图', '更换头像'],
-            success: (res) => {
+            success: (res) => __awaiter(this, void 0, void 0, function* () {
                 if (res.tapIndex === 0) {
                     wx.previewImage({
                         urls: [this.data.userInfo.avatarUrl],
@@ -164,6 +163,13 @@ Page({
                     });
                 }
                 else if (res.tapIndex === 1) {
+                    try {
+                        yield (0, compliance_1.requirePrivacy)();
+                    }
+                    catch (e) {
+                        wx.showToast({ title: (e === null || e === void 0 ? void 0 : e.message) || '请先同意隐私授权', icon: 'none' });
+                        return;
+                    }
                     wx.chooseMedia({
                         count: 1,
                         mediaType: ['image'],
@@ -171,19 +177,21 @@ Page({
                             var _a;
                             const tempFilePath = (_a = chooseRes.tempFiles[0]) === null || _a === void 0 ? void 0 : _a.tempFilePath;
                             if (tempFilePath) {
-                                this.setData({ 'userInfo.avatarUrl': tempFilePath });
                                 try {
-                                    yield auth_service_1.AuthService.updateProfile({ avatarUrl: tempFilePath });
-                                    wx.showToast({ title: '头像已更新', icon: 'success' });
+                                    if (chooseRes.tempFiles[0].size > 2 * 1024 * 1024)
+                                        throw new Error('头像图片请小于2MB');
+                                    const uploaded = yield wx.cloud.uploadFile({ cloudPath: `avatars/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`, filePath: tempFilePath });
+                                    yield auth_service_1.AuthService.updateProfile({ avatarUrl: uploaded.fileID });
+                                    wx.showToast({ title: '头像已提交审核', icon: 'none' });
                                 }
-                                catch (_b) {
-                                    wx.showToast({ title: '头像已保存在本地', icon: 'none' });
+                                catch (e) {
+                                    wx.showToast({ title: (e === null || e === void 0 ? void 0 : e.message) || '头像提交失败，请重试', icon: 'none' });
                                 }
                             }
                         })
                     });
                 }
-            }
+            })
         });
     },
     onEditNickname() {
@@ -196,13 +204,13 @@ Page({
                 var _a;
                 if (res.confirm && ((_a = res.content) === null || _a === void 0 ? void 0 : _a.trim())) {
                     const newName = res.content.trim();
-                    this.setData({ 'userInfo.nickName': newName });
                     try {
-                        yield auth_service_1.AuthService.updateProfile({ nickName: newName });
+                        const user = yield auth_service_1.AuthService.updateProfile({ nickName: newName });
+                        this.setData({ 'userInfo.nickName': user.nickName });
                         wx.showToast({ title: '昵称修改成功', icon: 'success' });
                     }
-                    catch (_b) {
-                        wx.showToast({ title: '昵称已保存在本地', icon: 'none' });
+                    catch (e) {
+                        wx.showToast({ title: (e === null || e === void 0 ? void 0 : e.message) || '昵称修改失败，请重试', icon: 'none' });
                     }
                 }
             })
@@ -221,6 +229,7 @@ Page({
             }
         });
     },
+    onStopPropagation() { },
     // -------------------------
     // 订单模块交互
     // -------------------------
@@ -289,6 +298,61 @@ Page({
             }
         });
     },
+    // -------------------------
+    // 看广告得购物额度交互
+    // -------------------------
+    onTapAdReward() {
+        this.playRewardedAd();
+    },
+    playRewardedAd() {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const info = yield ad_service_1.AdService.getAdInfo();
+                if (!info.enabled || !info.adUnitId) {
+                    wx.showToast({ title: '广告位暂未开放，敬请期待', icon: 'none' });
+                    return;
+                }
+                if (Number(info.remainingToday) <= 0) {
+                    wx.showToast({ title: '今日观看次数已达上限', icon: 'none' });
+                    return;
+                }
+                const rewardedAd = wx.createRewardedVideoAd({ adUnitId: info.adUnitId });
+                rewardedAd.onClose((res) => {
+                    if (res && res.isEnded) {
+                        this.claimAdReward();
+                    }
+                    else {
+                        wx.showToast({ title: '完整观看才能获得购物额度', icon: 'none' });
+                    }
+                });
+                rewardedAd.onError((err) => {
+                    console.warn('[ad] rewarded video error:', err);
+                    wx.showToast({ title: '广告加载失败，请稍后重试', icon: 'none' });
+                });
+                rewardedAd.show().catch(() => {
+                    rewardedAd.load()
+                        .then(() => rewardedAd.show())
+                        .catch(() => wx.showToast({ title: '广告加载失败，请稍后重试', icon: 'none' }));
+                });
+            }
+            catch (err) {
+                wx.showToast({ title: (err === null || err === void 0 ? void 0 : err.message) || '广告暂不可用', icon: 'none' });
+            }
+        });
+    },
+    claimAdReward() {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const res = yield ad_service_1.AdService.reward();
+                const yuan = (Number(res.rewardAmount) / 100).toFixed(2);
+                wx.showToast({ title: `已到账 ¥${yuan} 购物额度`, icon: 'success' });
+                yield this.syncUserData();
+            }
+            catch (err) {
+                wx.showToast({ title: (err === null || err === void 0 ? void 0 : err.message) || '领取失败，请稍后重试', icon: 'none' });
+            }
+        });
+    },
     filterOrdersByTab(tab) {
         const list = this.data.allOrders;
         let filtered = [...list];
@@ -299,7 +363,7 @@ Page({
             filtered = list.filter(o => o.status === 'PAID');
         }
         else if (tab === 'SHIPPED') {
-            filtered = list.filter(o => o.status === 'SHIPPED' || o.status === 'WAITING_PICKUP' || o.status === 'READY_FOR_PICKUP');
+            filtered = list.filter(o => o.status === 'SHIPPED');
         }
         else if (tab === 'REFUND') {
             filtered = list.filter(o => o.status === 'CANCELLED' || o.status === 'REFUNDING' || o.status === 'REFUNDED');
@@ -390,6 +454,10 @@ Page({
     // -------------------------
     onTapMenu(e) {
         const id = e.currentTarget.dataset.id;
+        if (id === 'privacy') {
+            (0, compliance_1.openPrivacy)();
+            return;
+        }
         if (id === 'coupon') {
             wx.showToast({ title: '优惠券功能暂未开放', icon: 'none' });
         }
@@ -417,9 +485,6 @@ Page({
                 activeDrawer: 'service',
                 drawerTitle: '官方在线客服'
             });
-        }
-        else if (id === 'merchant') {
-            wx.navigateTo({ url: '/pages/merchant/dashboard/index' });
         }
         else if (id === 'setting') {
             const info = wx.getStorageInfoSync ? wx.getStorageInfoSync() : { currentSize: 128 };
@@ -672,16 +737,13 @@ Page({
     // 客服交互
     // -------------------------
     onContactService() {
-        wx.makePhoneCall({
-            phoneNumber: this.data.customerServicePhone || '400-000-0000',
-            fail: () => {
-                wx.showToast({ title: '已取消拨打', icon: 'none' });
-            }
-        });
+        wx.navigateTo({ url: '/pages/service/index' });
     },
     onCallHotline() {
+        if (!this.data.customerServicePhone)
+            return;
         wx.makePhoneCall({
-            phoneNumber: this.data.customerServicePhone || '400-000-0000',
+            phoneNumber: this.data.customerServicePhone,
             fail: () => {
                 wx.showToast({ title: '已取消拨打', icon: 'none' });
             }
@@ -693,7 +755,7 @@ Page({
     onClearCache() {
         wx.showLoading({ title: '清理缓存中...' });
         setTimeout(() => {
-            // 保留当前登录身份；订单、库存和支付状态始终从云端读取
+            // 保留当前登录身份；订单和支付状态始终从云端读取
             const user = wx.getStorageSync('sneaker_mall_user');
             wx.clearStorageSync();
             if (user)

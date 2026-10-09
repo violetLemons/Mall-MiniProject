@@ -9,6 +9,7 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const crypto = require('crypto');
 
+const commerce = require('./common/commerce');
 const { success, fail } = require('./common/response');
 const { requireAdmin } = require('./common/authMiddleware');
 
@@ -42,56 +43,16 @@ exports.main = async (event) => {
       const userId = userRes.data[0]._id;
 
       const now = new Date();
-      let txOutcome = 'SUCCESS';
-
-      try {
-        await db.runTransaction(async (transaction) => {
-          const cardDoc = await transaction.collection('activation_codes').doc(card._id).get();
-          const c = cardDoc.data;
-          if (!c || c.status !== 'UNUSED') {
-            txOutcome = 'CODE_USED';
-            return;
-          }
-          if (c.expireAt && new Date(c.expireAt).getTime() < Date.now()) {
-            txOutcome = 'CODE_EXPIRED';
-            return;
-          }
-          await transaction.collection('activation_codes').doc(card._id).update({
-            data: { status: 'USED', redeemedBy: openid, redeemedAt: now, updatedAt: now }
-          });
-          if (c.type === 'BALANCE') {
-            // 读-改-写累加额度，事务内原子 + 冲突自动重试，避免「卡密已用但额度未到账」
-            const userDoc = await transaction.collection('users').doc(userId).get();
-            const curBalance = Number(userDoc.data && userDoc.data.balance) || 0;
-            await transaction.collection('users').doc(userId).update({
-              data: { balance: curBalance + Number(c.value || 0), updatedAt: now }
-            });
-          }
-        });
-      } catch (txErr) {
-        console.error('[activation][redeem] transaction error:', txErr && txErr.message ? txErr.message : txErr);
-        return fail('SYSTEM_ERROR', '兑换失败，请稍后重试');
-      }
-
-      if (txOutcome === 'CODE_USED') return fail('CODE_USED', '该卡密已被使用');
-      if (txOutcome === 'CODE_EXPIRED') return fail('CODE_EXPIRED', '该卡密已过期');
-
-      // 记录兑换流水（失败不阻断主流程）
-      try {
-        await db.collection('activation_records').add({
-          data: {
-            code,
-            userId: openid,
-            type: card.type || '',
-            benefit: card.benefit || '',
-            value: card.value || 0,
-            createdAt: now
-          }
-        });
-      } catch (recErr) {
-        console.warn('[activation][redeem] record warn:', recErr && recErr.message);
-      }
-
+      await commerce.transaction(db,async tx=>{
+        const current=await commerce.get(tx,'activation_codes',card._id);
+        if(!current||current.status!=='UNUSED')throw commerce.error('CODE_USED','卡密已使用');
+        if(current.type!=='BALANCE')throw commerce.error('INVALID_PARAMS','仅支持购物额度卡密');
+        if(current.expireAt&&new Date(current.expireAt).getTime()<=Date.now())throw commerce.error('CODE_EXPIRED','卡密已过期');
+        const value=commerce.integer(current.value,'额度分',1);
+        await commerce.changeBalance(tx,openid,value,'ACTIVATION:'+card._id,null);
+        await tx.collection('activation_codes').doc(card._id).update({data:{status:'USED',redeemedBy:openid,redeemedAt:now,updatedAt:now}});
+        await tx.collection('activation_records').doc(commerce.key('activation',card._id)).set({data:{code,userId:openid,type:'BALANCE',value,createdAt:now}});
+      });
       return success({
         code,
         type: card.type || '',
@@ -104,9 +65,10 @@ exports.main = async (event) => {
     if (action === 'generate') {
       const admin = requireSuperAdmin(await requireAdmin(event, db));
 
-      const count = Math.min(Math.max(Number(params.count) || 1, 1), 500);
+      const count = commerce.integer(params.count || 1,'数量',1,500);
       const type = String(params.type || 'BALANCE').trim();
-      const value = Number(params.value) || 0;
+      const value = commerce.integer(params.value,'额度分',1);
+      if(type !== 'BALANCE')return fail('INVALID_PARAMS','只支持购物额度卡密');
       const expireAtRaw = params.expireAt;
       const now = new Date();
 

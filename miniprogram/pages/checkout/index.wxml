@@ -1,6 +1,6 @@
 <view class="checkout-page">
   <custom-navbar title="确认订单" />
-  
+
   <view class="checkout-list">
     <view wx:for="{{items}}" wx:key="id" class="checkout-item">
       <image src="{{item.image}}" mode="aspectFill" class="checkout-image" />
@@ -14,13 +14,9 @@
 
   <view class="checkout-card">
     <text class="checkout-title">配送方式</text>
-    <view class="checkout-types">
-      <view class="checkout-type {{deliveryType === 'DELIVERY' ? 'active' : ''}}" data-type="DELIVERY" bindtap="onSelectDelivery">极速快递包邮</view>
-      <view wx:if="{{false}}" class="checkout-type {{deliveryType === 'PICKUP' ? 'active' : ''}}" data-type="PICKUP" bindtap="onSelectDelivery">潮流旗舰店到店自提</view>
-    </view>
-
+    <view>快递配送</view>
     <!-- 顺丰快递包邮：收货地址展示区域 -->
-    <view wx:if="{{deliveryType === 'DELIVERY'}}" class="address-row" bindtap="onOpenAddressPicker">
+    <view class="address-row" bindtap="onOpenAddressPicker">
       <view wx:if="{{selectedAddress}}" class="addr-content-box">
         <view class="addr-head-row">
           <text class="address-main">{{selectedAddress.name}} {{maskedPhone}}</text>
@@ -30,24 +26,17 @@
         <text class="address-sub">{{selectedAddress.province}}{{selectedAddress.city}}{{selectedAddress.district}}{{selectedAddress.detail}}</text>
       </view>
       <text wx:else class="address-empty">您还没有收货地址，点击添加 ›</text>
-      
+
       <view class="addr-right-ops">
         <text wx:if="{{selectedAddress && addressList.length >= 2}}" class="change-addr-btn" catchtap="onOpenAddressPicker">更换地址</text>
         <text class="arrow">›</text>
       </view>
     </view>
 
-    <!-- 潮流旗舰店到店自提：自提点展示区域 -->
-    <view wx:else class="pickup-section">
-      <view wx:for="{{pickupPoints}}" wx:key="id" class="pickup-row {{selectedPickupPoint.id === item.id ? 'active' : ''}}" data-index="{{index}}" bindtap="onSelectPickupPoint">
-        <view class="radio {{selectedPickupPoint.id === item.id ? 'checked' : ''}}"></view>
-        <view>
-          <text class="address-main">{{item.name}}</text>
-          <text class="address-sub">{{item.address}} · {{item.hours}}</text>
-        </view>
-      </view>
-      <text wx:if="{{pickupPoints.length === 0}}" class="address-empty">暂无可用自提点</text>
-    </view>
+
+
+
+
   </view>
 
   <!-- 金额明细：商品合计 / 购物额度抵扣 / 实付 -->

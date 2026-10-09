@@ -3,10 +3,13 @@
  * 统一网络通信、错误拦截、环境自动侦测与支付安全防腐
  */
 
+import { requirePrivacy, report } from './compliance';
 import { ApiResponse } from '../models/common';
 
 // 微信云开发环境 ID (请在微信开发者工具云开发控制台查看并填入)
-export const CLOUD_ENV_ID = 'cloud1-d3gffg6ok96e6cf3f';
+export const CLOUD_ENV_ID = 'REPLACE_WITH_TARGET_ENV_ID';
+// Local simulator is an explicit development switch; cloud failures never change environments.
+export const ENABLE_LOCAL_GATEWAY = false;
 const LOCAL_GATEWAY = 'http://127.0.0.1:3001';
 const LOCAL_SESSION_KEY = 'sneaker_local_session';
 
@@ -87,14 +90,16 @@ export async function callCloud<T>(
   action: string,
   params: any = {}
 ): Promise<T> {
+  if ((functionName === 'addresses' && ['create','save','update'].includes(action)) || (functionName === 'auth' && action === 'updateProfile') || (functionName === 'orders' && action === 'create')) await requirePrivacy();
+  if (functionName === 'orders' && action === 'create') report('order_submit');
   initCloud();
 
-  const isPlaceholderEnv = !CLOUD_ENV_ID || /your[-_]|placeholder|sneaker-mall-env-id/i.test(CLOUD_ENV_ID);
+  const isPlaceholderEnv = !CLOUD_ENV_ID || /REPLACE_|your[-_]|placeholder|sneaker-mall-env-id/i.test(CLOUD_ENV_ID);
 
   // 1. 本地模拟器模式优先尝试直连隔离网关 (127.0.0.1:3001)
   // 当云环境仍为占位符时，立即直连 local-admin-api，避免云端 404011 报错与网络挂起延迟，
   // 确保微信开发者工具与 PC 管理后台的数据毫秒级双向同步
-  if (isPlaceholderEnv) {
+  if (ENABLE_LOCAL_GATEWAY && isPlaceholderEnv) {
     try {
       return await callLocalGateway<T>(functionName, action, params);
     } catch (localErr: any) {
@@ -102,6 +107,7 @@ export async function callCloud<T>(
     }
   }
 
+  if (isPlaceholderEnv) throw new Error('请配置目标云环境 ID');
   // 2. 尝试调用微信官方 wx.cloud.callFunction
   if (wx.cloud) {
     try {
@@ -157,6 +163,7 @@ export async function callCloud<T>(
       const enhancedErr: any = new Error(friendlyMsg);
       enhancedErr.functionName = functionName;
       enhancedErr.action = action;
+      enhancedErr.code = err?.code;
       enhancedErr.errMsg = err?.errMsg || err?.message;
       enhancedErr.errCode = err?.errCode;
       enhancedErr.errno = err?.errno;

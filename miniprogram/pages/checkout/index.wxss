@@ -10,9 +10,7 @@
 .checkout-types { display: flex; gap: 16rpx; }
 .checkout-type { padding: 12rpx 20rpx; border: 1rpx solid #EBEDF0; border-radius: 999rpx; color: #8A8D93; font-size: 22rpx; }
 .checkout-type.active { border-color: #111; background: #111; color: #FFF; }
-.address-row, .pickup-row { display: flex; align-items: center; justify-content: space-between; margin-top: 18rpx; padding: 16rpx; border-radius: 12rpx; background: #FAFAFB; }
-.pickup-row { justify-content: flex-start; gap: 14rpx; margin-top: 14rpx; }
-.pickup-row.active .address-main { color: #111; }
+.address-row{ display: flex; align-items: center; justify-content: space-between; margin-top: 18rpx; padding: 16rpx; border-radius: 12rpx; background: #FAFAFB; }
 .address-main { display: block; font-size: 24rpx; font-weight: 600; color: #18191B; }
 .address-empty { display: block; margin-top: 16rpx; font-size: 22rpx; color: #FF5500; }
 .arrow { font-size: 36rpx; color: #8A8D93; }

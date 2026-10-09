@@ -10,11 +10,7 @@
     "pages/order/detail/index",
     "pages/goods/list/index",
     "pages/goods/detail/index",
-    "pages/activation/index",
-    "pages/merchant/dashboard/index",
-    "pages/merchant/goods/index",
-    "pages/merchant/order/index",
-    "pages/merchant/setting/index"
+    "pages/activation/index"
   ],
   "window": {
     "backgroundTextStyle": "dark",

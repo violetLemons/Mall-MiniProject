@@ -18,13 +18,10 @@ class AuthService {
      */
     static login() {
         return __awaiter(this, arguments, void 0, function* (extraParams = {}) {
-            var _a, _b;
-            const cached = wx.getStorageSync(STORAGE_USER_KEY);
-            const params = {
-                nickName: extraParams.nickName || ((_a = cached === null || cached === void 0 ? void 0 : cached.user) === null || _a === void 0 ? void 0 : _a.nickName) || undefined,
-                avatarUrl: extraParams.avatarUrl || ((_b = cached === null || cached === void 0 ? void 0 : cached.user) === null || _b === void 0 ? void 0 : _b.avatarUrl) || undefined
-            };
+            const params = {};
             const res = yield (0, cloud_1.callCloud)('auth', 'login', params);
+            if (res && res.user && (extraParams.nickName || extraParams.avatarUrl))
+                res.user = yield this.updateProfile(extraParams);
             if (res && res.user) {
                 wx.setStorageSync(STORAGE_USER_KEY, res);
             }

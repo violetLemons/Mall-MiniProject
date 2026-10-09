@@ -1,3 +1,4 @@
+import { openPrivacy, requirePrivacy } from '../../services/compliance';
 import { AuthService } from '../../services/auth.service';
 import { OrderService, OrderModel } from '../../services/order.service';
 import { CartService } from '../../services/cart.service';
@@ -48,10 +49,10 @@ Page({
       { id: 'history', title: '浏览历史', badge: '' },
       { id: 'address', title: '收货地址管理', badge: '' },
       { id: 'service', title: '官方在线客服', badge: '9:00-22:00' },
-      { id: 'merchant', title: '商户跳转', badge: '' },
+      { id: 'privacy', title: '隐私保护指引', badge: '' },
       { id: 'setting', title: '通用设置', badge: '' }
     ],
-    customerServicePhone: STORE_CONFIG.customerServicePhone || '400-000-0000',
+    customerServicePhone: STORE_CONFIG.customerServicePhone,
 
     // 抽屉状态
     activeDrawer: null as string | null,
@@ -138,6 +139,7 @@ Page({
       }
 
       const ordersRes = await OrderService.getList({ page: 1, pageSize: 20 }).catch(() => ({ list: [] }));
+      const summary = await OrderService.getSummary();
       const rawList = ordersRes.list || [];
       const list = rawList.map(o => ({
         ...o,
@@ -147,18 +149,13 @@ Page({
           unitPriceYuan: (Number(i.unitPrice || 0) / 100).toFixed(2)
         }))
       }));
-      const unpaidCount = list.filter(o => o.status === 'PENDING_PAYMENT').length;
-      const unshippedCount = list.filter(o => o.status === 'PAID').length;
-      const shippedCount = list.filter(o => o.status === 'SHIPPED' || o.status === 'WAITING_PICKUP' || o.status === 'READY_FOR_PICKUP').length;
-      const refundCount = list.filter(o => o.status === 'REFUND_PENDING' || o.status === 'REFUNDING').length;
-
       this.setData({
         allOrders: list,
-        'orderStats[0].count': list.length,     // 全部订单
-        'orderStats[1].count': unpaidCount,
-        'orderStats[2].count': unshippedCount,
-        'orderStats[3].count': shippedCount,
-        'orderStats[4].count': refundCount
+        'orderStats[0].count': summary.ALL,
+        'orderStats[1].count': summary.PENDING_PAYMENT,
+        'orderStats[2].count': summary.PAID,
+        'orderStats[3].count': summary.SHIPPED,
+        'orderStats[4].count': summary.REFUND
       });
 
       // 如果当前订单抽屉已打开，同步刷新过滤列表
@@ -185,25 +182,27 @@ Page({
   onTapAvatar() {
     wx.showActionSheet({
       itemList: ['查看头像大图', '更换头像'],
-      success: (res) => {
+      success: async (res) => {
         if (res.tapIndex === 0) {
           wx.previewImage({
             urls: [this.data.userInfo.avatarUrl],
             current: this.data.userInfo.avatarUrl
           });
         } else if (res.tapIndex === 1) {
+          try { await requirePrivacy(); } catch (e: any) { wx.showToast({ title: e?.message || '请先同意隐私授权', icon: 'none' }); return; }
           wx.chooseMedia({
             count: 1,
             mediaType: ['image'],
             success: async (chooseRes) => {
               const tempFilePath = chooseRes.tempFiles[0]?.tempFilePath;
               if (tempFilePath) {
-                this.setData({ 'userInfo.avatarUrl': tempFilePath });
                 try {
-                  await AuthService.updateProfile({ avatarUrl: tempFilePath });
-                  wx.showToast({ title: '头像已更新', icon: 'success' });
-                } catch {
-                  wx.showToast({ title: '头像已保存在本地', icon: 'none' });
+                  if (chooseRes.tempFiles[0].size > 2 * 1024 * 1024) throw new Error('头像图片请小于2MB');
+                  const uploaded = await wx.cloud.uploadFile({ cloudPath: `avatars/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`, filePath: tempFilePath });
+                  await AuthService.updateProfile({ avatarUrl: uploaded.fileID });
+                  wx.showToast({ title: '头像已提交审核', icon: 'none' });
+                } catch (e: any) {
+                  wx.showToast({ title: e?.message || '头像提交失败，请重试', icon: 'none' });
                 }
               }
             }
@@ -222,12 +221,12 @@ Page({
       success: async (res) => {
         if (res.confirm && res.content?.trim()) {
           const newName = res.content.trim();
-          this.setData({ 'userInfo.nickName': newName });
           try {
-            await AuthService.updateProfile({ nickName: newName });
+            const user = await AuthService.updateProfile({ nickName: newName });
+            this.setData({ 'userInfo.nickName': user.nickName });
             wx.showToast({ title: '昵称修改成功', icon: 'success' });
-          } catch {
-            wx.showToast({ title: '昵称已保存在本地', icon: 'none' });
+          } catch (e: any) {
+            wx.showToast({ title: e?.message || '昵称修改失败，请重试', icon: 'none' });
           }
         }
       }
@@ -247,6 +246,8 @@ Page({
       }
     });
   },
+
+  onStopPropagation() {},
 
   // -------------------------
   // 订单模块交互
@@ -375,7 +376,7 @@ Page({
     } else if (tab === 'PAID') {
       filtered = list.filter(o => o.status === 'PAID');
     } else if (tab === 'SHIPPED') {
-      filtered = list.filter(o => o.status === 'SHIPPED' || o.status === 'WAITING_PICKUP' || o.status === 'READY_FOR_PICKUP');
+      filtered = list.filter(o => o.status === 'SHIPPED');
     } else if (tab === 'REFUND') {
       filtered = list.filter(o => o.status === 'CANCELLED' || o.status === 'REFUNDING' || o.status === 'REFUNDED');
     }
@@ -464,6 +465,7 @@ Page({
   // -------------------------
   onTapMenu(e: any) {
     const id = e.currentTarget.dataset.id;
+    if (id === 'privacy') { openPrivacy(); return; }
     if (id === 'coupon') {
       wx.showToast({ title: '优惠券功能暂未开放', icon: 'none' });
     } else if (id === 'fav') {
@@ -487,8 +489,7 @@ Page({
         activeDrawer: 'service',
         drawerTitle: '官方在线客服'
       });
-    } else if (id === 'merchant') {
-      wx.navigateTo({ url: '/pages/merchant/dashboard/index' });
+
     } else if (id === 'setting') {
       const info = wx.getStorageInfoSync ? wx.getStorageInfoSync() : { currentSize: 128 };
       const currentKb = info.currentSize || 128;
@@ -749,17 +750,13 @@ Page({
   // 客服交互
   // -------------------------
   onContactService() {
-    wx.makePhoneCall({
-      phoneNumber: this.data.customerServicePhone || '400-000-0000',
-      fail: () => {
-        wx.showToast({ title: '已取消拨打', icon: 'none' });
-      }
-    });
+    wx.navigateTo({ url: '/pages/service/index' });
   },
 
   onCallHotline() {
+    if (!this.data.customerServicePhone) return;
     wx.makePhoneCall({
-      phoneNumber: this.data.customerServicePhone || '400-000-0000',
+      phoneNumber: this.data.customerServicePhone,
       fail: () => {
         wx.showToast({ title: '已取消拨打', icon: 'none' });
       }

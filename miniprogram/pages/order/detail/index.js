@@ -11,14 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const order_service_1 = require("../../../services/order.service");
 const STATUS_LABEL = {
-    PENDING_PAYMENT: '待付款', PAID: '待发货', SHIPPED: '运输中', WAITING_PICKUP: '待发货',
-    READY_FOR_PICKUP: '待收货', COMPLETED: '已完成', CANCELLED: '已取消', REFUNDING: '退款处理中', REFUNDED: '已退款'
-};
-const PICKUP_STATUS_LABEL = {
-    PREPARING: '门店备货中',
-    READY: '待自提（可到店提货）',
-    PICKED: '已自提交付',
-    COMPLETED: '已自提完成'
+    CLOSING: '关单核实中', REFUND_PENDING: '退款待审核', PENDING_PAYMENT: '待付款', PAID: '待发货', SHIPPED: '运输中', COMPLETED: '已完成', CANCELLED: '已取消', REFUNDING: '退款处理中', REFUNDED: '已退款'
 };
 function formatDateTime(val) {
     if (!val)
@@ -50,7 +43,6 @@ Page({
     },
     loadOrder(idOrNo, options) {
         return __awaiter(this, void 0, void 0, function* () {
-            var _a;
             if (!idOrNo) {
                 this.setData({ loading: false, errorMessage: '未指定订单查询编号' });
                 return;
@@ -59,19 +51,8 @@ Page({
                 const order = yield order_service_1.OrderService.getDetail(idOrNo, options);
                 if (!order)
                     throw new Error('订单不存在');
-                const isExpress = order.deliveryType === 'DELIVERY' || order.deliveryType === 'express';
-                const isPickup = order.deliveryType === 'PICKUP' || order.deliveryType === 'pickup';
-                const isPaid = order.status !== 'PENDING_PAYMENT' && order.status !== 'CANCELLED';
-                const rawPickupStatus = ((_a = order.pickupInfo) === null || _a === void 0 ? void 0 : _a.pickupStatus) || order.pickupStatus || '';
-                let pickupStatusLabel = PICKUP_STATUS_LABEL[rawPickupStatus];
-                if (!pickupStatusLabel) {
-                    if (order.status === 'COMPLETED')
-                        pickupStatusLabel = '已自提交付';
-                    else if (order.status === 'READY_FOR_PICKUP')
-                        pickupStatusLabel = '待自提（可到店提货）';
-                    else
-                        pickupStatusLabel = '门店备货中';
-                }
+                const isExpress = true;
+                const isPaid = !['PENDING_PAYMENT', 'CLOSING', 'CANCELLED'].includes(order.status);
                 // 物流信息：优先取子订单 shipments[] 数组；兼容旧版单一 trackingNo 数据
                 const rawShipments = (order.shipments && order.shipments.length > 0)
                     ? order.shipments
@@ -80,9 +61,7 @@ Page({
                         : []);
                 const shipments = rawShipments.map(s => (Object.assign(Object.assign({}, s), { shippedAtFormatted: formatDateTime(s.shippedAt) })));
                 this.setData({
-                    order: Object.assign(Object.assign({}, order), { statusLabel: STATUS_LABEL[order.status] || order.status, paymentStatusLabel: isPaid ? '已支付' : '待付款', pickupStatusLabel,
-                        isExpress,
-                        isPickup, hasShipment: shipments.length > 0, shipments, payAmountYuan: (Number(order.payAmount || 0) / 100).toFixed(2), totalAmountYuan: (Number(order.totalAmount || order.payAmount || 0) / 100).toFixed(2), createdAtFormatted: formatDateTime(order.createdAt || order.createTime), paidAtFormatted: formatDateTime(order.paidAt || order.payTime), shippedAtFormatted: formatDateTime(order.shippedAt || order.shippingTime), items: (order.items || []).map(item => (Object.assign(Object.assign({}, item), { unitPriceYuan: (Number(item.unitPrice || 0) / 100).toFixed(2), totalAmountYuan: (Number(item.totalAmount || 0) / 100).toFixed(2) }))) }),
+                    order: Object.assign(Object.assign({}, order), { statusLabel: STATUS_LABEL[order.status] || order.status, paymentStatusLabel: isPaid ? '已支付' : '待付款', isExpress, hasShipment: shipments.length > 0, shipments, payAmountYuan: (Number(order.payAmount || 0) / 100).toFixed(2), totalAmountYuan: (Number(order.totalAmount || order.payAmount || 0) / 100).toFixed(2), createdAtFormatted: formatDateTime(order.createdAt || order.createTime), paidAtFormatted: formatDateTime(order.paidAt || order.payTime), shippedAtFormatted: formatDateTime(order.shippedAt || order.shippingTime), items: (order.items || []).map(item => (Object.assign(Object.assign({}, item), { unitPriceYuan: (Number(item.unitPrice || 0) / 100).toFixed(2), totalAmountYuan: (Number(item.totalAmount || 0) / 100).toFixed(2) }))) }),
                     loading: false,
                     errorMessage: ''
                 });
@@ -132,6 +111,29 @@ Page({
             }
             catch (err) {
                 wx.showToast({ title: (err === null || err === void 0 ? void 0 : err.message) || '取消失败', icon: 'none' });
+            }
+        });
+    },
+    onApplyRefund() {
+        return __awaiter(this, void 0, void 0, function* () {
+            var _a, _b;
+            const id = ((_a = this.data.order) === null || _a === void 0 ? void 0 : _a._id) || ((_b = this.data.order) === null || _b === void 0 ? void 0 : _b.id);
+            if (!id || this.data.submitting)
+                return;
+            const response = yield new Promise(resolve => wx.showModal({ title: '申请整单退款', content: '已发货订单需要退货并由管理员确认。请输入原因。', editable: true, placeholderText: '退款原因', success: resolve }));
+            if (!response.confirm || !String(response.content || '').trim())
+                return;
+            this.setData({ submitting: true });
+            try {
+                yield order_service_1.OrderService.applyRefund(id, String(response.content).trim());
+                wx.showToast({ title: '已提交退款申请', icon: 'success' });
+                yield this.loadOrder(id);
+            }
+            catch (e) {
+                wx.showToast({ title: e.message || '申请失败', icon: 'none' });
+            }
+            finally {
+                this.setData({ submitting: false });
             }
         });
     },

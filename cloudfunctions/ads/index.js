@@ -54,7 +54,7 @@ exports.main = async (event) => {
       if (!openid) return fail('AUTH_REQUIRED', '请先登录');
       const cfg = await getConfigDoc();
       const c = cfg || defaultConfig();
-      const enabled = !!c.enabled && String(c.adUnitId || '').trim().length > 0 && Number(c.rewardAmount) > 0;
+      const enabled = false; // No trusted server-side ad completion evidence is configured.
       const dailyLimit = Math.max(1, Number(c.dailyLimit) || 5);
       let remainingToday = dailyLimit;
       if (enabled) {
@@ -72,71 +72,8 @@ exports.main = async (event) => {
       });
     }
 
-    if (action === 'reward') {
-      if (!openid) return fail('AUTH_REQUIRED', '请先登录');
-      const cfg = await getConfigDoc();
-      if (!cfg || !cfg.enabled || String(cfg.adUnitId || '').trim().length === 0 || Number(cfg.rewardAmount) <= 0) {
-        return fail('AD_DISABLED', '广告暂未开放');
-      }
-      const rewardAmount = Number(cfg.rewardAmount);
-      const dailyLimit = Math.max(1, Number(cfg.dailyLimit) || 5);
+    if (action === 'reward') return fail('AD_DISABLED', '额度奖励未开放：缺少可信服务端核验');
 
-      const uRes = await db.collection('users').where({ _openid: openid }).limit(1).get().catch(() => ({ data: [] }));
-      if (!uRes.data || uRes.data.length === 0) return fail('USER_NOT_FOUND', '用户不存在');
-      const userId = uRes.data[0]._id;
-
-      const today = todayStr();
-      let txOutcome = 'SUCCESS';
-      let balanceAfter = 0;
-
-      try {
-        await db.runTransaction(async (transaction) => {
-          const uDoc = await transaction.collection('users').doc(userId).get();
-          const u = uDoc.data;
-          const seen = (u && u.adRewardDate === today) ? (Number(u.adRewardCountToday) || 0) : 0;
-          if (seen >= dailyLimit) {
-            txOutcome = 'DAILY_LIMIT_REACHED';
-            return;
-          }
-          const curBalance = Number(u && u.balance) || 0;
-          balanceAfter = curBalance + rewardAmount;
-          await transaction.collection('users').doc(userId).update({
-            data: {
-              balance: balanceAfter,
-              adRewardDate: today,
-              adRewardCountToday: seen + 1,
-              updatedAt: new Date()
-            }
-          });
-        });
-      } catch (txErr) {
-        console.error('[ads][reward] transaction error:', txErr && txErr.message ? txErr.message : txErr);
-        return fail('SYSTEM_ERROR', '领取失败，请稍后重试');
-      }
-
-      if (txOutcome === 'DAILY_LIMIT_REACHED') return fail('DAILY_LIMIT_REACHED', '今日观看次数已达上限');
-
-      // 发放流水（失败不阻断主流程）
-      try {
-        await db.collection('ad_reward_records').add({
-          data: {
-            openid,
-            userId,
-            configId: CONFIG_ID,
-            rewardAmount,
-            balanceAfter,
-            date: today,
-            createdAt: new Date()
-          }
-        });
-      } catch (recErr) {
-        console.warn('[ads][reward] record warn:', recErr && recErr.message);
-      }
-
-      return success({ rewardAmount, balance: balanceAfter }, '领取成功');
-    }
-
-    // ---------------- 管理侧 ----------------
     if (action === 'getConfig') {
       await requireAdmin(event, db);
       const cfg = await getConfigDoc();
@@ -145,7 +82,7 @@ exports.main = async (event) => {
         adUnitId: cfg.adUnitId || '',
         rewardAmount: Number(cfg.rewardAmount) || 0,
         dailyLimit: Number(cfg.dailyLimit) || 5,
-        enabled: !!cfg.enabled,
+        enabled: false,
         updatedAt: cfg.updatedAt || null
       } : defaultConfig());
     }
@@ -158,7 +95,7 @@ exports.main = async (event) => {
       const dailyLimit = Number(params.dailyLimit);
       if (!Number.isInteger(rewardAmount) || rewardAmount <= 0) return fail('INVALID_PARAMS', '单次奖励额度必须为正整数(分)');
       if (!Number.isInteger(dailyLimit) || dailyLimit < 1) return fail('INVALID_PARAMS', '每日上限必须为 >=1 的整数');
-      const enabled = !!params.enabled;
+      const enabled = false;
 
       const now = new Date();
       try {

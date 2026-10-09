@@ -45,7 +45,7 @@ try {
 
   # Test payment is deliberately opt-in. Production deployments must never
   # expose a simulated payment/refund entry point.
-  $functions = @('addresses', 'adminAuth', 'adminBanners', 'adminCategories', 'adminGateway', 'adminInventory', 'adminOrders', 'adminProducts', 'adminUsers', 'activation', 'auth', 'cart', 'orders', 'orderTimeoutJob', 'payment', 'paymentCallback', 'pickupPoints', 'products')
+  $functions = @('addresses', 'adminAuth', 'adminBanners', 'adminCategories', 'adminGateway', 'adminOrders', 'adminProducts', 'adminUsers', 'activation', 'ads', 'auth', 'cart', 'orders', 'orderTimeoutJob', 'payment', 'paymentCallback', 'refundCallback', 'wechatEvents', 'contentReviewJob', 'products')
   if ($IncludeTestPayment) { $functions += 'testPayment' }
 
   foreach ($name in $functions) {

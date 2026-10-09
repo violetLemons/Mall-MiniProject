@@ -68,16 +68,9 @@
 
     <view class="checkout-options">
       <view class="checkout-option-title">配送方式</view>
-      <view class="checkout-type-row">
-        <view class="checkout-type {{deliveryType === 'DELIVERY' ? 'is-active' : ''}}" data-type="DELIVERY" bindtap="onSelectDelivery">
-          <text>极速快递包邮</text>
-        </view>
-        <view wx:if="{{false}}" class="checkout-type {{deliveryType === 'PICKUP' ? 'is-active' : ''}}" data-type="PICKUP" bindtap="onSelectDelivery">
-          <text>校园自提</text>
-        </view>
-      </view>
+      <view>快递配送</view>
 
-      <view wx:if="{{deliveryType === 'DELIVERY'}}" class="checkout-address" bindtap="onOpenAddress">
+      <view class="checkout-address" bindtap="onOpenAddress">
         <view wx:if="{{selectedAddress}}">
           <text class="checkout-address-main">{{selectedAddress.name}} {{selectedAddress.phone}}</text>
           <text class="checkout-address-sub">{{selectedAddress.province}}{{selectedAddress.city}}{{selectedAddress.district}}{{selectedAddress.detail}}</text>
@@ -86,22 +79,7 @@
         <text class="checkout-arrow">›</text>
       </view>
 
-      <view wx:else class="checkout-pickup-list">
-        <view
-          wx:for="{{pickupPoints}}"
-          wx:key="id"
-          class="checkout-pickup-item {{selectedPickupPoint.id === item.id ? 'is-selected' : ''}}"
-          data-index="{{index}}"
-          bindtap="onSelectPickupPoint"
-        >
-          <view class="checkout-pickup-radio {{selectedPickupPoint.id === item.id ? 'radio-checked' : ''}}"></view>
-          <view>
-            <text class="checkout-address-main">{{item.name}}</text>
-            <text class="checkout-address-sub">{{item.address}} · {{item.hours}}</text>
-          </view>
-        </view>
-        <text wx:if="{{pickupPoints.length === 0}}" class="checkout-address-empty">暂无可用自提点</text>
-      </view>
+
     </view>
   </view>
 

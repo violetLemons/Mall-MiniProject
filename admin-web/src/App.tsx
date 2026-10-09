@@ -10,15 +10,13 @@ import { Categories } from './pages/Categories';
 import { Banners } from './pages/Banners';
 import { Admins } from './pages/Admins';
 import { Logs } from './pages/Logs';
-import { AuditTickets } from './pages/AuditTickets';
-import { MerchantSettings } from './pages/MerchantSettings';
 import { CardKeys } from './pages/CardKeys';
 import { Ads } from './pages/Ads';
 
 // 登录守卫 (Route Guard)
 const RequireAuth: React.FC<{ children: React.ReactElement }> = ({ children }) => {
   const user = AdminApi.getCurrentUser();
-  if (!user) {
+  if (!user || user.role !== 'SUPER_ADMIN') {
     return <Navigate to="/login" replace />;
   }
   return children;
@@ -33,10 +31,10 @@ const RequireSuperAdmin: React.FC<{ children: React.ReactElement }> = ({ childre
   return children;
 };
 
-// 平台角色守卫 (Platform Guard): 商家 (MERCHANT) 不可访问平台专属模块
+// 所有管理模块只允许超级管理员
 const RequirePlatform: React.FC<{ children: React.ReactElement }> = ({ children }) => {
   const user = AdminApi.getCurrentUser();
-  if (!user || user.role === 'MERCHANT') {
+  if (!user || user.role !== 'SUPER_ADMIN') {
     return <Navigate to="/" replace />;
   }
   return children;
@@ -73,8 +71,6 @@ export const App: React.FC = () => {
           >
             <Route index element={<Dashboard />} />
             <Route path="products" element={<Products />} />
-            <Route path="audit" element={<AuditTickets />} />
-            <Route path="merchant-settings" element={<MerchantSettings />} />
             <Route path="orders" element={<Orders />} />
             <Route
               path="categories"

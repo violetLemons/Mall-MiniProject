@@ -14,7 +14,7 @@ import {
   Trash2,
   RefreshCw,
   ArchiveRestore,
-  AlertOctagon,
+
   Upload,
   Image as ImageIcon,
   Sparkles,
@@ -64,7 +64,7 @@ export const Products: React.FC = () => {
     detailImages: []
   });
 
-  const currentUser = AdminApi.getCurrentUser();
+
   const [parentCategoryId, setParentCategoryId] = useState('');
   const level1Categories = categories.filter(c => !c.parentId);
   const level2Categories = categories.filter(c => c.parentId === parentCategoryId);
@@ -111,9 +111,11 @@ export const Products: React.FC = () => {
 
   const handleToggleStatus = async (product: Product) => {
     const nextStatus = product.status === 'ON_SALE' ? 'OFF_SALE' : 'ON_SALE';
-    await AdminApi.updateProductStatus(product.id, nextStatus);
-    toast(`商品 [${product.name}] 已${nextStatus === 'ON_SALE' ? '上架发布' : '下架停售'}`, 'success');
-    await loadProducts();
+    try {
+      await AdminApi.updateProductStatus(product.id, nextStatus);
+      toast(`商品 [${product.name}] 已${nextStatus === 'ON_SALE' ? '上架发布' : '下架停售'}`, 'success');
+      await loadProducts();
+    } catch (e: any) { toast(e?.message || '操作失败', 'error'); }
   };
 
   const handleSoftDelete = async (product: Product) => {
@@ -134,17 +136,6 @@ export const Products: React.FC = () => {
       await loadProducts();
     } catch (e: any) {
       toast(e.message || '恢复失败', 'error');
-    }
-  };
-
-  const handlePurge = async (product: Product) => {
-    if (!window.confirm(`【高危物理清除】确定彻底删除商品 [${product.name}] 吗？此操作不可逆！`)) return;
-    try {
-      await AdminApi.purgeProduct(product.id);
-      toast('物理销毁成功，数据已彻底抹除', 'success');
-      await loadProducts();
-    } catch (e: any) {
-      toast(e.message || '物理删除失败', 'error');
     }
   };
 
@@ -312,15 +303,7 @@ export const Products: React.FC = () => {
         detailImages: formData.detailImages || []
       });
 
-      // 商家提交 → 生成审核工单，不直接上架
-      if (saved?.pending) {
-        toast(`商品 [${formData.name}] 已提交审核工单，等待平台审核后上架`, 'success');
-        setEditModalOpen(false);
-        await loadProducts();
-        return;
-      }
-
-      toast(`商品 [${formData.name}] 保存成功`, 'success');
+      toast(`商品 [${formData.name}] 保存成功，微信图片审核通过后可上架`, 'success');
       setEditModalOpen(false);
       await loadProducts();
     } catch (err: any) {
@@ -337,7 +320,7 @@ export const Products: React.FC = () => {
             商品库 · Products
           </h1>
           <p style={{ fontSize: '14px', color: '#64748B', marginTop: '4px' }}>
-            支持上架/下架、软删除及高危物理清除。
+            支持上架/下架、软删除及恢复，保留历史订单引用。
           </p>
         </div>
 
@@ -362,26 +345,6 @@ export const Products: React.FC = () => {
           <span>新增商品</span>
         </button>
       </div>
-
-      {/* 商家审核提示 */}
-      {currentUser?.role === 'MERCHANT' && (
-        <div
-          style={{
-            backgroundColor: '#EFF6FF',
-            border: '1px solid #BFDBFE',
-            borderRadius: '12px',
-            padding: '12px 16px',
-            fontSize: '13px',
-            color: '#1E40AF',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}
-        >
-          <ShieldCheck size={18} color="#2563EB" />
-          <span>新增或修改商品需提交审核工单，平台审核通过后自动上架。可在「商品审核工单」查看进度。</span>
-        </div>
-      )}
 
       {/* Filter Toolbar */}
       <div
@@ -551,11 +514,7 @@ export const Products: React.FC = () => {
                   {/* Price */}
                   <td style={{ padding: '14px 18px', fontWeight: 700, color: '#FF5500' }}>
                     {formatCents(p.minPrice)} {p.maxPrice > p.minPrice && `~ ${formatCents(p.maxPrice)}`}
-                    {currentUser?.role === 'SUPER_ADMIN' && (p.platformFee || 0) > 0 && (
-                      <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 500, marginTop: '2px' }}>
-                        抽成 {formatCents(p.platformFee)}/件 · 买家实付 {formatCents((p.minPrice || 0) + (p.platformFee || 0))}
-                      </div>
-                    )}
+
                   </td>
 
                   {/* Sales */}
@@ -565,7 +524,7 @@ export const Products: React.FC = () => {
 
                   {/* Status */}
                   <td style={{ padding: '14px 18px' }}>
-                    <Badge status={p.status} />
+                    <Badge status={p.status} /><div style={{fontSize:12,marginTop:6}}>微信审核：{p.contentSafety?.status || '需提交审核'}</div>
                   </td>
 
                   {/* Actions */}
@@ -643,28 +602,7 @@ export const Products: React.FC = () => {
                             <span>恢复商品</span>
                           </button>
 
-                          {currentUser?.role === 'SUPER_ADMIN' && (
-                            <button
-                              onClick={() => handlePurge(p)}
-                              title="高危物理删除 (仅超管可用)"
-                              style={{
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                border: '1px solid #FECACA',
-                                backgroundColor: '#FEF2F2',
-                                color: '#DC2626',
-                                fontSize: '12px',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px'
-                              }}
-                            >
-                              <AlertOctagon size={14} />
-                              <span>彻底清除</span>
-                            </button>
-                          )}
+
                         </>
                       )}
                     </div>

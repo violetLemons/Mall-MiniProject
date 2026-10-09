@@ -18,16 +18,13 @@ export class AuthService {
    * 静默登录 / 自动获取身份 (自动获取/安排头像、昵称并随机分配用户ID)
    */
   static async login(extraParams: { nickName?: string; avatarUrl?: string } = {}): Promise<{ openid: string; user: UserProfile }> {
-    const cached = wx.getStorageSync(STORAGE_USER_KEY);
-    const params = {
-      nickName: extraParams.nickName || cached?.user?.nickName || undefined,
-      avatarUrl: extraParams.avatarUrl || cached?.user?.avatarUrl || undefined
-    };
+    const params = {};
     const res = await callCloud<{ openid: string; user: UserProfile }>(
       'auth',
       'login',
       params
     );
+    if (res && res.user && (extraParams.nickName || extraParams.avatarUrl)) res.user = await this.updateProfile(extraParams);
     if (res && res.user) {
       wx.setStorageSync(STORAGE_USER_KEY, res);
     }

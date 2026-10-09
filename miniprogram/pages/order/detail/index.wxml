@@ -62,29 +62,8 @@
       </view>
     </view>
 
-    <!-- 2.2 到店自提模式 (严格无自提码，无收货地址，无运单号) -->
-    <view wx:elif="{{false}}" class="detail-card pickup-card">
-      <view class="card-header">
-        <text class="card-title">自提网点</text>
-        <text class="card-tag tag-pickup">潮流旗舰店到店自提</text>
-      </view>
-      <view class="pickup-box">
-        <text class="pickup-name">{{order.pickupInfo.pointName || order.pickupPointName || '示例大学潮流自提站'}}</text>
-        <text class="pickup-addr">{{order.pickupInfo.address || order.pickupPointAddress || '示例省示例市示例区大学城学苑大道1088号'}}</text>
-        <view class="pickup-meta">
-          <text class="meta-label">自提状态：</text>
-          <text class="meta-val" style="color: #FF5500; font-weight: 600;">{{order.pickupStatusLabel}}</text>
-        </view>
-        <view class="pickup-meta">
-          <text class="meta-label">营业时间：</text>
-          <text class="meta-val">09:00 - 21:30</text>
-        </view>
-        <view class="pickup-meta">
-          <text class="meta-label">自提说明：</text>
-          <text class="meta-val">到店核对订单号或登记手机号即可提货，由店员在系统确认交付</text>
-        </view>
-      </view>
-    </view>
+
+
 
     <!-- 3. 商品清单卡片 -->
     <view class="detail-card goods-card">
@@ -134,7 +113,7 @@
       </view>
       <view class="info-row">
         <text class="info-label">支付方式</text>
-        <text class="info-val">微信支付 (JSAPI)</text>
+        <text class="info-val">{{order.payAmount > 0 ? '微信支付（可含购物额度抵扣）' : '购物额度支付'}}</text>
       </view>
       <view class="info-row">
         <text class="info-label">支付状态</text>
@@ -151,17 +130,19 @@
     </view>
 
     <!-- 6. 底部操作栏 -->
-    <view wx:if="{{order.status === 'PENDING_PAYMENT' || order.status === 'SHIPPED' || (order.status === 'COMPLETED' && !order.reviewed)}}" class="detail-actions">
+    <view wx:if="{{order.status === 'PENDING_PAYMENT' || order.status === 'CLOSING' || order.status === 'PAID' || order.status === 'SHIPPED' || (order.status === 'COMPLETED' && !order.reviewed)}}" class="detail-actions">
       <block wx:if="{{order.status === 'PENDING_PAYMENT'}}">
         <button class="pay-btn" bindtap="onPay" loading="{{submitting}}">立即支付</button>
         <button class="secondary cancel-btn" bindtap="onCancel">取消订单</button>
       </block>
+      <block wx:elif="{{order.status === 'CLOSING'}}"><button class="secondary" bindtap="onCancel">重试关单核实</button></block>
       <block wx:elif="{{order.status === 'SHIPPED'}}">
         <button class="confirm-btn" bindtap="onConfirmReceive">确认收货</button>
       </block>
       <block wx:elif="{{order.status === 'COMPLETED' && !order.reviewed}}">
         <button class="review-btn" bindtap="onOpenReview">去评价</button>
       </block>
+      <button wx:if="{{order.status === 'PAID' || order.status === 'SHIPPED'}}" class="secondary" bindtap="onApplyRefund" loading="{{submitting}}">申请整单退款</button>
     </view>
   </block>
 

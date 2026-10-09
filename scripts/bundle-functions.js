@@ -40,6 +40,7 @@ function bundleFunctions() {
     if (!dir.isDirectory() || dir.name === 'common') continue;
 
     const funcDir = path.join(CLOUD_FUNCTIONS_ROOT, dir.name);
+    if (!fs.existsSync(path.join(funcDir, 'index.js'))) continue;
     const targetCommonDir = path.join(funcDir, 'common');
 
     // 1. 同步公共 common 模块到每个云函数子目录

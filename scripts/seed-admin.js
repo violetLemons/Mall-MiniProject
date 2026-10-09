@@ -1,49 +1,7 @@
-/**
- * 初始超级管理员生成脚本 (Seed Admin)
- * 使用 scrypt + 32位强随机盐，绝对禁止明文密码
- */
-
-const crypto = require('crypto');
-
-function hashPassword(password, customSalt = null) {
-  const salt = customSalt || crypto.randomBytes(32).toString('hex');
-  const hash = `scrypt$${crypto.scryptSync(password, salt, 64, { N: 16384, r: 8, p: 1 }).toString('hex')}`;
-  return { salt, hash };
-}
-
-// 默认生成预置超级管理员数据
-const defaultUsername = 'superadmin';
-const defaultPassword = process.env.INITIAL_ADMIN_PASSWORD || crypto.randomBytes(12).toString('base64url');
-
-const { salt, hash } = hashPassword(defaultPassword);
-
-const initialSuperAdmin = {
-  _id: 'admin_super_01',
-  username: defaultUsername,
-  passwordHash: hash,
-  salt: salt,
-  role: 'SUPER_ADMIN',
-  permissions: ['*'], // 超级管理员拥有全局通配符权限
-  status: 'ACTIVE',
-  failedLoginAttempts: 0,
-  lockUntil: null,
-  createdAt: new Date(),
-  updatedAt: new Date()
-};
-
-console.log('========================================================');
-console.log('   通用商城 · 初始超级管理员安全凭证生成成功          ');
-console.log('========================================================');
-console.log(`用户名 (Username): ${defaultUsername}`);
-console.log(`初始密码 (Password): ${defaultPassword}`);
-console.log(`Salt (32 bytes):   ${salt}`);
-console.log(`PasswordHash:      ${hash}`);
-console.log('--------------------------------------------------------');
-console.log('已生成可直接写入 admins 集合的 JSON 数据：');
-console.log(JSON.stringify(initialSuperAdmin, null, 2));
-console.log('========================================================');
-
-module.exports = {
-  hashPassword,
-  initialSuperAdmin
-};
+const fs=require('fs'),path=require('path'),crypto=require('crypto');
+const {hashPassword}=require('../cloudfunctions/common/crypto');
+const password=process.env.INITIAL_ADMIN_PASSWORD;
+if(!password||password.length<12||password.length>128)throw Error('请通过 INITIAL_ADMIN_PASSWORD 设置12~128位初始密码，脚本不会输出明文');
+const salt=crypto.randomBytes(32).toString('hex'),admin={_id:'admin_super_01',username:'superadmin',name:'超级管理员',salt,passwordHash:hashPassword(password,salt),role:'SUPER_ADMIN',permissions:[],status:'ACTIVE',sessionVersion:0,createdAt:new Date(),updatedAt:new Date()};
+const index=process.argv.indexOf('--out'),out=path.resolve(index>=0?process.argv[index+1]:'work/cloud-seed/admins.json');
+if(out===path.parse(out).root)throw Error('输出路径无效');fs.mkdirSync(path.dirname(out),{recursive:true});fs.writeFileSync(out,JSON.stringify(admin)+'\n');console.log('仅导出初始超管密码摘要，不连接云环境：'+out);

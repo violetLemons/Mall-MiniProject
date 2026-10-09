@@ -32,19 +32,12 @@ Component({
                 const matchingSku = skus.find(s => (s.colorName === color.name || s.colorId === color.id) &&
                     Number(s.size) === Number(bs.size));
                 if (matchingSku) {
-                    const stock = Number(matchingSku.stock) || 0;
                     return {
                         size: bs.size,
-                        inStock: stock > 0,
-                        stockCount: stock,
                         skuId: matchingSku.skuId || matchingSku.id || matchingSku._id
                     };
                 }
-                return {
-                    size: bs.size,
-                    inStock: false,
-                    stockCount: 0
-                };
+                return { size: bs.size };
             });
         },
         onVisibleChange(val) {
@@ -59,10 +52,10 @@ Component({
             // 默认选中第一个颜色
             const defaultColor = p.colors[0];
             const dynamicSizes = this.computeSizesForColor(defaultColor, p.skus || [], p.sizes || []);
-            // 默认选中第一个有库存的规格
+            // 默认选中第一个规格
             let defaultSize = null;
             if (dynamicSizes && dynamicSizes.length > 0) {
-                defaultSize = dynamicSizes.find(s => s.inStock) || dynamicSizes[0] || null;
+                defaultSize = dynamicSizes[0] || null;
             }
             this.setData({
                 selectedColor: defaultColor,
@@ -84,8 +77,8 @@ Component({
                     nextSize = matched;
                 }
             }
-            if (!nextSize || !nextSize.inStock) {
-                nextSize = dynamicSizes.find(s => s.inStock) || dynamicSizes[0] || null;
+            if (!nextSize) {
+                nextSize = dynamicSizes[0] || null;
             }
             this.setData({
                 selectedColor: color,
@@ -97,13 +90,6 @@ Component({
         },
         onSelectSize(e) {
             const size = e.currentTarget.dataset.size;
-            if (!size.inStock) {
-                wx.showToast({
-                    title: `规格 ${size.size} 暂时缺货`,
-                    icon: 'none'
-                });
-                return;
-            }
             this.setData({ selectedSize: size }, () => {
                 this.updateSelectedText();
             });
@@ -116,7 +102,7 @@ Component({
             }
         },
         onPlus() {
-            const max = this.data.selectedSize ? (this.data.selectedSize.stockCount || 99) : 99;
+            const max = 5;
             if (this.data.quantity < max) {
                 this.setData({ quantity: this.data.quantity + 1 }, () => {
                     this.updateSelectedText();

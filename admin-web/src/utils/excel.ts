@@ -43,8 +43,6 @@ function orderStatusText(status?: string): string {
     PENDING_PAYMENT: '待付款',
     PAID: '待发货',
     SHIPPED: '已发货',
-    WAITING_PICKUP: '待自提',
-    READY_FOR_PICKUP: '待自提',
     COMPLETED: '已完成',
     CANCELLED: '已取消',
     REFUND_PENDING: '待退款审核',
@@ -55,7 +53,7 @@ function orderStatusText(status?: string): string {
 }
 
 export function exportOrdersExcel(orders: Order[], fileName = '订单导出.xlsx'): void {
-  const header = ['订单号', '商户名称', '下单时间', '商品', '数量', '买家', '手机号', '收货地址', '配送方式', '状态', '实付金额(元)'];
+  const header = ['订单号', '下单时间', '商品', '数量', '买家', '手机号', '收货地址', '配送方式', '状态', '实付金额(元)'];
   const rows = orders.map(o => {
     const productSummary = (o.items || []).map(i => `${i.productName || ''}${i.colorName ? ' ' + i.colorName : ''}${i.size ? ' ' + i.size : ''}`).join('；');
     const countSum = (o.items || []).reduce((s, i) => s + (Number(i.count) || 0), 0);
@@ -64,14 +62,13 @@ export function exportOrdersExcel(orders: Order[], fileName = '订单导出.xlsx
       : '';
     return [
       o.orderNo,
-      o.merchantName || '',
       formatDateTime(o.createdAt),
       productSummary,
       countSum,
       o.customerName || '微信买家',
       o.customerPhone || '',
       addr,
-      o.deliveryType === 'PICKUP' ? '到店自提' : '极速快递',
+      '快递配送',
       orderStatusText(o.status),
       (Number(o.payAmount || 0) / 100).toFixed(2)
     ];

@@ -1,4 +1,4 @@
-export type AdminRole = 'SUPER_ADMIN' | 'OPERATOR' | 'MERCHANT';
+export type AdminRole = 'SUPER_ADMIN';
 
 export interface AdminUser {
   id: string;
@@ -8,30 +8,11 @@ export interface AdminUser {
   address?: string;
   role: AdminRole;
   permissions: string[];
-  merchantId?: string | null;
-  subMchIdMask?: string;
   status: 'ACTIVE' | 'DISABLED' | 'SUSPENDED' | 'DELETED';
   lastLoginAt?: string;
   createdAt: string;
 }
 
-export interface ProductAuditTicket {
-  id: string;
-  merchantId: string;
-  type: 'CREATE' | 'UPDATE';
-  productId?: string | null;
-  payload: {
-    product?: any;
-    skus?: SkuItem[] | null;
-  };
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
-  platformFee?: number;
-  rejectReason?: string;
-  reviewedBy?: string | null;
-  reviewedAt?: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
 
 export interface SkuItem {
   id?: string;
@@ -45,6 +26,7 @@ export interface SkuItem {
 }
 
 export interface Product {
+  contentSafety?: { status: string; version: string };
   id: string;
   name: string;
   title?: string;
@@ -60,9 +42,7 @@ export interface Product {
   maxPrice: number;
   price?: number;
   originalPrice?: number;
-  platformFee?: number;
   basePrice?: number;
-  merchantId?: string | null;
   sales: number;
   status: 'ON_SALE' | 'OFF_SALE' | 'DELETED';
   tags: string[];
@@ -70,7 +50,6 @@ export interface Product {
   isHot: boolean;
   sort: number;
   skus: SkuItem[];
-  deliveryTypes?: ('DELIVERY' | 'PICKUP')[];
   createdAt: string;
   updatedAt: string;
   deletedAt?: string | null;
@@ -97,13 +76,10 @@ export interface Order {
   items: OrderItem[];
   totalAmount: number;
   payAmount: number;
-  deliveryType: 'DELIVERY' | 'PICKUP';
-  status: 'PENDING_PAYMENT' | 'PAID' | 'SHIPPED' | 'WAITING_PICKUP' | 'READY_FOR_PICKUP' | 'COMPLETED' | 'CANCELLED' | 'REFUND_PENDING' | 'REFUNDING' | 'REFUNDED';
+  balanceAmount?: number;
+  refundNo?: string;
+  status: 'PENDING_PAYMENT' | 'PAID' | 'SHIPPED' | 'CLOSING' | 'COMPLETED' | 'CANCELLED' | 'REFUND_PENDING' | 'REFUNDING' | 'REFUNDED';
   isTest?: boolean;
-  merchantId?: string | null;
-  merchantName?: string;
-  subOrderNo?: string;
-  parentOrderId?: string;
   shipments?: { trackingNo?: string; logisticsCompany?: string; expressCompany?: string; shippedAt?: string }[];
   trackingNo?: string;
   logisticsCompany?: string;
@@ -123,13 +99,6 @@ export interface Order {
   };
   shippingSyncStatus?: string;
   shippingSyncError?: string;
-  pickupInfo?: {
-    pointId: string;
-    pointName: string;
-    pickupCode?: string;
-    pickupStatus: 'PREPARING' | 'READY' | 'COMPLETED' | 'PICKED';
-    pickedUpAt?: string;
-  };
   shippingAddress?: {
     name?: string;
     receiverName?: string;
@@ -151,7 +120,7 @@ export interface Category {
   parentId?: string;
   badge?: string;
   sort: number;
-  status: 'ACTIVE' | 'DISABLED';
+  status: 'ACTIVE' | 'DISABLED' | 'REVIEWING';
   productCount: number;
   createdAt?: string;
 }
@@ -166,7 +135,7 @@ export interface Banner {
   targetUrl?: string;
   linkUrl?: string;
   sort: number;
-  status: 'ACTIVE' | 'DISABLED';
+  status: 'ACTIVE' | 'DISABLED' | 'REVIEWING';
   createdAt: string;
 }
 

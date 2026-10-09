@@ -1,0 +1,15 @@
+{
+  "timeout": 60,
+  "triggers": [
+    {
+      "name": "contentReviewQueue",
+      "type": "timer",
+      "config": "0 */1 * * * * *"
+    }
+  ],
+  "permissions": {
+    "openapi": [
+      "security.mediaCheckAsync"
+    ]
+  }
+}

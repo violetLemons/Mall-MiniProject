@@ -9,9 +9,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const compliance_1 = require("../../../services/compliance");
 const product_service_1 = require("../../../services/product.service");
 const cart_service_1 = require("../../../services/cart.service");
-const pickup_service_1 = require("../../../services/pickup.service");
 Page({
     data: {
         id: '',
@@ -31,11 +31,9 @@ Page({
         selectedColor: null,
         selectedSize: null,
         selectedQuantity: 1,
-        deliveryType: 'express', // 'express' | 'store_pickup'
-        pickupPoints: [],
-        selectedPickupPoint: null
     },
     onLoad(options) {
+        (0, compliance_1.report)('product_view', { product_id: String(options.id || '').slice(0, 100) });
         const id = String(options.id || '').trim();
         if (!id) {
             wx.showToast({ title: '商品参数缺失，请返回重试', icon: 'none' });
@@ -96,35 +94,6 @@ Page({
             duration: 1500
         });
     },
-    onSelectDelivery(e) {
-        const type = e.currentTarget.dataset.type;
-        this.setData({ deliveryType: type });
-        if (type === 'store_pickup' && this.data.pickupPoints.length === 0) {
-            this.loadPickupPoints();
-        }
-    },
-    loadPickupPoints() {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                const points = (yield pickup_service_1.PickupService.list()).filter(point => point.status !== 'DISABLED');
-                this.setData({ pickupPoints: points, selectedPickupPoint: points[0] || null });
-                if (!points.length)
-                    wx.showToast({ title: '暂无可用自提点', icon: 'none' });
-                return points;
-            }
-            catch (err) {
-                console.warn('[detail] load pickup points failed:', err);
-                wx.showToast({ title: '自提点加载失败，请重试', icon: 'none' });
-                return [];
-            }
-        });
-    },
-    onSelectPickupPoint(e) {
-        const index = Number(e.currentTarget.dataset.index);
-        const point = this.data.pickupPoints[index];
-        if (point)
-            this.setData({ selectedPickupPoint: point });
-    },
     onOpenSku(e) {
         const type = e.currentTarget.dataset.type || 'both';
         this.directAction(type);
@@ -167,10 +136,8 @@ Page({
                 selected: true
             };
             wx.setStorageSync('sneaker_checkout_items', [checkoutItem]);
-            const deliveryParam = this.data.deliveryType === 'store_pickup' ? 'PICKUP' : 'DELIVERY';
-            const pointParam = this.data.selectedPickupPoint ? (this.data.selectedPickupPoint.id || this.data.selectedPickupPoint._id) : '';
             wx.navigateTo({
-                url: `/pages/checkout/index?deliveryType=${deliveryParam}&pickupPointId=${pointParam || ''}`
+                url: '/pages/checkout/index'
             });
         }
     },
@@ -227,10 +194,8 @@ Page({
                     selected: true
                 };
                 wx.setStorageSync('sneaker_checkout_items', [checkoutItem]);
-                const deliveryParam = this.data.deliveryType === 'store_pickup' ? 'PICKUP' : 'DELIVERY';
-                const pointParam = this.data.selectedPickupPoint ? (this.data.selectedPickupPoint.id || this.data.selectedPickupPoint._id) : '';
                 wx.navigateTo({
-                    url: `/pages/checkout/index?deliveryType=${deliveryParam}&pickupPointId=${pointParam || ''}`
+                    url: '/pages/checkout/index'
                 });
             }
         });
@@ -268,14 +233,6 @@ Page({
     },
     onStopProp() {
         // 阻止点击内容区域事件冒泡导致关闭弹窗
-    },
-    onContactService() {
-        wx.showModal({
-            title: '在线商品顾问',
-            content: '专属顾问已在线，正在为您接入...',
-            showCancel: false,
-            confirmText: '知道了'
-        });
     },
     onShareAppMessage() {
         return {

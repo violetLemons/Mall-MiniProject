@@ -21,6 +21,10 @@ exports.main = async (event, context) => {
 
   try {
     const admin = await requireAdmin(event, db);
+    if (['create', 'update'].includes(action)) {
+      requirePermission(admin, 'category.manage');
+      return success(await require('./common/catalogSafety').saveCatalog(cloud, db, admin, 'CATEGORY', action, params), '已保存，图片审核通过后生效');
+    }
 
     switch (action) {
       case 'uploadImage': {
@@ -30,6 +34,7 @@ exports.main = async (event, context) => {
         if (!base64Data) return fail('INVALID_PARAMS', '请提供图片数据');
 
         const buffer = Buffer.from(String(base64Data).replace(/^data:image\/\w+;base64,/, ''), 'base64');
+        if (!buffer.length || buffer.length > 2 * 1024 * 1024) return fail('INVALID_PARAMS', '图片须为1字节至2MB');
         const rawExt = (filename.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
         const ext = ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(rawExt) ? rawExt : 'jpg';
         const cloudPath = `categories/${Date.now()}_${crypto.randomBytes(4).toString('hex')}.${ext}`;
@@ -89,64 +94,6 @@ exports.main = async (event, context) => {
         return success(list);
       }
 
-      case 'create': {
-        requirePermission(admin, 'category.manage');
-        const { name, icon, badge = '', sort = 100, parentId = '' } = params;
-        if (!name || !icon) return fail('INVALID_PARAMS', '分类名与图标不可为空');
-
-        // 可选父级：parentId 非空时校验父级存在（一级分类 parentId 为空串）
-        let parent = '';
-        if (parentId) {
-          parent = String(parentId).trim();
-          const parentDoc = await db.collection('categories').doc(parent).get().catch(() => null);
-          if (!parentDoc || !parentDoc.data) return fail('INVALID_PARAMS', '父级分类不存在');
-        }
-
-        const addRes = await db.collection('categories').add({
-          data: {
-            name,
-            icon,
-            badge,
-            parentId: parent,
-            sort: Number(sort) || 100,
-            status: 'ACTIVE',
-            createdAt: db.serverDate(),
-            updatedAt: db.serverDate()
-          }
-        });
-
-        await recordOperationLog(db, {
-          adminId: admin.adminId,
-          adminUsername: admin.username,
-          action: 'CREATE_CATEGORY',
-          resourceType: 'CATEGORY',
-          resourceId: addRes._id,
-          after: { name, parentId: parent }
-        });
-
-        return success({ categoryId: addRes._id }, '分类创建成功');
-      }
-
-      case 'update': {
-        requirePermission(admin, 'category.manage');
-        const { id, ...updateFields } = params;
-        if (!id) return fail('INVALID_PARAMS', '缺少分类ID');
-
-        updateFields.updatedAt = db.serverDate();
-        await db.collection('categories').doc(id).update({ data: updateFields });
-
-        await recordOperationLog(db, {
-          adminId: admin.adminId,
-          adminUsername: admin.username,
-          action: 'UPDATE_CATEGORY',
-          resourceType: 'CATEGORY',
-          resourceId: id,
-          after: updateFields
-        });
-
-        return success(null, '分类更新成功');
-      }
-
       case 'delete': {
         requirePermission(admin, 'category.manage');
         const { id } = params;
@@ -163,7 +110,7 @@ exports.main = async (event, context) => {
         }
 
         // 强安全外键约束：一级分类下仍有二级分类时禁止删除
-        const childCount = await db.collection('categories').where({ parentId: id }).count().catch(() => ({ total: 0 }));
+        const childCount = await db.collection('categories').where({ parentId: id }).count();
         if (childCount.total > 0) {
           return fail('CATEGORY_HAS_CHILDREN', `该分类下仍有 ${childCount.total} 个二级分类，禁止直接删除！请先删除或转移二级分类。`);
         }

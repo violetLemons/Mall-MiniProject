@@ -7,9 +7,10 @@ function loadRuntime(db) {
   const root = path.resolve(__dirname, '../../cloudfunctions');
   const oldLoad = Module._load;
   Module._load = function(id, parent, main) { if (id === 'wx-server-sdk' && parent?.filename.startsWith(root + path.sep)) return cloud; return oldLoad.call(this, id, parent, main); };
-  const names = ['auth', 'products', 'cart', 'orders', 'payment', 'paymentCallback', 'addresses', 'pickupPoints', 'adminAuth', 'adminProducts', 'adminCategories', 'adminBanners', 'adminOrders', 'adminInventory', 'adminUsers', 'testPayment', 'orderTimeoutJob'];
+  const names = ['auth', 'products', 'cart', 'orders', 'payment', 'paymentCallback', 'refundCallback', 'wechatEvents', 'activation', 'adminGateway', 'ads', 'addresses', 'adminAuth', 'adminProducts', 'adminCategories', 'adminBanners', 'adminOrders', 'adminUsers', 'testPayment', 'orderTimeoutJob'];
   const handlers = Object.fromEntries(names.map(n => [n, require(path.join(root, n, 'index.js')).main]));
   Module._load = oldLoad;
+  cloud.callFunction = async ({name,data}) => ({result: await handlers[name](data)});
   return { cloud, call: (name, event, context = {}) => identity.run(context, () => handlers[name](event)), names };
 }
 module.exports = { loadRuntime };

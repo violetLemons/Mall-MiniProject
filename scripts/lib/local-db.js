@@ -3,14 +3,17 @@
 const fs = require('fs'), crypto = require('crypto');
 const clone = value => structuredClone(value);
 function createDb(initial = {}, filename = null) {
-  let state = clone(initial), queue = Promise.resolve(), failure = null;
-  const command = Object.fromEntries(['inc', 'gte', 'lte', 'neq', 'in'].map(op => [op, value => ({ $op: op, value })]));
+  let state = clone(initial), queue = Promise.resolve(), failure = null, readFailure = null;
+  const command = Object.fromEntries(['inc', 'gt', 'lt', 'gte', 'lte', 'neq', 'in'].map(op => [op, value => ({ $op: op, value })]));
   const at = (obj, path) => path.split('.').reduce((o, k) => o?.[k], obj);
   function matches(doc, query) {
     return Object.entries(query).every(([k, v]) => {
       const a = at(doc, k);
       if (v instanceof RegExp) return v.test(String(a || ''));
-      if (v?.$op) return ({ gte: () => a >= v.value, lte: () => a <= v.value, neq: () => a !== v.value, in: () => v.value.includes(a) })[v.$op]();
+      if (v?.$op) {
+        const left = v.value instanceof Date ? new Date(a).getTime() : a, right = v.value instanceof Date ? v.value.getTime() : v.value;
+        return ({ gt: () => left > right, lt: () => left < right, gte: () => left >= right, lte: () => left <= right, neq: () => a !== v.value, in: () => v.value.includes(a) })[v.$op]();
+      }
       return a === v || (v === null && a == null);
     });
   }
@@ -45,6 +48,7 @@ function createDb(initial = {}, filename = null) {
         where(q) { query = q; return chain; }, skip(n) { offset = n; return chain; }, limit(n) { limit = n; return chain; },
         orderBy(k, dir) { sort.push([k, dir]); return chain; }, field(f) { fields = f; return chain; },
         async get() {
+          if (readFailure && readFailure(name)) throw new Error('INJECTED_DATABASE_READ_FAILURE');
           let found = rows().filter(r => matches(r, query));
           for (const [k, dir] of sort.slice().reverse()) found.sort((a, b) => (at(a, k) > at(b, k) ? 1 : at(a, k) < at(b, k) ? -1 : 0) * (dir === 'desc' ? -1 : 1));
           found = found.slice(offset, offset + limit);
@@ -54,13 +58,13 @@ function createDb(initial = {}, filename = null) {
         doc(id) {
           if (typeof id !== 'string' || !id) throw new Error('INVALID_DOC_ID');
           return {
-            async get() { return { data: clone(rows().find(r => r._id === id) || null) }; },
+            async get() { if (readFailure && readFailure(name, id)) throw new Error('INJECTED_DATABASE_READ_FAILURE'); return { data: clone(rows().find(r => r._id === id) || null) }; },
             set({ data }) { return write(s => { const arr = s[name] ||= [], idx = arr.findIndex(r => r._id === id), value = { ...clone(data), _id: id }; if (idx < 0) arr.push(value); else arr[idx] = value; return { _id: id }; }); },
             update({ data }) { return write(s => { const row = (s[name] || []).find(r => r._id === id); if (!row) throw new Error('DOCUMENT_NOT_FOUND'); change(row, data); return { stats: { updated: 1 } }; }); },
             remove() { return write(s => { const old = s[name] || []; s[name] = old.filter(r => r._id !== id); return { stats: { removed: old.length - s[name].length } }; }); }
           };
         },
-        add({ data }) { const id = data._id || crypto.randomUUID(); return write(s => { const arr = s[name] ||= []; if (arr.some(r => r._id === id)) throw new Error('DUPLICATE_KEY'); arr.push({ ...clone(data), _id: id }); return { _id: id }; }); },
+        add({ data }) { const entries = (Array.isArray(data) ? data : [data]).map(row => ({ ...clone(row), _id: row._id || crypto.randomUUID() })); return write(s => { const arr = s[name] ||= []; if (entries.some(e => arr.some(r => r._id === e._id))) throw new Error('DUPLICATE_KEY'); arr.push(...entries); return Array.isArray(data) ? { _ids: entries.map(e => e._id) } : { _id: entries[0]._id }; }); },
         update({ data }) { return write(s => { const found = (s[name] || []).filter(r => matches(r, query)); found.forEach(r => change(r, data)); return { stats: { updated: found.length } }; }); },
         remove() { return write(s => { const old = s[name] || []; s[name] = old.filter(r => !matches(r, query)); return { stats: { removed: old.length - s[name].length } }; }); }
       };
@@ -72,6 +76,7 @@ function createDb(initial = {}, filename = null) {
   const db = interfaceFor(() => state);
   db.snapshot = () => clone(state);
   db.injectFailure = callback => { failure = callback; };
+  db.injectReadFailure = callback => { readFailure = callback; };
   return db;
 }
 module.exports = { createDb };

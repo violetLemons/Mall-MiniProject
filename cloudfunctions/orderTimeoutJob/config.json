@@ -1,5 +1,5 @@
 {
-  "timeout": 30,
+  "timeout": 60,
   "triggers": [
     {
       "name": "cancelExpiredOrdersAndSyncShippingCron",
@@ -10,8 +10,7 @@
   "permissions": {
     "openapi": [
       "wxa.sec.order.uploadShippingInfo",
-      "wxa.sec.order.getOrder",
-      "wxa.sec.order.getOrderList"
+      "wxa.sec.order.getOrder"
     ]
   }
 }

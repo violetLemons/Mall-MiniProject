@@ -416,10 +416,6 @@
   color: #1890FF;
 }
 
-.status-pickup {
-  color: #52C41A;
-}
-
 .status-shipped {
   color: #722ED1;
 }

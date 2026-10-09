@@ -80,10 +80,6 @@
   padding: 4rpx 14rpx;
   border-radius: 999rpx;
 }
-.card-tag.tag-pickup {
-  color: #0F62FE;
-  background: rgba(15, 98, 254, 0.08);
-}
 .item-count {
   font-size: 22rpx;
   color: #8A8D93;
@@ -155,29 +151,6 @@
 .shipment-title .logistics-label {
   color: #FF5500;
   font-weight: 600;
-}
-
-/* 配送信息 (自提) */
-.pickup-box {
-  display: flex;
-  flex-direction: column;
-  gap: 10rpx;
-}
-.pickup-name {
-  font-size: 28rpx;
-  font-weight: 700;
-  color: #111111;
-}
-.pickup-addr {
-  font-size: 24rpx;
-  color: #666666;
-  line-height: 1.4;
-}
-.pickup-meta {
-  display: flex;
-  align-items: center;
-  margin-top: 4rpx;
-  font-size: 22rpx;
 }
 .meta-label {
   color: #8A8D93;

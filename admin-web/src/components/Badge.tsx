@@ -30,6 +30,14 @@ export const Badge: React.FC<BadgeProps> = ({ status, text, variant }) => {
           if (status === 'PENDING_PAYMENT') label = '待付款';
         }
         break;
+      case 'REVIEWING':
+        v = 'warning';
+        if (!text) label = '内容审核中';
+        break;
+      case 'CLOSING':
+        v = 'warning';
+        if (!text) label = '关单核实中';
+        break;
       case 'SHIPPED':
         v = 'purple';
         if (!text) {

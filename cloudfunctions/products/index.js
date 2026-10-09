@@ -52,11 +52,10 @@ function escapeRegex(str) {
 function formatProductDTO(p) {
   const id = p._id || p.id;
   const title = p.title || p.name || '通用商品';
-  const platformFee = Number(p.platformFee) || 0;
   const baseMin = typeof p.minPrice === 'number' ? p.minPrice : (typeof p.price === 'number' ? p.price : 0);
   const baseMax = typeof p.maxPrice === 'number' ? p.maxPrice : baseMin;
-  const price = baseMin + platformFee; // 买家实付最低价 = 商家基础价 + 平台抽成
-  const originalPrice = (p.originalPrice || baseMax) + platformFee;
+  const price = baseMin; // 商品价格单位为整数分
+  const originalPrice = (p.originalPrice || baseMax);
 
   return {
     id,
@@ -70,11 +69,10 @@ function formatProductDTO(p) {
     cover: p.cover || '',
     images: p.images || (p.cover ? [p.cover] : []),
     detailImages: p.detailImages || [],
-    platformFee,
     basePrice: baseMin,
     price,
     minPrice: price,
-    maxPrice: baseMax + platformFee,
+    maxPrice: baseMax,
     originalPrice,
     sales: Number(p.sales) || 0,
     tags: Array.isArray(p.tags) ? p.tags : [],
@@ -214,7 +212,6 @@ exports.main = async (event, context) => {
 
         const product = prodRes.data;
         const skus = skusRes.data || [];
-        const platformFee = Number(product.platformFee) || 0;
 
         // 提取颜色列表与规格列表，计算 2D 矩阵
         const colorMap = new Map();
@@ -247,9 +244,8 @@ exports.main = async (event, context) => {
             image: sku.colorImage || product.cover,
             size: sizeNum,
             basePrice: sku.price,
-            platformFee,
-            price: sku.price + platformFee,
-            originalPrice: (sku.originalPrice || product.originalPrice || sku.price) + platformFee
+            price: sku.price,
+            originalPrice: (sku.originalPrice || product.originalPrice || sku.price)
           };
         });
 
@@ -321,20 +317,11 @@ exports.main = async (event, context) => {
       case 'promoCards': {
         try {
           const res = await db.collection('banners')
-            .where({ type: 'PROMO_ZONE' })
+            .where({ type: 'PROMO_ZONE', status: 'ACTIVE' })
             .orderBy('sort', 'asc')
             .get();
           if (res.data && res.data.length > 0) {
             return success(res.data);
-          }
-        } catch (_) {}
-
-        try {
-          const res2 = await db.collection('promo_cards')
-            .orderBy('sort', 'asc')
-            .get();
-          if (res2.data && res2.data.length > 0) {
-            return success(res2.data);
           }
         } catch (_) {}
 

@@ -1,7 +1,6 @@
 import { CartService, CartItemModel } from '../../services/cart.service';
 import { OrderService } from '../../services/order.service';
 import { AddressService, CloudAddress } from '../../services/address.service';
-import { PickupService, PickupPoint } from '../../services/pickup.service';
 
 Page({
   data: {
@@ -10,37 +9,11 @@ Page({
     totalPrice: 0,
     selectedCount: 0,
     loading: false,
-    deliveryType: 'DELIVERY' as 'DELIVERY' | 'PICKUP',
-    selectedAddress: null as CloudAddress | null,
-    pickupPoints: [] as PickupPoint[],
-    selectedPickupPoint: null as PickupPoint | null
-  },
+    selectedAddress: null as CloudAddress | null,},
 
   async onShow() {
     await this.loadCart();
-    await this.loadCheckoutOptions();
-  },
-
-  async loadCheckoutOptions() {
-    const [address, points] = await Promise.all([
-      AddressService.getDefault().catch(() => null),
-      PickupService.list().catch(() => [])
-    ]);
-    this.setData({
-      selectedAddress: address,
-      pickupPoints: points.filter(point => point.status !== 'DISABLED'),
-      selectedPickupPoint: points.find(point => point.status !== 'DISABLED') || null
-    });
-  },
-
-  onSelectDelivery(e: any) {
-    const type = e.currentTarget.dataset.type;
-    if (type === 'DELIVERY' || type === 'PICKUP') this.setData({ deliveryType: type });
-  },
-
-  onSelectPickupPoint(e: any) {
-    const point = this.data.pickupPoints[Number(e.currentTarget.dataset.index)];
-    if (point) this.setData({ selectedPickupPoint: point });
+    this.setData({ selectedAddress: await AddressService.getDefault().catch(() => null) });
   },
 
   onOpenAddress() {

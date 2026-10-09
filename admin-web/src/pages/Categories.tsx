@@ -112,9 +112,11 @@ export const Categories: React.FC = () => {
       sort: Number(formData.sort) || 0,
       parentId: formParentId
     };
-    await AdminApi.saveCategory(payload);
-    setModalOpen(false);
-    await loadData();
+    try {
+      await AdminApi.saveCategory(payload);
+      setModalOpen(false);
+      await loadData();
+    } catch (e: any) { alert(e?.message || '保存失败，请重试'); }
   };
 
   const handleDelete = async (c: Category) => {

@@ -10,22 +10,28 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.OrderService = exports.ORDER_STATUS_TOKEN = void 0;
+const compliance_1 = require("./compliance");
 const cloud_1 = require("./cloud");
 /**
  * 订单列表组合状态 token（与后端 orders.list 的 status 过滤逻辑对齐）
  * 后端将部分 token 展开为多个底层状态：REFUND → REFUND_PENDING|REFUNDING；
- * PENDING_REVIEW → COMPLETED 且未评价；SHIPPED → SHIPPED|WAITING_PICKUP|READY_FOR_PICKUP。
+ * PENDING_REVIEW → COMPLETED 且未评价；SHIPPED → 已发货。
  */
 exports.ORDER_STATUS_TOKEN = {
     ALL: 'ALL', // 全部订单
     PENDING_PAYMENT: 'PENDING_PAYMENT', // 待付款
     PAID: 'PAID', // 待发货（已付款未发货）
-    SHIPPED: 'SHIPPED', // 待收货（已发货 / 待自提）
+    SHIPPED: 'SHIPPED', // 待收货（已发货）
     REFUND: 'REFUND', // 退款中
     PENDING_REVIEW: 'PENDING_REVIEW', // 待评价（已完成且未评价）
     COMPLETED: 'COMPLETED' // 已完成
 };
 class OrderService {
+    static getSummary() {
+        return __awaiter(this, void 0, void 0, function* () {
+            return (0, cloud_1.callCloud)('orders', 'summary');
+        });
+    }
     /**
      * 提交创建订单 (金额单位：分)
      */
@@ -69,11 +75,23 @@ class OrderService {
      */
     static confirmReceive(id) {
         return __awaiter(this, void 0, void 0, function* () {
-            return (0, cloud_1.callCloud)('orders', 'confirmReceive', { id });
+            const order = yield this.getDetail(id);
+            if (!order)
+                throw new Error('订单不存在');
+            if (order.status === 'SHIPPED' && order.payAmount > 0 && !order.isTest) {
+                const transactionId = order.paymentTradeNo;
+                if (!transactionId)
+                    throw new Error('缺少微信交易号');
+                yield new Promise((resolve, reject) => wx.openBusinessView({
+                    businessType: 'weappOrderConfirm', extraData: { transaction_id: transactionId },
+                    success: () => resolve(), fail: reject
+                }));
+            }
+            yield (0, cloud_1.callCloud)('orders', 'confirmReceive', { id });
         });
     }
     /**
-     * 买家申请退款 (整子订单退，进入待商家审核)
+     * 买家申请退款 (整单退，进入管理员审核)
      */
     static applyRefund(id, reason) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -101,6 +119,7 @@ class OrderService {
     static payOrder(orderId) {
         return __awaiter(this, void 0, void 0, function* () {
             var _a;
+            (0, compliance_1.report)('payment_start');
             console.log(`[PAY-01] 用户点击支付, orderId: ${orderId}`);
             console.log('[PAY-02] 开始创建支付参数');
             // 预检订单详情获取订单号与金额
@@ -109,14 +128,14 @@ class OrderService {
             try {
                 const detail = yield this.getDetail(orderId);
                 if (detail) {
-                    currentOrderNo = detail.parentOrderNo || detail.orderNo || orderId;
+                    currentOrderNo = detail.orderNo || orderId;
                     payAmountFen = detail.payAmount || 0;
                 }
             }
             catch (e) {
                 console.warn('[PAY] 预查订单信息提示:', e);
             }
-            const currentAppId = 'wxYOUR_MINIPROGRAM_APPID';
+            const currentAppId = wx.getAccountInfoSync().miniProgram.appId;
             console.log(`[PAY-03] 当前商城订单号: ${currentOrderNo}`);
             console.log(`[PAY-04] 当前金额（分）: ${payAmountFen}`);
             console.log(`[PAY-05] 当前运行 AppID: ${currentAppId}`);
@@ -161,6 +180,16 @@ class OrderService {
                     rawError: createErr
                 };
             }
+            // 全额购物额度抵扣：后端已直结订单，无需拉起微信支付
+            if (res === null || res === void 0 ? void 0 : res.noPayment) {
+                return {
+                    success: true,
+                    status: 'PAID',
+                    code: 'SUCCESS',
+                    message: '已用购物额度抵扣完成',
+                    noPayment: true
+                };
+            }
             const packageStr = ((_a = res === null || res === void 0 ? void 0 : res.payment) === null || _a === void 0 ? void 0 : _a.package) || '';
             const hasPrepay = typeof packageStr === 'string' && packageStr.startsWith('prepay_id=') && packageStr.length > 10;
             console.log(`[PAY-08] 是否获得 prepay_id: ${hasPrepay ? 'true' : 'false'}${hasPrepay ? ` (${packageStr.slice(0, 24)}...)` : ''}`);
@@ -174,7 +203,7 @@ class OrderService {
                 };
             }
             if (!res || !res.payment || !hasPrepay) {
-                console.error('[PAYMENT FAILED] [PAY-08-FAIL] 未取得有效 prepay_id:', res);
+                console.error('[PAYMENT FAILED] [PAY-08-FAIL] 未取得有效 prepay_id');
                 return {
                     success: false,
                     status: 'PENDING_PAYMENT',
@@ -189,7 +218,7 @@ class OrderService {
                 !payment.nonceStr ||
                 !payment.package || !payment.package.startsWith('prepay_id=') ||
                 !payment.paySign) {
-                console.error('[PAYMENT FAILED] [PAY-09-FAIL] 支付调起参数校验不合格:', payment);
+                console.error('[PAYMENT FAILED] [PAY-09-FAIL] 支付调起参数校验不合格');
                 return {
                     success: false,
                     status: 'PENDING_PAYMENT',
@@ -270,7 +299,8 @@ class OrderService {
             // 3. 严格查询后端确认支付状态 (防伪造、防未入账)
             try {
                 const queryRes = yield (0, cloud_1.callCloud)('payment', 'queryOrder', { orderId: currentOrderNo });
-                if (queryRes && queryRes.status === 'PAID') {
+                if (queryRes && ['PAID', 'SHIPPED', 'COMPLETED'].includes(queryRes.status)) {
+                    (0, compliance_1.report)('payment_confirmed');
                     return { success: true, status: 'PAID', code: 'SUCCESS', message: '支付成功' };
                 }
                 return {

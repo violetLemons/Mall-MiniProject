@@ -46,24 +46,30 @@ function address(input) {
   if (!/^1[3-9]\d{9}$/.test(a.phone)) throw error('INVALID_ADDRESS', '请输入有效手机号');
   return a;
 }
-function stockCheck(sku) {
-  // 库存已从业务移除，保留函数避免外部引用破坏
-}
-// 库存字段已从业务中移除；本函数仅保留销量(sales)记账，不再做任何库存锁定/扣减/流水。
-async function inventory(tx, order, operation) {
-  if (operation !== 'PAYMENT_CONFIRMED' && operation !== 'REFUND_RESTORE') return;
+async function adjustSales(tx, order, sign) {
   for (const item of order.items) {
     const p = await get(tx, 'products', item.productId);
-    if (p) await tx.collection('products').doc(item.productId).update({ data: {
-      sales: Math.max(0, (p.sales || 0) + (operation === 'PAYMENT_CONFIRMED' ? item.count : -item.count)),
-      updatedAt: new Date()
-    } });
+    if (p) await tx.collection('products').doc(p._id).update({ data: { sales: Math.max(0, integer(p.sales || 0, '销量') + sign * item.count), updatedAt: new Date() } });
   }
+}
+async function changeBalance(tx, userId, delta, businessKey, orderId) {
+  integer(Math.abs(delta), '额度变动');
+  const id = key(businessKey);
+  const existing = await get(tx, 'balance_transactions', id);
+  if (existing) {
+    if (existing.amount !== delta || existing.userId !== userId) throw error('CONFLICT', '额度流水冲突');
+    return;
+  }
+  const { data } = await tx.collection('users').where({ _openid: userId }).limit(1).get();
+  const user = data[0];
+  if (!user) throw error('USER_NOT_FOUND', '用户不存在');
+  const before = integer(user.balance || 0, '购物额度'), after = integer(before + delta, '剩余额度');
+  await tx.collection('users').doc(user._id).update({ data: { balance: after, updatedAt: new Date() } });
+  await tx.collection('balance_transactions').doc(id).set({ data: { businessKey, userId, orderId, amount: delta, before, after, createdAt: new Date() } });
 }
 async function createOrder(db, userId, params) {
   if (!userId) throw error('AUTH_REQUIRED', '请先登录');
-  // 客户端应提供幂等标识；服务端为旧客户端生成一次性标识，避免把同一请求永久拒绝。
-  const requestId = text(params.requestId || (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : key(Date.now(), Math.random(), String(Math.random()))), '下单请求标识', 16, 100);
+  const requestId = text(params.requestId, '下单请求标识', 16, 100);
   if (!Array.isArray(params.items) || !params.items.length || params.items.length > 10) throw error('INVALID_PARAMS', '订单须包含 1~10 款规格');
   const seen = new Set();
   const inputs = params.items.map(i => {
@@ -72,167 +78,169 @@ async function createOrder(db, userId, params) {
     seen.add(skuId);
     return { skuId, count: integer(i.count, '数量', 1, 5), cartId: i.cartId ? text(i.cartId, '购物车ID', 1, 100) : '' };
   });
-  const deliveryType = params.deliveryType || 'DELIVERY';
-  if (!['DELIVERY', 'PICKUP'].includes(deliveryType)) throw error('INVALID_DELIVERY_TYPE', '配送方式无效');
-  const fingerprint = key(inputs, deliveryType, params.addressId || params.shippingAddress || null, params.pickupPointId || '', params.remark || '');
+  const remark = params.remark ? text(params.remark, '备注', 0, 200) : '';
+  const fingerprint = key(inputs, params.addressId || params.shippingAddress || params.receiverSnapshot || null, params.useBalance !== false, remark);
   const id = key(userId, requestId);
   return transaction(db, async tx => {
     const existing = await get(tx, 'orders', id);
     if (existing) {
       if (existing.requestFingerprint !== fingerprint) throw error('IDEMPOTENCY_CONFLICT', '同一请求标识不能用于不同订单');
-      return { orderId: id, orderNo: existing.orderNo, payAmount: existing.payAmount };
+      return { orderId: id, orderNo: existing.orderNo, payAmount: existing.payAmount, totalAmount: existing.totalAmount, balanceAmount: existing.balanceAmount };
     }
-    let shippingAddress = null, pickupInfo = null;
-    if (deliveryType === 'DELIVERY') {
-      let raw = params.shippingAddress;
-      if (params.addressId) {
-        raw = await get(tx, 'addresses', text(params.addressId, '地址ID', 1, 100));
-        if (!raw || raw.userId !== userId) throw error('PERMISSION_DENIED', '收货地址不属于当前用户');
-      }
-      shippingAddress = address(raw);
-    } else {
-      const point = await get(tx, 'pickup_points', text(params.pickupPointId, '自提点ID', 1, 100));
-      if (!point || point.status !== 'ACTIVE') throw error('INVALID_PICKUP_POINT', '自提点不存在或暂停营业');
-      pickupInfo = { pointId: point._id, pointName: point.name, address: point.address || '', pickupCode: '', pickupStatus: 'PREPARING' };
+    let raw = params.shippingAddress || params.receiverSnapshot;
+    if (params.addressId) {
+      raw = await get(tx, 'addresses', text(params.addressId, '地址ID', 1, 100));
+      if (!raw || raw.userId !== userId) throw error('PERMISSION_DENIED', '收货地址不属于当前用户');
     }
-    const snapshots = [];
+    const shippingAddress = address(raw), snapshots = [];
     for (const input of inputs) {
       const sku = await get(tx, 'product_skus', input.skuId);
       if (!sku || sku.status !== 'ACTIVE') throw error('SKU_NOT_FOUND', '规格不存在或停售');
       const p = await get(tx, 'products', sku.productId);
       if (!p || p.status !== 'ON_SALE' || p.deletedAt) throw error('PRODUCT_OFF_SALE', '商品已下架');
       integer(sku.price, '价格', 1);
-      snapshots.push({ productId: sku.productId, skuId: sku._id, productName: p.name, colorName: sku.colorName || '', size: sku.size,
-        image: sku.colorImage || p.cover || '', unitPrice: sku.price, count: input.count, totalAmount: sku.price * input.count });
+      snapshots.push({ productId: sku.productId, skuId: sku._id, productName: p.name, colorName: sku.colorName || '', size: sku.size || '',
+        image: sku.colorImage || p.cover || '', unitPrice: sku.price, count: input.count, totalAmount: integer(sku.price * input.count, '商品金额', 1) });
     }
-    const payAmount = integer(snapshots.reduce((s, i) => s + i.totalAmount, 0), '订单金额', 1);
-    const order = { _id: id, userId, orderNo: `SL${Date.now()}${id.slice(0, 8)}`, items: snapshots, totalAmount: payAmount, payAmount,
-      deliveryType, shippingAddress, pickupInfo, remark: params.remark ? text(params.remark, '备注', 0, 200) : '',
-      requestFingerprint: fingerprint, status: 'PENDING_PAYMENT', inventoryVersion: 2, isTest: testMode(), paymentInitiated: false,
+    const totalAmount = integer(snapshots.reduce((s, i) => s + i.totalAmount, 0), '订单金额', 1);
+    const { data: users } = await tx.collection('users').where({ _openid: userId }).limit(1).get();
+    if (!users[0]) throw error('USER_NOT_FOUND', '请先登录');
+    const balanceAmount = params.useBalance === false ? 0 : Math.min(totalAmount, integer(users[0].balance || 0, '购物额度'));
+    const payAmount = totalAmount - balanceAmount;
+    const order = { userId, orderNo: `SL${id.slice(0, 30)}`, items: snapshots, totalAmount, payAmount, balanceAmount, shippingAddress, remark,
+      requestFingerprint: fingerprint, status: 'PENDING_PAYMENT', isTest: testMode(), paymentInitiated: false,
       createdAt: new Date(), updatedAt: new Date(), expireAt: new Date(Date.now() + 30 * 60000) };
-    await inventory(tx, order, 'LOCK');
-    const orderData = { ...order };
-    delete orderData._id;
-    await tx.collection('orders').doc(id).set({ data: orderData });
+    await tx.collection('orders').doc(id).set({ data: order });
+    if (balanceAmount) await changeBalance(tx, userId, -balanceAmount, `ORDER_DEBIT:${id}`, id);
     for (const input of inputs) if (input.cartId) {
       const cart = await get(tx, 'carts', input.cartId);
-      if (!cart || cart.userId !== userId || cart.skuId !== input.skuId) throw error('PERMISSION_DENIED', '购物车记录不匹配');
+      if (!cart || cart.userId !== userId || cart.skuId !== input.skuId || cart.count < input.count) throw error('PERMISSION_DENIED', '购物车记录不匹配');
       if (cart.count > input.count) await tx.collection('carts').doc(cart._id).update({ data: { count: cart.count - input.count } });
       else await tx.collection('carts').doc(cart._id).remove();
     }
-    return { orderId: id, orderNo: order.orderNo, payAmount };
+    return { orderId: id, orderNo: order.orderNo, payAmount, totalAmount, balanceAmount };
   });
-}
-function assertVersion(order) {
-  // 库存版本已无意义，不再校验
 }
 async function confirmPayment(db, e) {
   return transaction(db, async tx => {
     const order = await get(tx, 'orders', e.orderId);
     if (!order) throw error('ORDER_NOT_FOUND', '订单不存在');
-    assertVersion(order);
     if (!Number.isSafeInteger(e.totalFee) || e.totalFee !== order.payAmount) throw error('AMOUNT_MISMATCH', '支付金额不匹配');
     if (!e.openid || e.openid !== order.userId) throw error('BUYER_MISMATCH', '付款身份不匹配');
-    if (Boolean(e.isTest) !== Boolean(order.isTest)) throw error('PAYMENT_MODE_MISMATCH', '支付环境不匹配');
+    if (Boolean(e.isTest) !== Boolean(order.isTest) || (order.isTest && !testMode())) throw error('PAYMENT_MODE_MISMATCH', '支付环境不匹配');
     text(e.transactionId, '交易号', 1, 100);
+    if (order.payAmount === 0 && e.transactionId !== `BALANCE_${order._id}`) throw error('PAYMENT_EVIDENCE_INVALID', '额度支付凭证无效');
     if (order.status === 'CANCELLED') throw error('ORDER_ALREADY_CANCELLED', '已取消订单发生支付，需要对账处理');
-    if (order.status !== 'PENDING_PAYMENT') {
+    if (!['PENDING_PAYMENT', 'CLOSING'].includes(order.status)) {
       if (order.paymentTradeNo !== e.transactionId) throw error('TRANSACTION_MISMATCH', '交易号不匹配');
       return { orderId: order._id, status: order.status, alreadyProcessed: true };
     }
     const previous = await get(tx, 'payment_transactions', key(e.transactionId));
     if (previous && previous.orderId !== order._id) throw error('TRANSACTION_MISMATCH', '交易号已属于其他订单');
-    await inventory(tx, order, 'PAYMENT_CONFIRMED');
+    await adjustSales(tx, order, 1);
     await tx.collection('payment_transactions').doc(key(e.transactionId)).set({ data: {
       orderId: order._id, userId: order.userId, outTradeNo: order.orderNo, transactionId: e.transactionId, totalFee: order.payAmount,
-      status: 'SUCCESS', isTest: order.isTest, createdAt: new Date()
+      status: 'SUCCESS', isTest: order.isTest, method: order.payAmount ? 'WECHAT' : 'BALANCE', createdAt: new Date()
     } });
-    await tx.collection('orders').doc(order._id).update({ data: { status: 'PAID', paymentTradeNo: e.transactionId, paidAt: new Date(), updatedAt: new Date() } });
-    // 合并支付：同步该支付单下所有子订单为 PAID（子订单集合可能尚不存在，容错处理）
-    try {
-      const subs = await tx.collection('merchant_orders').where({ parentOrderId: order._id }).get();
-      for (const s of (subs.data || [])) {
-        if (s.status === 'PENDING_PAYMENT') await tx.collection('merchant_orders').doc(s._id).update({ data: { status: 'PAID', paidAt: new Date(), updatedAt: new Date() } });
-      }
-    } catch (subErr) {
-      console.warn('[confirmPayment] merchant_orders sync warn:', subErr && subErr.message);
-    }
+    await tx.collection('orders').doc(order._id).update({ data: { status: 'PAID', paymentTradeNo: e.transactionId, paymentCreatingUntil: null, paidAt: new Date(), updatedAt: new Date() } });
     return { orderId: order._id, status: 'PAID' };
   });
 }
+async function beginPayment(db, orderId, userId) {
+  return transaction(db, async tx => {
+    const order = await get(tx, 'orders', orderId);
+    if (!order || order.userId !== userId) throw error('ORDER_NOT_FOUND', '订单不存在');
+    if (order.status !== 'PENDING_PAYMENT' || new Date(order.expireAt).getTime() <= Date.now()) throw error('INVALID_ORDER_STATUS', '订单已过期或状态不可支付');
+    if (new Date(order.paymentCreatingUntil || 0).getTime() > Date.now()) throw error('PAYMENT_BUSY', '支付创建中，请稍后查单');
+    if (order.isTest && !testMode()) throw error('PAYMENT_MODE_MISMATCH', '测试订单不可在生产支付');
+    const paymentCreatingUntil = new Date(Date.now() + 60000);
+    await tx.collection('orders').doc(orderId).update({ data: { paymentInitiated: true, paymentCreatingUntil, updatedAt: new Date() } });
+    return order;
+  });
+}
 async function cancelOrder(db, cloud, orderId, userId, reason = '用户取消') {
-  const order = await get(db, 'orders', text(orderId, '订单ID', 1, 100));
-  if (!order) throw error('ORDER_NOT_FOUND', '订单不存在');
-  if (userId && order.userId !== userId) throw error('PERMISSION_DENIED', '无权操作此订单');
-  assertVersion(order);
+  const order = await transaction(db, async tx => {
+    const o = await get(tx, 'orders', text(orderId, '订单ID', 1, 100));
+    if (!o || (userId && o.userId !== userId)) throw error('ORDER_NOT_FOUND', '订单不存在');
+    if (o.status === 'CANCELLED') return o;
+    if (!['PENDING_PAYMENT', 'CLOSING'].includes(o.status)) throw error('INVALID_ORDER_STATUS', '仅待付款订单可取消');
+    if (new Date(o.paymentCreatingUntil || 0).getTime() > Date.now()) throw error('PAYMENT_BUSY', '支付创建中，请稍后查单');
+    await tx.collection('orders').doc(orderId).update({ data: { status: 'CLOSING', updatedAt: new Date() } });
+    return o;
+  });
   if (order.status === 'CANCELLED') return { status: 'CANCELLED' };
-  if (order.status !== 'PENDING_PAYMENT') throw error('INVALID_ORDER_STATUS', '仅待付款订单可取消');
-  if (!order.isTest && order.paymentInitiated) {
-    const { queryPayment } = require('./payGateway');
-    const { getWechatPayMerchantId } = require('./config');
-    const result = await queryPayment(cloud, order);
+  if (!order.isTest && order.payAmount > 0 && order.paymentInitiated) {
+    const gateway = require('./payGateway');
+    const result = await gateway.queryPayment(cloud, order);
     if (result.tradeState === 'SUCCESS') { await confirmPayment(db, result); throw error('ORDER_ALREADY_PAID', '订单已付款，不能取消'); }
-    if (!['NOTPAY', 'CLOSED', 'NOT_FOUND'].includes(result.tradeState)) throw error('PAYMENT_UNCERTAIN', '支付状态待核实，请稍后重试');
-    if (result.tradeState === 'NOTPAY') {
-      const close = await cloud.cloudPay.closeOrder({ outTradeNo: order.orderNo, subMchId: getWechatPayMerchantId() });
-      if (close.returnCode !== 'SUCCESS' || close.resultCode !== 'SUCCESS') throw error('CLOSE_ORDER_FAILED', '微信关单失败，请稍后重试');
-    }
-  }
-  // 余额抵扣部分需退还：自包含订单(orders/index.js)写 balanceAmount；commerce 订单无此字段则跳过
-  const balanceUsed = Number(order.balanceAmount) || 0;
-  let refundUserDocId = null;
-  if (balanceUsed > 0) {
-    const userRes = await db.collection('users').where({ _openid: order.userId }).limit(1).get().catch(() => ({ data: [] }));
-    refundUserDocId = (userRes.data && userRes.data[0] && userRes.data[0]._id) || null;
+    if (result.tradeState === 'NOTPAY') await gateway.closePayment(order);
+    else if (!['CLOSED', 'NOT_FOUND'].includes(result.tradeState)) throw error('PAYMENT_UNCERTAIN', '支付状态待核实，请稍后重试');
   }
   return transaction(db, async tx => {
     const current = await get(tx, 'orders', orderId);
     if (current.status === 'CANCELLED') return { status: 'CANCELLED' };
-    if (current.status !== 'PENDING_PAYMENT' || current.paymentInitiated !== order.paymentInitiated) throw error('CONFLICT', '订单状态已变化，请刷新');
-    await inventory(tx, current, 'ORDER_CANCEL');
-    if (balanceUsed > 0 && refundUserDocId) {
-      const u = await get(tx, 'users', refundUserDocId);
-      if (u) await tx.collection('users').doc(refundUserDocId).update({ data: { balance: (Number(u.balance) || 0) + balanceUsed, updatedAt: new Date() } });
-    }
+    if (current.status !== 'CLOSING') throw error('CONFLICT', '订单状态已变化，请刷新');
+    if (current.balanceAmount) await changeBalance(tx, current.userId, current.balanceAmount, `ORDER_CANCEL:${orderId}`, orderId);
     await tx.collection('orders').doc(orderId).update({ data: { status: 'CANCELLED', cancelReason: reason, cancelledAt: new Date(), updatedAt: new Date() } });
-    // 合并支付：同步该支付单下所有子订单为 CANCELLED，避免买家端仍显示待付款并二次退款（子订单集合可能尚不存在，容错处理）
-    try {
-      const subs = await tx.collection('merchant_orders').where({ parentOrderId: orderId }).get();
-      for (const s of (subs.data || [])) {
-        if (s.status !== 'CANCELLED') await tx.collection('merchant_orders').doc(s._id).update({ data: { status: 'CANCELLED', cancelReason: reason, cancelledAt: new Date(), updatedAt: new Date() } });
-      }
-    } catch (subErr) {
-      console.warn('[cancelOrder] merchant_orders sync warn:', subErr && subErr.message);
-    }
     return { status: 'CANCELLED' };
   });
 }
-async function beginRefund(db, orderId, reason) {
+async function applyRefund(db, orderId, userId, reason) {
+  return transaction(db, async tx => {
+    const order = await get(tx, 'orders', orderId);
+    if (!order || order.userId !== userId) throw error('ORDER_NOT_FOUND', '订单不存在');
+    if (['REFUND_PENDING', 'REFUNDING', 'REFUNDED'].includes(order.status)) return { status: order.status, refundNo: order.refundNo };
+    if (!['PAID', 'SHIPPED'].includes(order.status)) throw error('INVALID_ORDER_STATUS', '当前订单不支持申请退款');
+    const refundNo = `RF${key(orderId, order.refundAttempt || 0)}`;
+    await tx.collection('refund_records').doc(refundNo).set({ data: { orderId, userId, outRefundNo: refundNo, totalFee: order.payAmount, refundFee: order.payAmount,
+      balanceFee: order.balanceAmount, priorStatus: order.status, status: 'PENDING', isTest: order.isTest, reason: text(reason, '退款原因', 1, 200), createdAt: new Date() } });
+    await tx.collection('orders').doc(orderId).update({ data: { status: 'REFUND_PENDING', refundNo, updatedAt: new Date() } });
+    return { status: 'REFUND_PENDING', refundNo };
+  });
+}
+async function beginRefund(db, orderId, reason, returnReceived = false) {
   return transaction(db, async tx => {
     const order = await get(tx, 'orders', orderId);
     if (!order) throw error('ORDER_NOT_FOUND', '订单不存在');
-    assertVersion(order);
-    if (order.status === 'REFUNDING') return order;
-    if (order.status !== 'PAID') throw error('INVALID_ORDER_STATUS', '仅未履约的已付款订单支持退款');
-    const refundNo = `RF${key(orderId)}`;
-    await tx.collection('refund_records').doc(refundNo).set({ data: { orderId, outRefundNo: refundNo, totalFee: order.payAmount, refundFee: order.payAmount,
-      status: 'PROCESSING', isTest: order.isTest, reason, createdAt: new Date() } });
-    await tx.collection('orders').doc(orderId).update({ data: { status: 'REFUNDING', refundNo, updatedAt: new Date() } });
-    return { ...order, refundNo, status: 'REFUNDING' };
+    if (order.status === 'REFUNDING' || order.status === 'REFUNDED') return order;
+    if (order.status !== 'REFUND_PENDING') throw error('INVALID_ORDER_STATUS', '请先申请退款');
+    const refund = await get(tx, 'refund_records', order.refundNo);
+    if (!refund || refund.status !== 'PENDING') throw error('CONFLICT', '退款记录异常');
+    if (refund.priorStatus === 'SHIPPED' && returnReceived !== true) throw error('RETURN_REQUIRED', '已发货订单须确认收到退货');
+    await tx.collection('refund_records').doc(refund._id).update({ data: { status: 'PROCESSING', returnReceived, updatedAt: new Date() } });
+    await tx.collection('orders').doc(orderId).update({ data: { status: 'REFUNDING', updatedAt: new Date() } });
+    return { ...order, status: 'REFUNDING' };
   });
 }
-async function finishRefund(db, refundNo) {
+async function rejectRefund(db, orderId, reason) {
+  return transaction(db, async tx => {
+    const order = await get(tx, 'orders', orderId);
+    if (!order || order.status !== 'REFUND_PENDING') throw error('INVALID_ORDER_STATUS', '只能拒绝待审核退款');
+    const refund = await get(tx, 'refund_records', order.refundNo);
+    if (!refund || refund.status !== 'PENDING') throw error('CONFLICT', '退款记录异常');
+    await tx.collection('refund_records').doc(refund._id).update({ data: { status: 'REJECTED', rejectReason: text(reason, '拒绝原因', 1, 200), updatedAt: new Date() } });
+    await tx.collection('orders').doc(orderId).update({ data: { status: refund.priorStatus, refundAttempt: (order.refundAttempt || 0) + 1, updatedAt: new Date() } });
+    return { status: refund.priorStatus };
+  });
+}
+async function finishRefund(db, refundNo, evidence) {
   return transaction(db, async tx => {
     const refund = await get(tx, 'refund_records', refundNo);
     if (!refund) throw error('RECORD_NOT_FOUND', '退款记录不存在');
-    if (refund.status === 'SUCCESS') return { status: 'REFUNDED' };
     const order = await get(tx, 'orders', refund.orderId);
-    if (!order || order.status !== 'REFUNDING' || order.refundNo !== refundNo) throw error('CONFLICT', '退款订单状态异常');
-    assertVersion(order);
-    await inventory(tx, order, 'REFUND_RESTORE');
-    await tx.collection('orders').doc(order._id).update({ data: { status: 'REFUNDED', updatedAt: new Date() } });
-    await tx.collection('refund_records').doc(refundNo).update({ data: { status: 'SUCCESS', refundedAt: new Date() } });
+    if (!order || order.refundNo !== refundNo) throw error('CONFLICT', '退款订单状态异常');
+    if (!evidence || evidence.status !== 'SUCCESS' || evidence.out_refund_no !== refundNo || evidence.out_trade_no !== order.orderNo ||
+      evidence.amount?.refund !== refund.refundFee || evidence.amount?.total !== refund.totalFee || evidence.amount?.currency !== 'CNY') throw error('REFUND_EVIDENCE_INVALID', '退款凭证不匹配');
+    if (refund.refundFee > 0 && !order.isTest) {
+      if (evidence.mchid !== require('./payGateway').config().mchId || evidence.transaction_id !== order.paymentTradeNo || !evidence.refund_id) throw error('REFUND_EVIDENCE_INVALID', '退款支付身份不匹配');
+    } else if (evidence.internal !== true || (order.isTest && !testMode())) throw error('REFUND_EVIDENCE_INVALID', '内部退款凭证无效');
+    if (refund.status === 'SUCCESS') return { status: 'REFUNDED' };
+    if (order.status !== 'REFUNDING' || refund.status !== 'PROCESSING') throw error('CONFLICT', '退款状态异常');
+    if (refund.balanceFee) await changeBalance(tx, order.userId, refund.balanceFee, `ORDER_REFUND:${order._id}`, order._id);
+    await adjustSales(tx, order, -1);
+    await tx.collection('orders').doc(order._id).update({ data: { status: 'REFUNDED', refundedAt: new Date(), updatedAt: new Date() } });
+    await tx.collection('refund_records').doc(refundNo).update({ data: { status: 'SUCCESS', refundId: evidence.refund_id || `INTERNAL_${refundNo}`, refundedAt: new Date() } });
     return { status: 'REFUNDED' };
   });
 }
-module.exports = { error, key, text, integer, get, transaction, testMode, address, stockCheck, createOrder, confirmPayment, cancelOrder, beginRefund, finishRefund };
+module.exports = { error, key, text, integer, get, transaction, testMode, address, changeBalance, createOrder, confirmPayment, beginPayment, cancelOrder, applyRefund, beginRefund, rejectRefund, finishRefund };

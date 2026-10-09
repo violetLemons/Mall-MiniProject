@@ -135,8 +135,8 @@
           <view wx:for="{{filteredOrders}}" wx:key="id" class="sheet-order-card">
             <view class="soc-header">
               <text class="soc-no">单号: {{item.orderNo}}</text>
-              <text class="soc-status {{item.status === 'PENDING_PAYMENT' ? 'status-unpaid' : ''}} {{item.status === 'PAID' ? 'status-paid' : ''}} {{(item.status === 'WAITING_PICKUP' || item.status === 'READY_FOR_PICKUP') ? 'status-pickup' : ''}} {{item.status === 'SHIPPED' ? 'status-shipped' : ''}}">
-                {{item.status === 'PENDING_PAYMENT' ? '待付款' : (item.status === 'PAID' ? '待发货' : ((item.status === 'WAITING_PICKUP' || item.status === 'READY_FOR_PICKUP') ? '待收货' : (item.status === 'SHIPPED' ? '包裹运输中' : (item.status === 'REFUNDING' ? '退款处理中' : (item.status === 'REFUNDED' ? '已退款' : (item.status === 'COMPLETED' ? '已完成' : '已取消'))))))}}
+              <text class="soc-status {{item.status === 'PENDING_PAYMENT' ? 'status-unpaid' : ''}} {{item.status === 'PAID' ? 'status-paid' : ''}} {{item.status === 'SHIPPED' ? 'status-shipped' : ''}}">
+                {{item.status === 'PENDING_PAYMENT' ? '待付款' : (item.status === 'PAID' ? '待发货' : (item.status === 'SHIPPED' ? '运输中' : (item.status === 'REFUND_PENDING' ? '退款待审核' : (item.status === 'REFUNDING' ? '退款处理中' : (item.status === 'REFUNDED' ? '已退款' : (item.status === 'COMPLETED' ? '已完成' : '已取消'))))))}}
               </text>
             </view>
 
@@ -254,7 +254,7 @@
                 <text class="fav-price">¥{{item.priceYuan || (item.price / 100)}}</text>
                 <text wx:if="{{item.originalPrice > item.price}}" class="fav-origin">¥{{item.originalPriceYuan || (item.originalPrice / 100)}}</text>
               </view>
-              <view class="fav-actions" catchtap="true">
+              <view class="fav-actions" catchtap="onStopPropagation">
                 <button class="fav-act-btn btn-cart press-active" data-item="{{item}}" bindtap="onAddToCartFromFav">加购物车</button>
                 <button class="fav-act-btn btn-remove press-active" data-id="{{item.id}}" bindtap="onRemoveFav">取消</button>
               </view>
@@ -372,13 +372,13 @@
           </view>
 
           <!-- 客服电话接入按钮 (居中，点击弹出客服电话) -->
-          <view class="btn-wechat-contact press-active" bindtap="onContactService">
+          <button class="btn-wechat-contact press-active" open-type="contact">
             <text>💬 接入微信官方在线客服</text>
-          </view>
+          </button>
 
           <!-- 电话呼叫 -->
-          <view class="btn-phone-contact press-active" bindtap="onCallHotline">
-            <text class="bpc-text">拨打客服专线：{{customerServicePhone || '400-000-0000'}}</text>
+          <view wx:if="{{customerServicePhone}}" class="btn-phone-contact press-active" bindtap="onCallHotline">
+            <text class="bpc-text">拨打客服专线：{{customerServicePhone}}</text>
           </view>
 
           <!-- 常见问题 (仅保留规格退换问题，防伪扣改为吊牌) -->

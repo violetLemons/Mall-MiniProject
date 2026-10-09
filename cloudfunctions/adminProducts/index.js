@@ -2,6 +2,8 @@ const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const crypto = require('crypto');
+const commerce = require('./common/commerce');
+const content = require('./common/contentSafety');
 
 // --- Helper Functions (Self-contained, bulletproof) ---
 const error = (code, message) => Object.assign(new Error(message), { code });
@@ -55,49 +57,7 @@ function fail(code = 'SYSTEM_ERROR', message = '服务暂时不可用，请稍�
   };
 }
 
-function getJwtSecret(event) {
-  return event?.adminJwtSecret || process.env.ADMIN_JWT_SECRET || '636353631d78ee1619556dc0a92cd2f4111317b5820e821a6d307de9947b6bbf';
-}
-
-function verifyToken(token, secret) {
-  if (typeof token !== 'string' || token.length > 4096) return null;
-  try {
-    const [h, b, s, extra] = token.split('.');
-    if (!h || !b || !s || extra) return null;
-    const header = JSON.parse(Buffer.from(h, 'base64url'));
-    if (header.alg !== 'HS256' || header.typ !== 'JWT') return null;
-    const expected = crypto.createHmac('sha256', secret).update(`${h}.${b}`).digest('base64url');
-    if (expected.length !== s.length || !crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(s))) return null;
-    const p = JSON.parse(Buffer.from(b, 'base64url'));
-    const now = Math.floor(Date.now() / 1000);
-    if (!Number.isSafeInteger(p.exp) || !Number.isSafeInteger(p.iat) || p.exp <= now || p.iat > now + 60 || p.exp - p.iat > 48 * 3600 || p.iss !== 'sneaker-admin' || p.aud !== 'sneaker-admin-api') return null;
-    return p;
-  } catch {
-    return null;
-  }
-}
-
-function permissionVersion(admin) {
-  return crypto.createHash('sha256').update(JSON.stringify([admin.role, (admin.permissions || []).slice().sort(), admin.sessionVersion || 0])).digest('hex');
-}
-
-async function requireAdmin(event, db) {
-  const secret = getJwtSecret(event);
-  const headers = event.headers || event.header || {};
-  const token = (event.token || headers.authorization || headers.Authorization || '').replace(/^Bearer\s+/i, '');
-  const payload = verifyToken(token, secret);
-  if (!payload || !payload.adminId) throw error('AUTH_REQUIRED', '登录已失效，请重新登录');
-  const admin = await getDoc(db, 'admins', payload.adminId);
-  if (!admin || admin.status !== 'ACTIVE') throw error('ADMIN_REQUIRED', '管理员账号不存在或已停用');
-  if (payload.version !== permissionVersion(admin)) throw error('AUTH_REQUIRED', '权限或会话已变更，请重新登录');
-  return { adminId: admin._id, username: admin.username, role: admin.role, permissions: admin.permissions || [], merchantId: admin.merchantId || null };
-}
-
-function requirePermission(admin, permission) {
-  if (admin.role === 'SUPER_ADMIN' || admin.permissions?.includes('*') || admin.permissions?.includes(permission)) return true;
-  throw error('PERMISSION_DENIED', `无权执行此操作 (需要权限: ${permission})`);
-}
-
+const { requireAdmin, requirePermission } = require('./common/authMiddleware');
 function getEnvId() {
   try { return cloud.getWXContext().ENV || process.env.TCB_ENV || ''; }
   catch { return process.env.TCB_ENV || ''; }
@@ -152,7 +112,7 @@ function fields(p) {
       out[k] = text(val, k, ['subtitle', 'description'].includes(k) ? 0 : 1, k === 'description' ? 5000 : 500);
     }
   }
-  for (const k of ['images', 'detailImages', 'tags', 'deliveryTypes']) {
+  for (const k of ['images', 'detailImages', 'tags', ]) {
     if (p[k] !== undefined && p[k] !== null) {
       const arr = Array.isArray(p[k]) ? p[k] : typeof p[k] === 'string' ? p[k].split(',').map(s => s.trim()).filter(Boolean) : [];
       if (arr.length > 30 || arr.some(x => typeof x !== 'string' || x.length > 2000)) throw error('INVALID_PARAMS', '图片或标签格式不正确');
@@ -160,7 +120,7 @@ function fields(p) {
     }
   }
   for (const url of [out.cover, ...(out.images || []), ...(out.detailImages || [])].filter(Boolean)) {
-    if (!/^(https:\/\/|cloud:\/\/|data:image\/|\/\/)/.test(url)) throw error('INVALID_PARAMS', '图片须使用HTTPS、云存储地址或DataURL');
+    if (!/^(https:\/\/|cloud:\/\/)/.test(url)) throw error('INVALID_PARAMS', '图片须使用HTTPS或云存储地址');
   }
   for (const k of ['sort', 'originalPrice', 'minPrice', 'maxPrice', 'sales']) {
     if (p[k] !== undefined && p[k] !== null && p[k] !== '') {
@@ -181,7 +141,7 @@ function fields(p) {
 
 // 无规格时用商品的基准价自动生成单一隐藏默认 SKU（颜色=默认、规格=1）
 function buildDefaultSkuInput(product) {
-  const price = Number(product.minPrice) > 0 ? Number(product.minPrice) : 1;
+  const price = integer(product.minPrice, '商品价格分', 1);
   return { colorName: '默认', size: 1, price };
 }
 
@@ -204,7 +164,7 @@ async function saveSkus(tx, product, inputs, old, admin) {
       colorImage: s.colorImage || product.cover, status: s.status || 'ACTIVE',
       createdAt: previous?.createdAt || new Date(), updatedAt: new Date()
     };
-    if (!/^(https:\/\/|cloud:\/\/|data:image\/)/.test(row.colorImage)) throw error('INVALID_PARAMS', '规格图片地址不安全');
+    if (!/^(https:\/\/|cloud:\/\/)/.test(row.colorImage)) throw error('INVALID_PARAMS', '规格图片须使用HTTPS或云存储地址');
     await tx.collection('product_skus').doc(id).set({ data: row });
     all.push(row);
   }
@@ -225,97 +185,11 @@ async function saveSkus(tx, product, inputs, old, admin) {
   return aggregate;
 }
 
-// 商家新增/修改商品 → 提交审核工单（不直接写 products）
-async function submitTicket(db, admin, action, params, id) {
-  const data = fields(params);
-  if (action === 'create' && (!data.name || !data.cover)) throw error('INVALID_PARAMS', '请填写商品名称和封面');
-  if (action === 'update' || action === 'updateSkus') {
-    const existing = await getDoc(db, 'products', id);
-    if (!existing) throw error('PRODUCT_NOT_FOUND', '商品不存在');
-    if ((existing.merchantId || null) !== admin.merchantId) throw error('PERMISSION_DENIED', '无权修改其他商家的商品');
-  }
-  if (Array.isArray(params.skus) && (params.skus.length < 1 || params.skus.length > 30)) throw error('INVALID_PARAMS', '规格矩阵须为1~30项');
-
-  // 合并：同一商品同一时刻至多一个 PENDING UPDATE 工单，避免乱序通过时旧数据覆盖
-  if (action === 'update' || action === 'updateSkus') {
-    const pending = (await db.collection('product_audit_tickets')
-      .where({ merchantId: admin.merchantId, productId: id, status: 'PENDING' })
-      .limit(1)
-      .get()).data[0];
-    if (pending) {
-      const oldPayload = pending.payload || {};
-      const mergedPayload = {
-        product: action === 'update' ? { ...(oldPayload.product || {}), ...data } : (oldPayload.product || {}),
-        skus: Array.isArray(params.skus) ? params.skus : (oldPayload.skus || null)
-      };
-      await db.collection('product_audit_tickets').doc(pending._id).update({
-        data: { payload: mergedPayload, updatedAt: new Date() }
-      });
-      return { ticketId: pending._id, status: 'PENDING' };
-    }
-  }
-
-  const ticketId = key(crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
-  const ticket = {
-    merchantId: admin.merchantId,
-    type: action === 'create' ? 'CREATE' : 'UPDATE',
-    productId: action === 'create' ? null : id,
-    payload: { product: data, skus: Array.isArray(params.skus) ? params.skus : null },
-    status: 'PENDING',
-    platformFee: 0,
-    rejectReason: '',
-    reviewedBy: null,
-    reviewedAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date()
-  };
-  await db.collection('product_audit_tickets').doc(ticketId).set({ data: ticket });
-  return { ticketId, status: 'PENDING' };
-}
-
 exports.main = async event => {
   try {
     const admin = await requireAdmin(event, db), { action, params = {} } = event;
-    const supportedActions = new Set(['list', 'get', 'create', 'update', 'updateSkus', 'updateStatus', 'delete', 'softDelete', 'restore', 'uploadImage', 'listTickets', 'reviewTicket', 'reseedDefaultSkus', 'migrateImages']);
+    const supportedActions = new Set(['list', 'get', 'create', 'update', 'updateSkus', 'updateStatus', 'delete', 'softDelete', 'restore', 'uploadImage']);
     if (!supportedActions.has(action)) throw error('ACTION_NOT_FOUND', `未知指令: ${action}`);
-
-    // 历史数据迁移：把已过期的云存储临时链接统一转回永久 fileID（cloud://）
-    if (action === 'migrateImages') {
-      if (admin.role !== 'SUPER_ADMIN') throw error('PERMISSION_DENIED', '仅平台超级管理员可执行');
-      const targets = [
-        { coll: 'products', keys: ['cover', 'images', 'detailImages'] },
-        { coll: 'product_skus', keys: ['colorImage'] }
-      ];
-      let scanned = 0, fixed = 0;
-      for (const t of targets) {
-        let skip = 0;
-        for (;;) {
-          const batch = await db.collection(t.coll).skip(skip).limit(100).get();
-          const list = batch.data || [];
-          if (list.length === 0) break;
-          for (const doc of list) {
-            scanned++;
-            const update = {};
-            for (const k of t.keys) {
-              const v = doc[k];
-              if (typeof v === 'string') {
-                const nv = toFileID(v);
-                if (nv !== v) update[k] = nv;
-              } else if (Array.isArray(v)) {
-                const nv = v.map(toFileID);
-                if (JSON.stringify(nv) !== JSON.stringify(v)) update[k] = nv;
-              }
-            }
-            if (Object.keys(update).length > 0) {
-              await db.collection(t.coll).doc(doc._id).update({ data: update });
-              fixed++;
-            }
-          }
-          skip += list.length;
-        }
-      }
-      return success({ scanned, fixed });
-    }
 
     // 上传图片（封面/详情大图）
     if (action === 'uploadImage') {
@@ -325,7 +199,7 @@ exports.main = async event => {
       }
       const base64Data = params.base64 || '';
       const filename = params.filename || 'cover.jpg';
-      if (!base64Data) throw error('INVALID_PARAMS', '请提供图片数据');
+      if (typeof base64Data !== 'string' || !base64Data || base64Data.length > 2 * 1024 * 1024) throw error('INVALID_PARAMS', '图片数据无效或过大');
       const buffer = Buffer.from(base64Data.replace(/^data:image\/\w+;base64,/, ''), 'base64');
       const rawExt = (filename.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
       const ext = ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(rawExt) ? rawExt : 'jpg';
@@ -339,8 +213,7 @@ exports.main = async event => {
         } catch (_) {}
         return success({ fileID: uploadRes.fileID, url });
       } catch (uploadErr) {
-        console.warn('[uploadImage] cloud.uploadFile fallback to DataURL:', uploadErr.message);
-        return success({ fileID: null, url: base64Data });
+        throw error('UPLOAD_FAILED', '云存储上传失败，请重试');
       }
     }
 
@@ -350,7 +223,6 @@ exports.main = async event => {
       const page = integer(params.page || 1, '页码', 1, 10000);
       const pageSize = integer(params.pageSize || 20, '每页数量', 1, 100);
       const query = { status: params.status || db.command.neq('DELETED') };
-      if (admin.merchantId) query.merchantId = admin.merchantId;
       if (params.categoryId) query.categoryId = text(params.categoryId, '分类');
       if (params.keyword) query.name = db.RegExp({ regexp: text(params.keyword, '关键词', 1, 80).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), options: 'i' });
       const [listRes, countRes] = await Promise.all([
@@ -359,107 +231,6 @@ exports.main = async event => {
       ]);
       await fileIDsToTempURLs(listRes.data, ['cover', 'images', 'detailImages']);
       return success({ list: listRes.data, total: countRes.total, page, pageSize });
-    }
-
-    // 商品审核工单列表（商家看自己的，平台看全部）
-    if (action === 'listTickets') {
-      requirePermission(admin, 'product.view');
-      const page = integer(params.page || 1, '页码', 1, 10000);
-      const pageSize = integer(params.pageSize || 20, '每页数量', 1, 100);
-      const query = {};
-      if (admin.merchantId) query.merchantId = admin.merchantId;
-      if (params.status && ['PENDING', 'APPROVED', 'REJECTED'].includes(params.status)) query.status = params.status;
-      const [listRes, countRes] = await Promise.all([
-        db.collection('product_audit_tickets').where(query).orderBy('createdAt', 'desc').skip((page - 1) * pageSize).limit(pageSize).get(),
-        db.collection('product_audit_tickets').where(query).count()
-      ]);
-      return success({ list: listRes.data, total: countRes.total, page, pageSize });
-    }
-
-    // 平台审核商品工单（通过并填抽成 / 驳回）
-    if (action === 'reviewTicket') {
-      if (admin.role !== 'SUPER_ADMIN') throw error('PERMISSION_DENIED', '仅平台超级管理员可审核商品');
-      const ticketId = text(params.ticketId, '工单ID');
-      const decision = text(params.decision, '审核结果');
-      if (!['approve', 'reject'].includes(decision)) throw error('INVALID_PARAMS', '审核结果无效');
-      const platformFee = decision === 'approve' ? integer(params.platformFee || 0, '平台抽成', 0, 100000000) : 0;
-      const rejectReason = decision === 'reject' ? text(params.rejectReason || '', '驳回原因', 1, 500) : '';
-      const txResult = await db.runTransaction(async tx => {
-        const ticket = await getDoc(tx, 'product_audit_tickets', ticketId);
-        if (!ticket) throw error('TICKET_NOT_FOUND', '工单不存在');
-        if (ticket.status !== 'PENDING') throw error('TICKET_ALREADY_REVIEWED', '工单已处理，请勿重复审核');
-        const now = new Date();
-        if (decision === 'reject') {
-          await tx.collection('product_audit_tickets').doc(ticketId).update({ data: { status: 'REJECTED', rejectReason, reviewedBy: admin.adminId, reviewedAt: now, updatedAt: now } });
-          return { ticketId, status: 'REJECTED' };
-        }
-        const payload = ticket.payload || {};
-        const prodData = payload.product || {};
-        if (prodData.categoryId) {
-          const category = await getDoc(tx, 'categories', prodData.categoryId);
-          if (!category || category.status !== 'ACTIVE') throw error('INVALID_CATEGORY', '请选择有效分类');
-        }
-        // 商家若已被下架/删除，新商品审核通过后保持下架，避免绕过商家管控
-        let merchantActive = true;
-        if (ticket.merchantId) {
-          const mRes = await tx.collection('admins').where({ merchantId: ticket.merchantId, role: 'MERCHANT' }).limit(1).get();
-          const m = mRes.data && mRes.data[0];
-          merchantActive = !m || m.status === 'ACTIVE';
-        }
-        if (ticket.type === 'CREATE') {
-          if (!prodData.name || !prodData.cover) throw error('INVALID_PARAMS', '工单缺少商品名称或封面');
-          const newId = key(crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
-          const docData = {
-            ...prodData,
-            merchantId: ticket.merchantId || null,
-            platformFee,
-            status: merchantActive ? 'ON_SALE' : 'OFF_SALE',
-            deletedAt: null,
-            sales: 0,
-            minPrice: prodData.minPrice || 0,
-            maxPrice: prodData.maxPrice || prodData.minPrice || 0,
-            sort: prodData.sort || 0,
-            createdAt: now,
-            updatedAt: now
-          };
-          delete docData._id; delete docData.id;
-          await tx.collection('products').doc(newId).set({ data: docData });
-          const p = { ...docData, _id: newId };
-          await saveSkus(tx, p, payload.skus, [], admin);
-        } else {
-          const existing = await getDoc(tx, 'products', ticket.productId);
-          if (!existing) throw error('PRODUCT_NOT_FOUND', '商品不存在或已被删除');
-          const updateData = { ...prodData, platformFee, updatedAt: now };
-          delete updateData._id; delete updateData.id;
-          await tx.collection('products').doc(existing._id).update({ data: updateData });
-          const merged = { ...existing, ...updateData };
-          const oldSkus = (await tx.collection('product_skus').where({ productId: existing._id }).limit(100).get()).data;
-          await saveSkus(tx, merged, payload.skus, oldSkus, admin);
-        }
-        await tx.collection('product_audit_tickets').doc(ticketId).update({ data: { status: 'APPROVED', platformFee, reviewedBy: admin.adminId, reviewedAt: now, updatedAt: now } });
-        return { ticketId, status: 'APPROVED' };
-      });
-      return success(txResult);
-    }
-
-    // 重置所有商品的 SKU：删除现有全部 SKU，并按每个商品的基准价重建单一隐藏默认 SKU
-    if (action === 'reseedDefaultSkus') {
-      if (admin.role !== 'SUPER_ADMIN') throw error('PERMISSION_DENIED', '仅平台超级管理员可重置 SKU');
-      let total = 0, created = 0, skip = 0;
-      for (;;) {
-        const batch = await db.collection('products').skip(skip).limit(100).get();
-        const list = batch.data || [];
-        if (list.length === 0) break;
-        for (const p of list) {
-          total++;
-          const oldSkus = (await db.collection('product_skus').where({ productId: p._id }).limit(100).get()).data;
-          for (const s of oldSkus) await db.collection('product_skus').doc(s._id).remove().catch(() => {});
-          await saveSkus(db, p, [], [], admin);
-          created++;
-        }
-        skip += list.length;
-      }
-      return success({ total, created });
     }
 
     const id = action === 'create' ? key(crypto.randomUUID ? crypto.randomUUID() : String(Date.now())) : text(params.id, '商品ID');
@@ -471,7 +242,6 @@ exports.main = async event => {
         getDoc(db, 'products', id),
         db.collection('product_skus').where({ productId: id }).limit(100).get()
       ]);
-      if (admin.merchantId && prod && (prod.merchantId || null) !== admin.merchantId) throw error('PERMISSION_DENIED', '无权查看其他商家的商品');
       if (prod) {
         prod.coverFileID = prod.cover;
         prod.imagesFileIDs = prod.images;
@@ -484,18 +254,18 @@ exports.main = async event => {
     requirePermission(admin, action === 'create' ? 'product.create' : ['delete', 'softDelete', 'purge'].includes(action) ? 'product.delete' : action === 'updateStatus' ? 'product.status' : 'product.update');
     if (action === 'purge') throw error('OPERATION_FORBIDDEN', '请使用软删除保留业务引用');
 
-    // 商家（merchantId 非空）新增/修改商品 → 提交审核工单，不直接写商品
-    if (admin.merchantId && ['create', 'update', 'updateSkus'].includes(action)) {
-      return success(await submitTicket(db, admin, action, params, id));
-    }
 
     const oldSkus = action === 'updateSkus' ? (await db.collection('product_skus').where({ productId: id }).limit(100).get()).data : [];
     const before = action === 'updateSkus' ? await getDoc(db, 'products', id) : null;
 
-    const txResult = await db.runTransaction(async tx => {
+    const safetyVersion = crypto.randomUUID();
+    if (['create','update','updateSkus'].includes(action)) {
+      const existing = action === 'create' ? null : await getDoc(db,'products',id);
+      await content.checkText(cloud, process.env.CONTENT_SECURITY_OPENID, [params.name || existing?.name, params.subtitle || existing?.subtitle, params.description || existing?.description, ...(params.tags || existing?.tags || [])].filter(Boolean).join('\n'), 3);
+    }
+    const txResult = await commerce.transaction(db, async tx => {
       let p = await getDoc(tx, 'products', id), result = null;
       if (action !== 'create' && !p) throw error('PRODUCT_NOT_FOUND', '商品不存在');
-      if (action !== 'create' && admin.merchantId && (p.merchantId || null) !== admin.merchantId) throw error('PERMISSION_DENIED', '无权操作其他商家的商品');
       if (['create', 'update'].includes(action)) {
         const data = fields(params), categoryId = data.categoryId || p?.categoryId;
         if (categoryId) {
@@ -506,8 +276,8 @@ exports.main = async event => {
           if (!data.name || !data.cover) throw error('INVALID_PARAMS', '请填写商品名称和封面');
           const docData = {
             ...data,
-            merchantId: admin.merchantId || null,
             status: 'OFF_SALE',
+            contentSafety: { version: safetyVersion, status: 'PENDING' },
             deletedAt: null,
             sales: 0,
             minPrice: data.minPrice || 0,
@@ -523,26 +293,34 @@ exports.main = async event => {
           await saveSkus(tx, p, params.skus, [], admin);
           result = { productId: id };
         } else {
-          const updateData = { ...data, updatedAt: new Date() };
+          const updateData = { ...data, status: 'OFF_SALE', contentSafety: { version: safetyVersion, status: 'PENDING' }, updatedAt: new Date() };
           delete updateData._id;
           delete updateData.id;
           await tx.collection('products').doc(id).update({ data: updateData });
           const merged = { ...p, ...updateData };
           const oldSkus = (await tx.collection('product_skus').where({ productId: id }).limit(100).get()).data;
-          await saveSkus(tx, merged, params.skus, oldSkus, admin);
+          const inputs = params.skus === undefined && oldSkus.length ? oldSkus.map(s => ({ ...s, id: s._id, price: data.minPrice ?? s.price })) : params.skus;
+          await saveSkus(tx, merged, inputs, oldSkus, admin);
         }
       } else if (action === 'updateSkus') {
         if ((p.skuVersion || 0) !== (before?.skuVersion || 0)) throw error('CONFLICT', '规格已被其他管理员更新，请刷新');
         result = await saveSkus(tx, p, params.skus, oldSkus, admin);
+        await tx.collection('products').doc(id).update({ data: { status: 'OFF_SALE', contentSafety: { version: safetyVersion, status: 'PENDING' } } });
       } else {
         const status = ['delete', 'softDelete'].includes(action) ? 'DELETED' : action === 'restore' ? 'OFF_SALE' : params.status;
         if (!['DELETED', 'OFF_SALE', 'ON_SALE'].includes(status)) throw error('INVALID_PARAMS', '状态无效');
+        if (status === 'ON_SALE' && p.contentSafety?.status !== 'PASS') throw error('CONTENT_REVIEW_REQUIRED', '微信内容审核通过后才能上架');
         if (status === 'ON_SALE' && (!p.minPrice || !p.skuVersion)) throw error('INVALID_PARAMS', '请先配置有效的规格和价格');
         await tx.collection('products').doc(id).update({ data: { status, deletedAt: status === 'DELETED' ? new Date() : null, updatedAt: new Date() } });
       }
       return result;
     });
 
+    if (['create','update','updateSkus'].includes(action)) {
+      const product = await getDoc(db,'products',id);
+      const skus = (await db.collection('product_skus').where({productId:id,status:'ACTIVE'}).get()).data;
+      await content.reviewAssets(cloud,db,'PRODUCT',id,safetyVersion,[product.cover,...(product.images||[]),...(product.detailImages||[]),...skus.map(s=>s.colorImage)],process.env.CONTENT_SECURITY_OPENID);
+    }
     try {
       await db.collection('operation_logs').doc(key(crypto.randomUUID ? crypto.randomUUID() : String(Date.now()))).set({ data: {
         adminId: admin.adminId, adminUsername: admin.username, action,

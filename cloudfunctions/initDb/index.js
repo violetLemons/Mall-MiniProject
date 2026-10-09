@@ -7,13 +7,7 @@ const crypto = require('crypto');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 
-const COLLECTIONS = [
-  'users', 'admins', 'auth_limits', 'products', 'product_skus', 'product_audit_tickets',
-  'categories', 'carts', 'orders', 'order_items', 'merchant_orders',
-  'payment_transactions', 'refund_records', 'activation_codes', 'activation_records',
-  'addresses', 'address_meta', 'favorites', 'coupons',
-  'user_coupons', 'banners', 'operation_logs', 'inventory_logs', 'pickup_points'
-];
+const COLLECTIONS = require('./common/schema').map(c => c.name);
 
 // 两级分类：parentId 为空 = 一级（主要词条），非空 = 二级（次要词条，值为一级 _id）
 const DEMO_CATEGORIES = [
@@ -46,7 +40,6 @@ const DEMO_PRODUCTS = [
     minPrice: 3990,
     maxPrice: 5990,
     sales: 320,
-    totalStock: 320,
     status: 'ON_SALE',
     tags: ['新鲜', '脆甜'],
     sort: 100,
@@ -65,7 +58,6 @@ const DEMO_PRODUCTS = [
     minPrice: 1990,
     maxPrice: 1990,
     sales: 268,
-    totalStock: 300,
     status: 'ON_SALE',
     tags: ['软糯', '包邮'],
     sort: 90,
@@ -84,7 +76,6 @@ const DEMO_PRODUCTS = [
     minPrice: 4990,
     maxPrice: 4990,
     sales: 210,
-    totalStock: 180,
     status: 'ON_SALE',
     tags: ['爆款', '多汁'],
     sort: 80,
@@ -103,7 +94,6 @@ const DEMO_PRODUCTS = [
     minPrice: 2990,
     maxPrice: 2990,
     sales: 156,
-    totalStock: 150,
     status: 'ON_SALE',
     tags: ['新鲜', '抗氧化'],
     sort: 70,
@@ -122,7 +112,6 @@ const DEMO_PRODUCTS = [
     minPrice: 8990,
     maxPrice: 8990,
     sales: 98,
-    totalStock: 80,
     status: 'ON_SALE',
     tags: ['进口', '大果'],
     sort: 100,
@@ -141,7 +130,6 @@ const DEMO_PRODUCTS = [
     minPrice: 3990,
     maxPrice: 3990,
     sales: 120,
-    totalStock: 160,
     status: 'ON_SALE',
     tags: ['进口', '即食'],
     sort: 90,
@@ -160,7 +148,6 @@ const DEMO_PRODUCTS = [
     minPrice: 6990,
     maxPrice: 6990,
     sales: 180,
-    totalStock: 100,
     status: 'ON_SALE',
     tags: ['健康', '即食'],
     sort: 90,
@@ -179,7 +166,6 @@ const DEMO_PRODUCTS = [
     minPrice: 1990,
     maxPrice: 1990,
     sales: 240,
-    totalStock: 250,
     status: 'ON_SALE',
     tags: ['零食', '酸甜'],
     sort: 80,
@@ -190,15 +176,15 @@ const DEMO_PRODUCTS = [
 ];
 
 const DEMO_SKUS = [
-  { _id: 'sku_apple_5', productId: 'prod_apple_fuji', skuCode: 'FRUIT-APPLE-5', colorName: '5斤装', size: 5, price: 3990, stock: 200, lockedStock: 0, status: 'ACTIVE' },
-  { _id: 'sku_apple_10', productId: 'prod_apple_fuji', skuCode: 'FRUIT-APPLE-10', colorName: '10斤装', size: 10, price: 5990, stock: 120, lockedStock: 0, status: 'ACTIVE' },
-  { _id: 'sku_banana_3', productId: 'prod_banana_hi', skuCode: 'FRUIT-BANANA-3', colorName: '3斤装', size: 3, price: 1990, stock: 300, lockedStock: 0, status: 'ACTIVE' },
-  { _id: 'sku_orange_5', productId: 'prod_orange_gan', skuCode: 'FRUIT-ORANGE-5', colorName: '5斤装', size: 5, price: 4990, stock: 180, lockedStock: 0, status: 'ACTIVE' },
-  { _id: 'sku_blueberry_2', productId: 'prod_blueberry', skuCode: 'FRUIT-BLUEBERRY-2', colorName: '2盒装', size: 2, price: 2990, stock: 150, lockedStock: 0, status: 'ACTIVE' },
-  { _id: 'sku_cherry_jj', productId: 'prod_cherry_chile', skuCode: 'FRUIT-CHERRY-JJ', colorName: 'JJ级 2斤', size: 2, price: 8990, stock: 80, lockedStock: 0, status: 'ACTIVE' },
-  { _id: 'sku_avocado_4', productId: 'prod_avocado', skuCode: 'FRUIT-AVOCADO-4', colorName: '4个装', size: 4, price: 3990, stock: 160, lockedStock: 0, status: 'ACTIVE' },
-  { _id: 'sku_nuts_30', productId: 'prod_nuts_daily', skuCode: 'FRUIT-NUTS-30', colorName: '30包/箱', size: 30, price: 6990, stock: 100, lockedStock: 0, status: 'ACTIVE' },
-  { _id: 'sku_mango_500', productId: 'prod_dried_mango', skuCode: 'FRUIT-MANGO-500', colorName: '500g/袋', size: 500, price: 1990, stock: 250, lockedStock: 0, status: 'ACTIVE' }
+  { _id: 'sku_apple_5', productId: 'prod_apple_fuji', skuCode: 'FRUIT-APPLE-5', colorName: '5斤装', size: 5, price: 3990, status: 'ACTIVE' },
+  { _id: 'sku_apple_10', productId: 'prod_apple_fuji', skuCode: 'FRUIT-APPLE-10', colorName: '10斤装', size: 10, price: 5990, status: 'ACTIVE' },
+  { _id: 'sku_banana_3', productId: 'prod_banana_hi', skuCode: 'FRUIT-BANANA-3', colorName: '3斤装', size: 3, price: 1990, status: 'ACTIVE' },
+  { _id: 'sku_orange_5', productId: 'prod_orange_gan', skuCode: 'FRUIT-ORANGE-5', colorName: '5斤装', size: 5, price: 4990, status: 'ACTIVE' },
+  { _id: 'sku_blueberry_2', productId: 'prod_blueberry', skuCode: 'FRUIT-BLUEBERRY-2', colorName: '2盒装', size: 2, price: 2990, status: 'ACTIVE' },
+  { _id: 'sku_cherry_jj', productId: 'prod_cherry_chile', skuCode: 'FRUIT-CHERRY-JJ', colorName: 'JJ级 2斤', size: 2, price: 8990, status: 'ACTIVE' },
+  { _id: 'sku_avocado_4', productId: 'prod_avocado', skuCode: 'FRUIT-AVOCADO-4', colorName: '4个装', size: 4, price: 3990, status: 'ACTIVE' },
+  { _id: 'sku_nuts_30', productId: 'prod_nuts_daily', skuCode: 'FRUIT-NUTS-30', colorName: '30包/箱', size: 30, price: 6990, status: 'ACTIVE' },
+  { _id: 'sku_mango_500', productId: 'prod_dried_mango', skuCode: 'FRUIT-MANGO-500', colorName: '500g/袋', size: 500, price: 1990, status: 'ACTIVE' }
 ];
 
 // 演示卡密（兑换码）：UNUSED 未使用 / USED 已使用 / DISABLED 已禁用
@@ -220,16 +206,6 @@ const DEMO_BANNERS = [
   }
 ];
 
-const DEMO_PICKUP_POINTS = [
-  {
-    _id: 'pt_sz_001',
-    name: '示例大学校园自提站',
-    address: '示例省示例市示例区示例路1号示例大学商业街',
-    hours: '09:00 - 21:30',
-    phone: '13800000000',
-    status: 'ACTIVE'
-  }
-];
 
 function hashPassword(password, salt) {
   return `scrypt$${crypto.scryptSync(password, salt, 64, { N: 16384, r: 8, p: 1 }).toString('hex')}`;
@@ -251,6 +227,12 @@ async function seedIfEmpty(name, docs) {
 }
 
 exports.main = async () => {
+  if (!['local','test','cloud-test'].includes(process.env.APP_ENV) || process.env.ALLOW_DATABASE_INIT !== 'true' || cloud.getWXContext().OPENID) {
+    return { success: false, code: 'FORBIDDEN', message: '初始化仅允许显式启用的隔离服务端环境' };
+  }
+  if (!process.env.INITIAL_ADMIN_PASSWORD || process.env.INITIAL_ADMIN_PASSWORD.length < 12) {
+    return { success: false, code: 'CONFIG_ERROR', message: '请通过环境变量配置至少12位初始化密码' };
+  }
   const report = { collections: [], seeds: [] };
 
   // 1. 创建集合
@@ -270,11 +252,10 @@ exports.main = async () => {
   try { report.seeds.push(await seedIfEmpty('product_skus', DEMO_SKUS)); } catch (e) { report.seeds.push({ name: 'product_skus', status: 'error: ' + (e.errMsg || e.message) }); }
   try { report.seeds.push(await seedIfEmpty('activation_codes', DEMO_ACTIVATION_CODES)); } catch (e) { report.seeds.push({ name: 'activation_codes', status: 'error: ' + (e.errMsg || e.message) }); }
   try { report.seeds.push(await seedIfEmpty('banners', DEMO_BANNERS)); } catch (e) { report.seeds.push({ name: 'banners', status: 'error: ' + (e.errMsg || e.message) }); }
-  try { report.seeds.push(await seedIfEmpty('pickup_points', DEMO_PICKUP_POINTS)); } catch (e) { report.seeds.push({ name: 'pickup_points', status: 'error: ' + (e.errMsg || e.message) }); }
 
-  // 3. 创建超级管理员 (superadmin / admin123456)
+  // 3. 创建超级管理员（密码仅环境变量）
   const ADMIN_USERNAME = 'superadmin';
-  const ADMIN_PASSWORD = 'admin123456';
+  const ADMIN_PASSWORD = process.env.INITIAL_ADMIN_PASSWORD;
   const adminSalt = crypto.randomBytes(32).toString('hex');
   const adminDoc = {
     _id: 'admin_super_01',
@@ -295,7 +276,7 @@ exports.main = async () => {
     if (existingAdmin.data.length === 0) {
       const { _id, ...adminRest } = adminDoc;
       await db.collection('admins').doc(_id).set({ data: adminRest });
-      report.admin = { username: ADMIN_USERNAME, password: ADMIN_PASSWORD, status: 'created' };
+      report.admin = { username: ADMIN_USERNAME, status: 'created' };
     } else {
       report.admin = { username: ADMIN_USERNAME, status: 'already exists' };
     }

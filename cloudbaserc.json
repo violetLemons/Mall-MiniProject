@@ -1,26 +1,127 @@
 {
   "$schema": "https://static.cloudbase.net/cli/cloudbaserc.schema.json",
-  "envId": "cloud1-d3gffg6ok96e6cf3f",
+  "envId": "REPLACE_WITH_TARGET_ENV_ID",
   "functionRoot": "cloudfunctions",
   "functions": [
-    { "name": "activation", "timeout": 20, "handler": "index.main", "memorySize": 256 },
-    { "name": "adminAuth", "timeout": 20, "handler": "index.main", "memorySize": 256 },
-    { "name": "adminBanners", "timeout": 20, "handler": "index.main", "memorySize": 256 },
-    { "name": "adminCategories", "timeout": 20, "handler": "index.main", "memorySize": 256 },
-    { "name": "adminGateway", "timeout": 20, "handler": "index.main", "memorySize": 256 },
-    { "name": "auth", "timeout": 20, "handler": "index.main", "memorySize": 256 },
-    { "name": "cart", "timeout": 20, "handler": "index.main", "memorySize": 256 },
-    { "name": "paymentCallback", "timeout": 20, "handler": "index.main", "memorySize": 256 },
-    { "name": "products", "timeout": 20, "handler": "index.main", "memorySize": 256 },
-    { "name": "adminProducts", "timeout": 20, "handler": "index.main", "memorySize": 256 },
-    { "name": "adminInventory", "timeout": 20, "handler": "index.main", "memorySize": 256 },
-    { "name": "adminUsers", "timeout": 20, "handler": "index.main", "memorySize": 256 },
-    { "name": "merchantAuth", "timeout": 20, "handler": "index.main", "memorySize": 256 },
-    { "name": "adminOrders", "timeout": 20, "handler": "index.main", "memorySize": 256 },
-    { "name": "orders", "timeout": 20, "handler": "index.main", "memorySize": 256 },
-    { "name": "payment", "timeout": 20, "handler": "index.main", "memorySize": 256 },
-    { "name": "orderTimeoutJob", "timeout": 30, "handler": "index.main", "memorySize": 256 },
-    { "name": "initDb", "timeout": 60, "handler": "index.main", "memorySize": 256 },
-    { "name": "ads", "timeout": 20, "handler": "index.main", "memorySize": 256 }
+    {
+      "name": "activation",
+      "timeout": 20,
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "adminAuth",
+      "timeout": 20,
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "adminBanners",
+      "timeout": 20,
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "adminCategories",
+      "timeout": 20,
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "adminGateway",
+      "timeout": 20,
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "auth",
+      "timeout": 20,
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "cart",
+      "timeout": 20,
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "paymentCallback",
+      "timeout": 20,
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "products",
+      "timeout": 20,
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "adminProducts",
+      "timeout": 20,
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "adminUsers",
+      "timeout": 20,
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "adminOrders",
+      "timeout": 20,
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "orders",
+      "timeout": 20,
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "payment",
+      "timeout": 20,
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "orderTimeoutJob",
+      "timeout": 60,
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "ads",
+      "timeout": 20,
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "addresses",
+      "timeout": 20,
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "refundCallback",
+      "timeout": 20,
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "wechatEvents",
+      "timeout": 20,
+      "handler": "index.main",
+      "memorySize": 256
+    },
+    {
+      "name": "contentReviewJob",
+      "timeout": 60,
+      "handler": "index.main",
+      "memorySize": 256
+    }
   ]
 }

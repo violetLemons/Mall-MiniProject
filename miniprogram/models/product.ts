@@ -44,7 +44,6 @@ export interface ProductItem {
   skus: ProductSku[];
   detailImages?: string[];
   description?: string;
-  shippingType?: ('express' | 'store_pickup')[];
 }
 
 export interface ProductCategory {

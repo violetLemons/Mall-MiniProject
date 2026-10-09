@@ -1,314 +1,139 @@
-﻿# 通用商城 · 微信小程序商城全栈生产级部署上线手册 (DEPLOYMENT.md)
+# 单商户部署与上线指南
 
-> **版本**：v2.1.0 (CloudBase 事务与网关整改版)
-> **适用范围**：微信原生小程序 + PC 管理后台 (React 18 + Vite) + CloudBase 微信云开发服务端  
-> **安全等级**：事务级库存一致性 + scrypt/PBKDF2 兼容鉴权 + 零信任客户端定价 + 微信官方 CloudPay 网关双重查验
+更新：2026-10-09。与实际代码配套；旧 CloudPay、多商户、库存、自提部署说明已退役。决策以用户 D1–D6 为准。代码本地验收不等于生产上线验收。
 
----
+## 1. 上线前必须填写
 
-## 目录索引
-- [一、准备工作与账号前置要求](#一准备工作与账号前置要求)
-- [二、生产级部署 17 步标准 SOP](#二生产级部署-17-步标准-sop)
-  - [步骤 1：创建微信云开发环境](#步骤-1创建微信云开发环境)
-  - [步骤 2：数据库 20 个集合与复合索引清单](#步骤-2数据库-20-个集合与复合索引清单)
-  - [步骤 3：超级管理员种子安全账号生成](#步骤-3超级管理员种子安全账号生成)
-  - [步骤 4：云函数依赖打包与公共模块同步](#步骤-4云函数依赖打包与公共模块同步)
-  - [步骤 5：部署 17/18 个云函数与定时触发器](#步骤-5部署-1718-个云函数与定时触发器)
-  - [步骤 6：配置数据库细粒度安全访问规则 (Security Rules)](#步骤-6配置数据库细粒度安全访问规则-security-rules)
-  - [步骤 7：小程序项目配置与 AppID 绑定](#步骤-7小程序项目配置与-appid-绑定)
-  - [步骤 8：小程序端云环境通信桥接与防腐配置](#步骤-8小程序端云环境通信桥接与防腐配置)
-  - [步骤 9：小程序端编译、本地构建与真机体验版发布](#步骤-9小程序端编译本地构建与真机体验版发布)
-  - [步骤 10：PC 管理后台依赖安装与环境变量配置](#步骤-10pc-管理后台依赖安装与环境变量配置)
-  - [步骤 11：PC 管理后台生产构建与产物校验](#步骤-11pc-管理后台生产构建与产物校验)
-  - [步骤 12：PC 管理后台部署至云开发静态网站托管](#步骤-12pc-管理后台部署至云开发静态网站托管)
-  - [步骤 13：微信官方 CloudPay 支付接口配置与发货信息管理规范](#步骤-13微信官方-cloudpay-支付接口配置与发货信息管理规范)
-  - [步骤 14：校园自提服务站配置与 6 位提货码核销联调](#步骤-14校园自提服务站配置与-6-位提货码核销联调)
-  - [步骤 15：多角色 RBAC 运营账号开通与分权](#步骤-15多角色-rbac-运营账号开通与分权)
-  - [步骤 16：执行全量生产级安全与业务自动化测试套件](#步骤-16执行全量生产级安全与业务自动化测试套件)
-  - [步骤 17：正式提交微信审核与全网灰度发布](#步骤-17正式提交微信审核与全网灰度发布)
-- [三、运维排错与应急回滚指南](#三运维排错与应急回滚指南)
+确认实际售卖品类、小程序主体、认证与类目资质、隐私协议数据项、售后时限、退货地址、真实客服电话和客服人员。当前仅快递、无库存控制、免运费、整单退款；已发货需管理员确认收到退货，完成订单不开放自动退款。不得把样例商品或客服页示例承诺当成实际经营承诺：按真实业务修改品牌、服务时间、FAQ 和商品描述。
 
----
+确认普通商户号已绑定本小程序，已开通 JSAPI，具备订单发货信息管理及相关接口权限。支付采用 API v3 直连。先在独立空测试环境走通，再上线；生产不允许模拟支付。历史只有可丢弃测试数据，不执行自动清库。
 
-## 一、准备工作与账号前置要求
+## 2. 本地准备和回归
 
-1. **微信小程序官方账号**：登录 [微信公众平台 (mp.weixin.qq.com)](https://mp.weixin.qq.com)，获取 AppID（需已认证且开通“云开发”功能）。本次开发者工具项目 AppID 为 `wxYOUR_MINIPROGRAM_APPID`，请以工具当前显示值为准。
-2. **微信支付商户平台账号**：微信支付商户号（MCH ID），与小程序 AppID 完成绑定。
-3. **开发工具与运行时环境**：
-   - Node.js `v18.0.0+` 或 `v20.0.0+` (推荐 LTS)
-   - 微信开发者工具 (最新 Stable 版本)
-   - npm 或 pnpm 包管理器
+在仓库根目录执行：
 
----
-
-## 二、生产级部署 17 步标准 SOP
-
-### 步骤 1：创建微信云开发环境
-1. 打开微信开发者工具，点击顶部工具栏的 **「云开发」** 按钮。本项目已确认环境 `YOUR_CLOUDBASE_ENV_ID`，部署前仍需确认其用途并保留现有数据。
-2. 首次进入点击“开通云开发”，选择计费模式（基础版或按量付费）。
-3. 记录生成的 **环境 ID (Env ID)**，例如：`mall-prod-7g81x`。
-
----
-
-### 步骤 2：数据库 20 个集合与复合索引清单
-本项目提供了可重复输出数据库结构清单的脚本 `scripts/init-db.js`。
-1. 在微信开发者工具中打开项目。
-2. 进入「云开发控制台」 -> 「数据库」，确认当前环境。
-3. 在项目根目录执行：
 ```powershell
-node scripts/init-db.js
+npm ci
+npm run build
+node scripts/bundle-functions.js
+node scripts/run-tests.js
+npm --prefix admin-web ci --ignore-scripts
+npm --prefix admin-web run build
 node scripts/init-db.js --json work/cloud-seed/database-manifest.json
-node scripts/export-cloud-seed.js --out work/cloud-seed
-```
-微信开发者工具 CLI 当前不提供数据库 DDL 接口，该脚本只输出可审计的集合、索引与权限清单，不会伪装执行云端写入。请在 CloudBase 控制台按清单创建或核对 20 个集合、索引和安全规则，再读取结果留档。请以 `work/cloud-seed/database-manifest.json` 和 `scripts/init-db.js` 输出为准创建索引；不要按旧文档中的历史集合名批量创建，以免产生无用或错误索引。
-
----
-
-### 步骤 3：超级管理员种子安全账号生成
-为保障管理后台绝对安全，系统杜绝明文或弱密码，采用 **scrypt + 32字节强随机盐**；旧 PBKDF2 哈希只用于兼容校验并在登录后升级。
-执行预置种子脚本：
-```bash
+node scripts/export-cloud-seed.js
 node scripts/seed-admin.js
 ```
-执行后控制台输出：
-```text
-[Seed] Admin user 'superadmin' generated successfully.
-Initial Credentials:
-  Username: superadmin
-  Password: <控制台安全打印或由 INITIAL_ADMIN_PASSWORD 环境变量注入>
-  Salt: 32-byte hex generated
-  Iterations: 10000
-```
-> [!IMPORTANT]
-> 首次登录管理后台后，请立即进入「管理员权限」修改超级管理员密码！当前服务端优先使用 scrypt，仍可校验旧 PBKDF2 哈希并在登录时升级。严禁使用弱口令！
 
----
+最后一条须先通过当前进程环境设置 INITIAL_ADMIN_PASSWORD（12–128 位），不在命令历史中填写真实密码。只生成哈希文件，不上传云端。种子商品默认下架；导入后必须重新保存、完成内容审核再上架。work/cloud-seed 输出不得当作生产交易数据。
 
-### 步骤 4：云函数依赖打包与公共模块同步
-微信云开发各云函数在独立上传时要求自身具备完整的模块。本项目提供了专属打包同步脚本 `scripts/bundle-functions.js`，将 `cloudfunctions/common/` 自动同步至全部云函数中：
-```bash
-node scripts/bundle-functions.js
-```
-控制台将提示 18 个云函数已成功注入公共核心：
-- `response.js`：统一 API 响应信封规范
-- `crypto.js`：scrypt/PBKDF2 兼容密码校验与防篡改 Token 签发 (timingSafeEqual)
-- `authMiddleware.js`：零信任管理员 RBAC 鉴权与 HTTP 网关报文解析
-- `orderPayConfirm.js`：微信商城核心 CAS 幂等支付确认与销库存事务引擎
-- `logger.js`：操作行为入库审计引擎
+common 源码只能改 cloudfunctions/common；改后必须重新打包。小程序改 TS/WXML/WXSS/JSON，再运行构建产生 JS；云函数 JS 和后台 TSX 本身是源码。
 
----
+## 3. 数据库先行
 
-### 步骤 5：部署 17/18 个云函数与定时触发器
-在微信开发者工具中，展开 `cloudfunctions/` 目录：
-对以下每一个云函数目录右键，选择 **「上传并部署：云端安装依赖 (不上传 node_modules)」**。也可以使用 `scripts/deploy-cloud.ps1` 先同步公共模块后通过 CLI 增量部署；脚本默认部署生产所需的 17 个函数，只有隔离云测试环境才追加 `-IncludeTestPayment`：
+新建目标 CloudBase 环境，记录环境 ID。以 cloudfunctions/common/schema.js 和导出的 manifest 为唯一集合及索引清单，共 25 个集合。在控制台逐项创建并读取核对；部署 cloudfunctions/database.rules.json 中的私有规则，禁止客户端直接读写，业务访问必须走服务端鉴权。
+
+node scripts/init-db.js 只导出清单，--apply 会拒绝伪执行。node scripts/apply-indexes.js 默认打印命令；真实应用要求 TCB_ENV_ID 与 --apply。Windows 的 CLI 包装器兼容性尚未云端验证，失败时按 manifest 在控制台创建，不能忽略错误。建立索引后保存实际索引截图/导出，尤其是订单超时、微信同步、退款轮询和内容审核队列索引。
+
+导入需要的分类、真实商品、SKU 和 admins.json（单条 JSON）；其余交易集合保持空。superadmin 首次登录后更改密码。不要导入旧商户、旧子单、库存或自提集合。生产不部署 initDb；该函数仅隔离环境且需要 ALLOW_DATABASE_INIT=true。
+
+## 4. 云函数和环境变量
+
+在控制台秘密配置中设置，切勿写进 Git、前端或日志：
+
+| 变量 | 要求 |
+| --- | --- |
+| APP_ENV | 生产为 production；隔离测试 cloud-test；生产禁止 ENABLE_TEST_PAYMENTS=true |
+| ADMIN_JWT_SECRET | 随机至少 32 字符；所有鉴权函数一致，轮换会使现有会话失效 |
+| WECHAT_APP_ID | 实际小程序 AppID，与商户绑定一致 |
+| WECHAT_APP_SECRET | 仅服务端 REST 接口回退使用，不进入小程序包 |
+| WECHAT_PAY_MCH_ID | 自有普通商户号 |
+| WECHAT_PAY_SERIAL_NO | 商户签名证书序列号 |
+| WECHAT_PAY_PRIVATE_KEY_BASE64 | 商户私钥 PEM 的 Base64；也支持 WECHAT_PAY_PRIVATE_KEY，二选一 |
+| WECHAT_PAY_API_V3_KEY | 恰好 32 字节 |
+| WECHAT_PAY_PLATFORM_KEYS_JSON | JSON：微信平台证书序列号或公钥 ID → 对应 PEM 公钥；必须与响应 serial 匹配 |
+| WECHAT_PAY_NOTIFY_URL | 支付 HTTP 回调 HTTPS URL |
+| WECHAT_REFUND_NOTIFY_URL | 退款 HTTP 回调 HTTPS URL |
+| WECHAT_EVENT_TOKEN | 小程序消息推送 Token |
+| WECHAT_EVENT_AES_KEY | 消息推送 EncodingAESKey，43 字符 |
+| CONTENT_SECURITY_OPENID | 真实管理员微信 openid，满足微信内容安全接口最近访问要求；失效须重新访问小程序 |
+
+公钥映射需建立轮换操作：提前加入新公钥，联调验证后再移除旧公钥。未知 serial 验签失败，订单保持待核实，不得绕过验签。
+
+部署共 20 个正式函数：addresses、adminAuth、adminBanners、adminCategories、adminGateway、adminOrders、adminProducts、adminUsers、activation、ads、auth、cart、orders、orderTimeoutJob、payment、paymentCallback、refundCallback、wechatEvents、contentReviewJob、products。ads 保留禁用响应以兼容前端，不发奖励。
+
 ```powershell
-# 生产或真实支付环境（不部署测试支付入口）
-powershell -File scripts/deploy-cloud.ps1 -EnvId <环境ID>
-
-# 隔离云测试环境（显式加入测试付款/退款入口）
-powershell -File scripts/deploy-cloud.ps1 -EnvId <环境ID> -IncludeTestPayment
+./scripts/deploy-cloud.ps1 -EnvId '<实际环境ID>' -CliPath '<微信开发者工具cli.bat绝对路径>'
 ```
-1. `adminAuth`：后台管理员账号登录、scrypt 加盐哈希鉴权与 JWT 签发
-2. `adminProducts`：商品库维护、SKU 规格矩阵调控、上架/下架与软删除
-3. `adminInventory`：库存精确手动调账与出入库变动流水审计
-4. `adminOrders`：订单履约发货（顺丰/中通）、物流单号录入与自提核销
-5. `adminCategories`：商品潮流类目管理
-6. `adminBanners`：首页运营轮播图配置
-7. `adminUsers`：后台多角色 RBAC 权限管理与操作审计日志查询
-8. `auth`：微信用户静默登录与个人信息维护
-9. `products`：小程序端商品瀑布流、分类筛选、品牌搜索与 2D SKU 矩阵聚合
-10. `cart`：购物车列表、批量勾选与下单前物理可用库存校验
-11. `orders`：生产级原子下单（全链路整型分计算、1~5件限购、地址规范校验、原子扣减可用库存并增加锁存）与主动取消
-12. `payment`：微信官方 CloudPay 统一下单预支付凭证生成、退款申请受理与主动网关查单
-13. `paymentCallback`：微信官方 CloudPay 支付成功回调安全处理器（严格拦截客户端直接调用，微信网关二次反查查单确认交易状态、商户号、AppID、订单号、金额、买家OpenID，CAS 原子确认流转并正式销存）
-14. `orderTimeoutJob`：超时未支付订单自动关单定时器
-15. `adminGateway`：浏览器管理后台 HTTPS 入口，仅转发管理员函数并执行来源白名单校验
-16. `addresses`：用户地址簿，服务端校验归属与默认地址
-17. `pickupPoints`：校园自提点查询与管理
-18. `testPayment`：仅测试环境授权管理员可用的隔离付款确认
 
-#### 定时触发器配置 (`orderTimeoutJob/config.json`)
-确保 `cloudfunctions/orderTimeoutJob/config.json` 包含以下定时触发规则，并右键点击 **「上传触发器」**：
-```json
-{
-  "triggers": [
-    {
-      "name": "orderTimeoutJobTrigger",
-      "type": "timer",
-      "config": "0 */5 * * * * *"
-    }
-  ]
-}
+脚本自动先打包；失败停止。也可开发者工具逐个选择“上传并部署：云端安装依赖”。生产不带 IncludeTestPayment，不部署 testPayment/initDb。cloudbaserc.json 的占位环境 ID 必须按目标填写。读取每个函数的版本、状态、权限、环境变量及超时，不以上传成功代替运行验证。
+
+## 5. HTTP 回调与微信官方能力
+
+为 paymentCallback、refundCallback 分别创建公开 HTTPS HTTP 触发入口，只接收微信 POST。必须传入未修改的原始 body 字符串、原始 Wechatpay-* 头、httpMethod、isBase64Encoded；网关不得先解析再序列化 JSON，否则验签失败。把完整 URL 填入环境变量。成功落账后才返回 200；验签、金额或数据库失败返回 500，让微信重试。不可用 cloud.callFunction 普通 JSON 代替原始 HTTP 通知。
+
+为 wechatEvents 配置 GET/POST HTTPS 入口；微信公众平台消息推送选择 JSON、安全模式，填写相同 Token/AESKey。GET 验签返回 echostr，POST 校验 msg_signature 并解密，AppID 校验后处理异步图片审核。不得选择明文或 XML 模式。接口验签和后台启用都要实际通过。
+
+核对各 config.json 的 OpenAPI 权限：adminProducts/auth 的文本与媒体安全、orders 的文本安全和发货查单、adminOrders/orderTimeoutJob 的发货上传和查单、contentReviewJob 的媒体异步安全。如果云调用不可用，REST 回退还需要正确 AppSecret、服务端网络及微信 IP 白名单配置；不得在不确定上传结果后盲目重复发货。
+
+```powershell
+./scripts/apply-openapi-permissions.ps1 -EnvId '<实际环境ID>'
+./scripts/apply-openapi-permissions.ps1 -EnvId '<实际环境ID>' -Apply
 ```
-该任务每 5 分钟自动扫描 30 分钟未付款的订单，执行微信支付关单并将锁存库存全量释放回原 SKU。
 
----
+第一条只打印核对清单，第二条创建定时器（不会自动授予权限）：内容审核每分钟；订单关单/退款/收货巡检每 15 分钟。已存在时请读回配置而非忽略失败。orderTimeoutJob/contentReviewJob 超时 60 秒。确认云端时区、cron 实际触发及日志；有待处理积压时告警。审核单次 3 个媒体任务，订单巡检分批处理，不能把一次运行当作全量完成。
 
-### 步骤 6：配置数据库细粒度安全访问规则 (Security Rules)
-为防止小程序前端越级非法改动商品价格或库存，核心业务表必须启用服务端受限访问规则：
-在云开发控制台 -> 数据库 -> 选择集合 -> 「权限设置」：
-- `products` / `product_skus`: **所有用户可读，仅管理端云函数可写**
-  ```json
-  { "read": true, "write": false }
-  ```
-- `orders`: **仅创建者可读，仅云函数可写**
-  ```json
-  { "read": "doc._openid == auth.openid", "write": false }
-  ```
-- `admins` / `inventory_logs` / `payment_transactions` / `refund_records` / `operation_logs`: **完全私有，前端不可读写**
-  ```json
-  { "read": false, "write": false }
-  ```
+商品保存强制下架并进入当前版本审核；全部图片通过才可手动上架。任一图片失败保持待处理；修改商品会废弃旧版本审核结果。微信余额纯抵扣订单没有现金交易号，无法上传微信支付发货信息；本地仍记录快递履约。如果业务要求每笔都出现在微信订单中心，须先调整余额策略后重新验收，不能伪造 transaction_id。
 
----
+## 6. 小程序和后台
 
-### 步骤 7：小程序项目配置与 AppID 绑定
-1. 打开 `project.config.json`，确保配置如下：
-```json
-{
-  "miniprogramRoot": "miniprogram/",
-  "cloudfunctionRoot": "cloudfunctions/",
-  "appid": "wxYOUR_MINIPROGRAM_APPID",
-  "projectname": "wechat-sneaker-mall"
-}
-```
-2. 开发者工具左上角确认显示当前真实 AppID。
+将 miniprogram/services/cloud.ts 中 CLOUD_ENV_ID 占位替换为实际环境，ENABLE_LOCAL_GATEWAY 保持 false；检查 project.config.json AppID。配置真实品牌及 miniprogram/config/store.ts 客服电话。未配置电话时不展示，在线客服使用官方 contact 按钮，需在平台配置接待人员。客服电话、服务时间、退换货条款按实际业务填写。
 
----
+微信公众平台补全实际类目及资质、隐私保护指引（地址、电话、头像等实际收集项）、隐私授权配置、内容安全与发货信息管理、客服、用户反馈、服务协议。小程序使用 requirePrivacyAuthorize/openPrivacyContract，体验版真机验证用户拒绝授权时不收集数据。低版本接口不可用时提示，不应降级绕过授权。
 
-### 步骤 8：小程序端云环境通信桥接与防腐配置
-打开 `miniprogram/services/cloud.ts`：
-```typescript
-// 本次开发者工具已确认的云环境 ID
-export const CLOUD_ENV_ID = 'YOUR_CLOUDBASE_ENV_ID';
-```
-> [!NOTE]
-> 商品、购物车、地址和订单请求全程直连微信云开发网关，不再从云调用失败回退 Mock。隔离的 `testPayment` 入口仅在 `APP_ENV=cloud-test`、`PAYMENT_MODE=test` 且显式开启时可用，正式构建不得配置这些开关。
+后台用 admin-web 构建 dist，按既有托管方案部署 HTTPS；配置 adminGateway HTTP 入口及前端环境变量（见 admin-web/.env.example），禁止公网无鉴权直写。核对仅 SUPER_ADMIN 可登录，退出/禁用/重置密码让旧会话失效。收货操作调用微信官方订单确认页面，再以服务端查单确认，不能只靠客户端成功回调。
 
----
+在微信数据分析配置事件 product_view、order_submit、payment_start、payment_confirmed，核对报表中收到事件；不上传 openid、地址和电话。
 
-### 步骤 9：小程序端编译、本地构建与真机体验版发布
-1. 在项目根目录下执行 TypeScript 编译：
-```bash
-npm run build
-```
-2. 在微信开发者工具中点击 **「编译」**，验证控制台无报错。
-3. 点击工具栏 **「真机调试」** 或 **「预览」**，使用手机微信扫码测试全流程。
-4. 点击工具栏 **「上传」**，填写测试版本号，项目备注填写“CloudBase 测试验收版”。
-5. 在公众平台「版本管理」中将其设为 **「体验版」** 进行最终业务验收。
+## 7. 真实联调验收，逐项保存证据
 
----
+1. 真机登录、拒绝隐私授权、同意后维护地址；购物车增改、商品下架后拒绝下单。
+2. 同 requestId 重复下单仅一单；篡改价格无效；金额全程整数分；他人订单/购物车不可访问。
+3. 小额真实微信支付，前端支付成功但回调延迟仍可靠查单；原始通知验签、重复通知、数据库失败重试后仅落账一次。
+4. 取消及超时订单先查单/关微信单；支付与取消并发不双记账。CLOSING 等待核实不得手动改成未付款。
+5. 真实快递公司及运单发货，上传微信发货信息；超时先查询已有发货结果再重试。微信状态 3/4 才确认收货，5/6 不得误判已收货；完成后评价进行内容安全审核。
+6. 未发货整单退款、已发货退货确认后退款；现金按 payAmount、余额按 balanceAmount 分别退，凭微信 SUCCESS 才终结。重复退款通知仅入账一次；PROCESSING/CLOSED/ABNORMAL 保持核实，不给用户虚假成功。CLOSED/ABNORMAL 当前需人工查账和后续恢复处理，后台不能强制标为 REFUNDED。
+7. 商品文本拒绝、图片异步全部通过、单图拒绝、旧版本回调均测试；队列定时器实际工作。头像检查及消息安全模式通过。
+8. 超管禁用、最后一个超管保护、密码重置和旧 JWT、伪造 role/adminJwtSecret 越权均拒绝；旧商户凭证失效。
+9. 对账订单、支付记录、refund_records、balance_transactions 与微信商户后台；查看所有异常及队列积压。保留测试单号、金额、通知结果、状态变化，隐去个人信息与密钥。
 
-### 步骤 10：PC 管理后台依赖安装与环境变量配置
-进入 `admin-web/` 目录：
-```bash
-cd admin-web
-npm install
-```
-检查并配置 `.env.production` 文件（可参考 `.env.example`）：
-```env
-VITE_APP_TITLE=通用商城管理控制台
-VITE_CLOUDBASE_URL=https://<你的云开发环境域名或自定义HTTP网关>
-```
-> [!CAUTION]
-> 生产模式严禁在未配置 `VITE_CLOUDBASE_URL` 时启动，前端已内建安全网关阻断逻辑，缺少真实接口地址将直接抛出安全异常并拒绝进入后台。
+本地已有 23 项测试，不能代替上述真机与实际 CloudBase 事务/索引/权限验证。当前未执行云部署、真实支付退款或提审。
 
----
+## 8. 退役、提审、发布与回滚
 
-### 步骤 11：PC 管理后台生产构建与产物校验
-在 `admin-web/` 目录下执行打包：
-```bash
-npm run build
-```
-构建产物输出至 `admin-web/dist/`，配置已强制设置 `build.sourcemap: false`，杜绝源码泄露。
+先备份并确认旧环境只有测试数据。停止旧定时器，控制台显式停用/删除 merchantAuth、adminInventory、pickupPoints 等旧入口及不再使用的测试函数；本地删除目录不会删除云函数。清除旧商户/子单/库存/自提数据时须确认目标环境，禁止脚本自动跨环境清库。
 
----
+上传体验版，按第 7 节验收完成后提交审核；填真实类目、资质、隐私与服务说明，提供审核人员可访问的路径和商品。生产密钥与测试隔离。发版后关注支付失败、通知失败、CLOSING/REFUNDING 长时间停留、发货上传失败、审核队列积压、超管异常操作。每天核对资金流水。
 
-### 步骤 12：PC 管理后台部署至云开发静态网站托管
-1. 打开微信开发者工具 -> 「云开发控制台」 -> 「更多」 -> **「静态网站托管」**。
-2. 将 `admin-web/dist/` 下的全部文件上传至静态网站根目录 `/`。
-3. 在「配置设置」中设置默认首页为 `index.html`，错误页面为 `index.html`（SPA 路由支持）。
-4. 打开浏览器访问分配的静态网站域名，使用初始超级管理员账号登录后台。
+依赖检查还存在既有后台依赖风险（本次 npm audit：6 项，含 3 high；涉及 xlsx、Vite、react-router、source-map-js）。上线前按锁文件实际版本重新 audit，制定兼容升级或替换方案并构建回归，不使用强制主版本升级掩盖问题。
 
----
+回滚前保存当前代码、云函数版本、权限、数据库备份及配置版本。不要回滚到旧多商户支付/退款逻辑；遇资金异常先暂停下单和退款，保留回调及对账，按已确认的交易证据人工处置。任何云端退款/余额修正必须留操作记录，禁止直接编辑订单假装完成。
 
-### 步骤 13：微信官方 CloudPay 支付接口配置与发货信息管理规范
-1. 在微信开发者工具 -> 云开发控制台 -> 「设置」 -> 「拓展功能」中开通 **「微信支付」** 绑定。
-2. 绑定已通过审核的微信支付商户号 (`WECHAT_PAY_MCH_ID`)。
-   商户管理员还需在“服务商助手”确认授权，并在微信支付商户平台开通小程序/JSAPI 支付；进行退款验收时同时开通退款权限。CloudBase 显示“已绑定/已授权”后，才进行真机支付验证。
-3. **统一下单调用规范**：
-   系统在 `cloudfunctions/payment/index.js` 中使用微信云开发原生官方能力：
-   ```javascript
-   const res = await cloud.cloudPay.unifiedOrder({
-     body: `通用商城 - ${order.orderNo}`,
-     outTradeNo: order.orderNo,
-     spbillCreateIp: '127.0.0.1',
-     subMchId: process.env.WECHAT_PAY_SUB_MCH_ID || process.env.WECHAT_PAY_MCH_ID,
-     subAppid: process.env.WECHAT_APP_ID,
-     totalFee: order.payAmount, // 数据库整型分 (¥699 对应 69900)
-     envId: process.env.CLOUDBASE_ENV_ID,
-     functionName: 'paymentCallback' // 支付成功回调云函数
-   });
-   ```
-   当前实现通过 CloudBase 云调用完成签名、证书和回调验签；不要把商户私钥、API v3 密钥或证书上传到代码仓库。若改用直连微信支付 API v3，需另行配置商户证书序列号、私钥、平台证书/公钥、API v3 密钥和可公网访问的通知地址。
-4. **微信小程序发货信息管理接口规范**：
-   针对实物商品交易，根据微信官方合规要求，商家发货后需通过微信小程序发货信息管理接口（或云开发官方插件）上报物流信息。已在 `cloudfunctions/adminOrders/index.js` 的 `ship` 指令中集成标准发货信息上报框架，支持顺丰、中通等合规物流公司编码及单号录入。
+## 9. 官方文档入口
 
----
+接口及准入以微信当前官方配置为准，部署时再次核对：[微信支付 API v3](https://pay.weixin.qq.com/doc/v3/merchant/4012062524)、[小程序内容安全](https://developers.weixin.qq.com/miniprogram/dev/OpenApiDoc/sec-center/sec-check/msgSecCheck.html)、[发货信息管理](https://developers.weixin.qq.com/miniprogram/dev/platform-capabilities/business-capabilities/order-shipping/order-shipping.html)、[消息推送](https://developers.weixin.qq.com/miniprogram/dev/framework/server-ability/message-push.html)、[隐私授权](https://developers.weixin.qq.com/miniprogram/dev/api/open-api/privacy/wx.requirePrivacyAuthorize.html)。本次已对照官方原始参数，最终账号准入仍须控制台验证。
 
-### 步骤 14：校园自提服务站配置与 6 位提货码核销联调
-1. 登录 PC 管理后台 -> 「订单管理」。
-2. 小程序端选择“校园自提”提交订单并完成支付。
-3. 商家在后台点击 **「备货完毕」**，订单状态流转为 `READY_FOR_PICKUP`。
-4. 买家出示小程序中的 6 位数字自提码。
-5. 站点管理员在管理后台点击 **「自提核销」**，输入 6 位验证码：
-   - 输错：拦截并提示“取货码不正确”
-   - 输对：订单状态原子流转为 `COMPLETED`，记录核销时间与操作人。
+## 10. 2026-10-09 全源码复核后的部署补充
 
----
+本轮运行时缺陷与修复清单见《代码复核报告.md》，其验收更新覆盖旧测试数。正式adminGateway必须设置 ADMIN_ALLOWED_ORIGINS 为真实后台Origin（例如 https://实际后台域名，不带路径，多域名逗号分隔），不接受通配符，不默认信任所有腾讯云托管域名。Base64 HTTP JSON已兼容；必须做实际浏览器跨域预检。
 
-### 步骤 15：多角色 RBAC 运营账号开通与分权
-使用 `superadmin` 登录后台 -> 点击左侧「管理员权限」：
-1. **运营人员账号**（`OPERATOR`）：分配商品上下架、订单发货权限，无权物理销毁商品与修改管理员。
-2. **仓库自提专员账号**（`WAREHOUSE`）：分配库存流水调拨、自提码核销权限。
-3. 遵循最小权限原则，禁止将 `SUPER_ADMIN` 账号分配给非核心技术人员。
+adminBanners/adminCategories新增 security.msgSecCheck 权限；分类文字图标文字审核后生效，分类图片、轮播及专区图片进入共用内容队列，REVIEWING不会对用户发布；通过后恢复 desiredStatus。保存后台内容前确保 CONTENT_SECURITY_OPENID 最近访问小程序，并实际验证每种内容的通过/拒绝/旧版本回调。旧专区 promo_cards 回退、重置商品规格与不经过审核的图片迁移接口已移除。普通商品编辑保留原规格矩阵；界面的基准售价作用于所有保留规格，显式skus请求可单独设价。
 
----
+补建 manifest 新增 user_updated、user_created、buyer_created、buyer_status_created 索引。地址最多50条，购物车最多100款，均为明确服务端限制；不涉及商品库存。订单数量统计由服务端对全部本人订单计数。
 
-### 步骤 16：执行全量生产级安全与业务自动化测试套件
-在正式上线前，必须在项目根目录下执行全量自动化安全验证：
-```bash
-node scripts/run-tests.js
-```
-验证全部 35 项核心用例 100% 成功通过：
-- [x] **Case 01~03**：缺少 JWT 密钥拦截、Token 防篡改时序比对、PBKDF2 10000 次加盐哈希
-- [x] **Case 04~06**：未登录拦截、正则转义防注入、2D SKU 矩阵与可用库存计算
-- [x] **Case 07~12**：下单整型分存储(¥699->69900)、防小数/负数/超限购攻击、缺货回滚、IDOR越权拦截、主动关单恢复库存
-- [x] **Case 13~14**：createPayment 强校验、彻底删除前端直改 PAID 后门
-- [x] **Case 15~16**：伪造回调全面防御（直调拦截/网关查单失败/1分钱金额篡改/买家不匹配/AppID不匹配全部阻断）、官方可信回调原子销存
-- [x] **Case 17~19**：回调与查单并发时 CAS 保证库存只扣减一次、异常半完成订单要求重新对账、取消与支付并发绝不取消已付款订单
-- [x] **Case 20~21**：已支付订单取消必须走退款(PAID->REFUNDING)且确认前不释放库存、定时轮询关单
-- [x] **Case 22~24**：未支付自提订单不可备货/不可核销、已支付自提凭 6 位码安全核销
-- [x] **Case 25**：生产模式无后台接口地址时拒绝启动、前端零本地沙箱凭证与零弱口令后门
+source-map-js已通过兼容升级修复；最新后台 npm audit 为5项（3 moderate、2 high），剩余Vite/esbuild、react-router及xlsx需要主版本升级或替换后专项回归。当前版本不应公网暴露开发服务器；xlsx仅用于导出、不读取导入文件。此风险未伪装为已修复。
 
----
+## 11. 依赖修复最终验收（覆盖第10节暂存告警）
 
-### 步骤 17：正式提交微信审核与全网灰度发布
-1. 登录 [微信公众平台 (mp.weixin.qq.com)](https://mp.weixin.qq.com)。
-2. 在「版本管理」中找到已上传的开发版本，点击 **「提交审核」**。
-3. 填写服务类目（服装/百货/箱包），提交小程序用户隐私保护指引。
-4. 审核通过后，点击 **「发布」**，建议选择渐进式灰度发布策略（10% -> 30% -> 100%）。
-5. 通用商城微信小程序商城正式上线运营！
+依赖兼容升级完成：Vite7.3.7、plugin-react5.2.0、React Router7.18.4、SheetJS官方CDN0.20.3，锁文件包含integrity；source-map-js保持修复版。后台npm audit最新0告警；生产构建、真实Excel导出/序列化和路由API导航smoke通过。构建主机须Node ^20.19.0或>=22.12.0，package.json已明确engines。本次未新增另一套导出库。
 
----
-
-## 三、运维排错与应急回滚指南
-
-| 常见异常场景 | 风险级别 | 排查方向 | 应急处置方案 |
-| :--- | :--- | :--- | :--- |
-| **小程序提示“云函数调用失败”** | P1 | 云环境 ID 未配置或云函数未部署 | 检查 `miniprogram/services/cloud.ts` 中的 `CLOUD_ENV_ID`；确认微信开发者工具中云函数已全量上传。 |
-| **PC 后台提示“未配置 VITE_CLOUDBASE_URL”** | P0 | 前端生产安全熔断保护生效 | 属于正常安全防护。检查 `.env.production` 中是否配置了真实的 CloudBase HTTP 触发网关地址。 |
-| **买家支付成功但页面提示“支付处理中”** | P2 | 微信支付回调延迟 | 买家退出订单页面重新进入即可，详情接口内置微信官方二次查单，若已付款将自动同步为 `PAID`。 |
-| **提货码提示核销码不匹配** | P2 | 提货码输入错误或买家订单未刷新 | 请买家出示订单详情页中展示的最新 6 位数字验证码，管理端核对是否含有多余空格。 |
-| **商品无法物理清除** | P2 | 外键保护与历史账单关联 | 该商品存在历史关联订单，系统严格禁止物理清除，使用“软删除”移入回收站即可。 |
-
+首次部署构建按锁文件npm ci --ignore-scripts，需要访问npm及cdn.sheetjs.com；不能改回npm上的旧xlsx版本。保持完整浏览器流程验收；约673kB入口大包提示尚存，可后续拆包，不影响本次构建通过。其他真实交易与微信准入门禁不变。

@@ -9,10 +9,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const cart_service_1 = require("../../services/cart.service");
 const address_service_1 = require("../../services/address.service");
 const order_service_1 = require("../../services/order.service");
-const pickup_service_1 = require("../../services/pickup.service");
+const auth_service_1 = require("../../services/auth.service");
 const CHECKOUT_KEY = 'sneaker_checkout_items';
 const LAST_USED_ADDR_KEY = 'sneaker_last_used_address_id';
 function maskPhone(phone) {
@@ -26,7 +25,9 @@ Page({
     data: {
         items: [],
         totalPrice: 0,
-        deliveryType: 'DELIVERY',
+        balance: 0, // 可用购物额度（分）
+        balanceDeduction: 0, // 本单抵扣额度（分）
+        payAmount: 0,
         // 地址相关数据
         addressList: [],
         sortedAddresses: [],
@@ -51,9 +52,6 @@ Page({
         },
         regionValue: ['福建省', '示例市', '示例区'],
         tagList: ['家', '公司', '学校', '常用'],
-        // 自提点
-        pickupPoints: [],
-        selectedPickupPoint: null,
         requestId: '',
         submitting: false,
         paying: false
@@ -66,18 +64,15 @@ Page({
                 setTimeout(() => wx.navigateBack(), 500);
                 return;
             }
-            const defaultDelivery = ((options === null || options === void 0 ? void 0 : options.deliveryType) === 'PICKUP' || (options === null || options === void 0 ? void 0 : options.deliveryType) === 'store_pickup') ? 'PICKUP' : 'DELIVERY';
-            const prePointId = (options === null || options === void 0 ? void 0 : options.pickupPointId) || '';
             const lastAddrId = wx.getStorageSync(LAST_USED_ADDR_KEY) || '';
             const requestId = `checkout_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
             this.setData({
                 items,
                 requestId,
-                deliveryType: defaultDelivery,
                 lastSelectedAddressId: lastAddrId
-            }, () => this.calculateTotal());
-            yield this.loadPickupPoints(prePointId);
-            if (defaultDelivery === 'DELIVERY') {
+            });
+            yield this.loadBalance();
+            {
                 yield this.reloadAndApplyAddressRules();
             }
         });
@@ -85,30 +80,33 @@ Page({
     onShow() {
         return __awaiter(this, void 0, void 0, function* () {
             // 页面从后台或外部唤回时，若是快递模式，静默刷新地址数据
-            if (this.data.deliveryType === 'DELIVERY' && !this.data.showAddressPickerModal && !this.data.showAddAddressModal) {
+            if (!this.data.showAddressPickerModal && !this.data.showAddAddressModal) {
                 yield this.reloadAndApplyAddressRules(false);
             }
         });
     },
     calculateTotal() {
-        this.setData({
-            totalPrice: this.data.items.reduce((sum, item) => sum + item.price * item.count, 0)
-        });
+        const totalPrice = this.data.items.reduce((sum, item) => sum + item.price * item.count, 0);
+        const balance = Math.max(0, Number(this.data.balance) || 0);
+        const balanceDeduction = Math.min(balance, totalPrice);
+        const payAmount = totalPrice - balanceDeduction;
+        this.setData({ totalPrice, balanceDeduction, payAmount });
     },
-    loadPickupPoints(preferredId) {
+    /**
+     * 读取用户购物额度，并刷新本单抵扣与实付金额（后端下单时按库内余额权威计算，此处仅做展示预估）
+     */
+    loadBalance() {
         return __awaiter(this, void 0, void 0, function* () {
+            const cached = auth_service_1.AuthService.getCurrentUser();
+            this.setData({ balance: Math.max(0, Number(cached === null || cached === void 0 ? void 0 : cached.balance) || 0) }, () => this.calculateTotal());
             try {
-                const points = (yield pickup_service_1.PickupService.list()).filter(point => point.status !== 'DISABLED');
-                let selected = points[0] || null;
-                if (preferredId) {
-                    const found = points.find(p => p.id === preferredId || p._id === preferredId);
-                    if (found)
-                        selected = found;
+                const authRes = yield auth_service_1.AuthService.login().catch(() => null);
+                if (authRes === null || authRes === void 0 ? void 0 : authRes.user) {
+                    this.setData({ balance: Math.max(0, Number(authRes.user.balance) || 0) }, () => this.calculateTotal());
                 }
-                this.setData({ pickupPoints: points, selectedPickupPoint: selected });
             }
-            catch (err) {
-                console.warn('[checkout] load pickup points failed:', err);
+            catch (_) {
+                // 网络异常时沿用本地缓存余额预估
             }
         });
     },
@@ -225,37 +223,6 @@ Page({
                 showAddAddressModal: false
             });
         }
-    },
-    /**
-     * 配送方式切换
-     */
-    onSelectDelivery(e) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const type = e.currentTarget.dataset.type;
-            if (type !== 'DELIVERY' && type !== 'PICKUP')
-                return;
-            if (type === 'PICKUP') {
-                // 快递 -> 自提: 立即关闭地址选择器，地址不再作为必填项
-                this.setData({
-                    deliveryType: 'PICKUP',
-                    showAddressPickerModal: false,
-                    showAddAddressModal: false
-                });
-                if (this.data.pickupPoints.length === 0) {
-                    yield this.loadPickupPoints();
-                }
-            }
-            else {
-                // 自提 -> 快递: 重新加载地址并执行地址规则判断
-                this.setData({ deliveryType: 'DELIVERY' });
-                yield this.reloadAndApplyAddressRules(true);
-            }
-        });
-    },
-    onSelectPickupPoint(e) {
-        const point = this.data.pickupPoints[Number(e.currentTarget.dataset.index)];
-        if (point)
-            this.setData({ selectedPickupPoint: point });
     },
     /**
      * 用户点击地址卡片或“更换地址”按钮
@@ -420,26 +387,21 @@ Page({
             if (this.data.submitting || this.data.paying)
                 return;
             // 快递订单严格检查收货地址
-            if (this.data.deliveryType === 'DELIVERY') {
+            {
                 if (!this.data.selectedAddress || !(this.data.selectedAddress.id || this.data.selectedAddress._id)) {
                     wx.showToast({ title: '请选择收货地址', icon: 'none' });
                     return;
                 }
             }
-            // 自提订单检查自提点
-            if (this.data.deliveryType === 'PICKUP' && !this.data.selectedPickupPoint) {
-                wx.showToast({ title: '请选择有效自提点', icon: 'none' });
-                return;
-            }
             this.setData({ submitting: true });
             const checkoutStart = Date.now();
-            console.log(`[CHECKOUT-01] 开始提交订单, 配送方式: ${this.data.deliveryType}, t=0ms`);
+            console.log(`[CHECKOUT-01] 开始提交订单, 配送方式: 快递, t=0ms`);
             wx.showLoading({ title: '创建订单中...' });
             try {
                 // 快递订单必须包含未脱敏真实手机号快照
                 const selectedAddr = this.data.selectedAddress;
                 const unmaskedPhone = selectedAddr ? selectedAddr.phone : '';
-                const receiverSnapshot = this.data.deliveryType === 'DELIVERY' && selectedAddr ? {
+                const receiverSnapshot = selectedAddr ? {
                     name: selectedAddr.name,
                     phone: unmaskedPhone, // 完整真实手机号，严禁脱敏入库
                     province: selectedAddr.province,
@@ -449,30 +411,25 @@ Page({
                     tag: selectedAddr.tag || ''
                 } : undefined;
                 const result = yield order_service_1.OrderService.createOrder({
-                    items: this.data.items.map(item => ({
-                        skuId: item.skuId || '',
-                        count: item.count,
-                        cartId: item.cartId || item.id,
-                        productId: item.productId,
-                        productName: item.title,
-                        image: item.image,
-                        price: item.price
-                    })),
-                    deliveryType: this.data.deliveryType,
-                    addressId: this.data.deliveryType === 'DELIVERY' ? this.data.selectedAddressId : undefined,
+                    items: this.data.items.map(item => {
+                        var _a;
+                        return ({
+                            skuId: item.skuId || '',
+                            count: item.count,
+                            cartId: item.cartId || (((_a = item.id) === null || _a === void 0 ? void 0 : _a.startsWith('buy_')) ? undefined : item.id),
+                            productId: item.productId,
+                            productName: item.title,
+                            image: item.image,
+                            price: item.price
+                        });
+                    }),
+                    addressId: this.data.selectedAddressId,
                     shippingAddress: receiverSnapshot,
                     receiverSnapshot: receiverSnapshot,
-                    pickupPointId: this.data.deliveryType === 'PICKUP' ? (this.data.selectedPickupPoint.id || this.data.selectedPickupPoint._id) : undefined,
                     requestId: this.data.requestId
                 });
                 console.log(`[CHECKOUT-02] 商城订单创建成功 (orderId: ${result.orderId}), 耗时: ${Date.now() - checkoutStart}ms`);
-                // 清除购物车中已购买的条目与缓存
-                for (const item of this.data.items) {
-                    const cartId = item.cartId || item.id;
-                    if (cartId && !cartId.startsWith('buy_')) {
-                        yield cart_service_1.CartService.removeItem(cartId).catch(() => { });
-                    }
-                }
+                // 后端已在下单事务中扣减购物车；这里不再删除，避免误删并发加购。
                 wx.removeStorageSync(CHECKOUT_KEY);
                 try {
                     wx.hideLoading();
@@ -490,7 +447,7 @@ Page({
                     catch (_) { }
                     console.log(`[CHECKOUT-04] 支付流程返回, status: ${payRes === null || payRes === void 0 ? void 0 : payRes.status}, code: ${payRes === null || payRes === void 0 ? void 0 : payRes.code}, 总耗时: ${Date.now() - checkoutStart}ms`);
                     if (payRes && payRes.status === 'PAID') {
-                        wx.showToast({ title: '支付成功！', icon: 'success' });
+                        wx.showToast({ title: payRes.noPayment ? '已用购物额度抵扣完成' : '支付成功！', icon: 'success' });
                         setTimeout(() => {
                             wx.redirectTo({ url: `/pages/order/list/index` });
                         }, 1200);

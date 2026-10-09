@@ -1,4 +1,4 @@
-import { AdminUser, Product, Order, Category, Banner, OperationLog, SkuItem, ProductAuditTicket, CardKey, AdConfig, AdStats } from '../types';
+import { AdminUser, Product, Order, Category, Banner, OperationLog, SkuItem, CardKey, AdConfig, AdStats } from '../types';
 
 const TOKEN_KEY = 'sneaker_admin_token';
 const USER_KEY = 'sneaker_admin_user';
@@ -74,21 +74,17 @@ export const AdminApi = {
       address?: string;
       role: any;
       permissions: string[];
-      merchantId?: string | null;
-      subMchIdMask?: string;
       expiresIn?: number;
     }>('adminAuth', 'login', { username, password });
 
     const user: AdminUser = {
       id: data.adminId,
       username: data.username,
-      name: data.role === 'MERCHANT' ? (data.name || '') : (data.name || (data.username === 'superadmin' ? '系统超级管理员' : data.username)),
+      name: data.name || data.username,
       phone: data.phone || '',
       address: data.address || '',
-      role: data.role || 'OPERATOR',
+      role: 'SUPER_ADMIN',
       permissions: data.permissions || [],
-      merchantId: data.merchantId || null,
-      subMchIdMask: data.subMchIdMask || '',
       status: 'ACTIVE',
       lastLoginAt: new Date().toLocaleString(),
       createdAt: new Date().toLocaleString()
@@ -101,7 +97,7 @@ export const AdminApi = {
   },
 
   logout: async (): Promise<void> => {
-    clearSession();
+    try { await requestCloud('adminAuth', 'logout'); } finally { clearSession(); }
   },
 
   getCurrentUser: (): AdminUser | null => {
@@ -111,7 +107,7 @@ export const AdminApi = {
         return null;
       }
       const raw = localStorage.getItem(USER_KEY);
-      if (raw) return JSON.parse(raw);
+      if (raw) { const user = JSON.parse(raw); if (user.role === 'SUPER_ADMIN') return user; clearSession(); }
       return null;
     } catch {
       return null;
@@ -148,14 +144,12 @@ export const AdminApi = {
       subtitle: p.subtitle || '',
       description: p.description || '',
       detailImages: p.detailImages || [],
-      deliveryTypes: p.deliveryTypes || [],
       minPrice: Number(p.minPrice) || 0,
       maxPrice: Number(p.maxPrice) || Number(p.minPrice) || 0,
-      platformFee: Number(p.platformFee) || 0,
       basePrice: Number(p.basePrice) || Number(p.minPrice) || 0,
-      merchantId: p.merchantId || null,
       sales: Number(p.sales) || 0,
       status: p.status,
+      contentSafety: p.contentSafety,
       tags: p.tags || [],
       isNew: Boolean(p.isNew),
       isHot: Boolean(p.isHot),
@@ -182,14 +176,12 @@ export const AdminApi = {
       subtitle: p.subtitle || '',
       description: p.description || '',
       detailImages: p.detailImages || [],
-      deliveryTypes: p.deliveryTypes || [],
       minPrice: Number(p.minPrice) || 0,
       maxPrice: Number(p.maxPrice) || Number(p.minPrice) || 0,
-      platformFee: Number(p.platformFee) || 0,
       basePrice: Number(p.basePrice) || Number(p.minPrice) || 0,
-      merchantId: p.merchantId || null,
       sales: Number(p.sales) || 0,
       status: p.status,
+      contentSafety: p.contentSafety,
       tags: p.tags || [],
       isNew: Boolean(p.isNew),
       isHot: Boolean(p.isHot),
@@ -206,33 +198,6 @@ export const AdminApi = {
       createdAt: p.createdAt ? new Date(p.createdAt).toLocaleString() : '',
       updatedAt: p.updatedAt ? new Date(p.updatedAt).toLocaleString() : ''
     };
-  },
-
-  // ---------------- 商品审核工单 ----------------
-  getAuditTickets: async (status?: string): Promise<ProductAuditTicket[]> => {
-    const res = await requestCloud<{ list: any[]; total: number }>('adminProducts', 'listTickets', {
-      status,
-      page: 1,
-      pageSize: 50
-    });
-    return (res.list || []).map(t => ({
-      id: t._id || t.id,
-      merchantId: t.merchantId,
-      type: t.type,
-      productId: t.productId || null,
-      payload: t.payload || {},
-      status: t.status,
-      platformFee: Number(t.platformFee) || 0,
-      rejectReason: t.rejectReason || '',
-      reviewedBy: t.reviewedBy || null,
-      reviewedAt: t.reviewedAt ? new Date(t.reviewedAt).toLocaleString() : null,
-      createdAt: t.createdAt ? new Date(t.createdAt).toLocaleString() : '',
-      updatedAt: t.updatedAt ? new Date(t.updatedAt).toLocaleString() : ''
-    }));
-  },
-
-  reviewTicket: async (ticketId: string, decision: 'approve' | 'reject', platformFee?: number, rejectReason?: string): Promise<void> => {
-    await requestCloud('adminProducts', 'reviewTicket', { ticketId, decision, platformFee, rejectReason });
   },
 
   // ---------------- 健康与环境检查 ----------------
@@ -279,10 +244,6 @@ export const AdminApi = {
     await requestCloud('adminProducts', 'restore', { id });
   },
 
-  purgeProduct: async (id: string): Promise<void> => {
-    await requestCloud('adminProducts', 'purge', { id });
-  },
-
   uploadProductImage: async (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -303,17 +264,15 @@ export const AdminApi = {
     });
   },
 
-  // ---------------- 订单管理与校园自提 ----------------
-  getOrders: async (filters?: { status?: string; deliveryType?: string; keyword?: string; merchantId?: string; statuses?: string[]; pageSize?: number; startTime?: string; endTime?: string }): Promise<Order[]> => {
+  // 单商户订单管理
+  getOrders: async (filters?: { status?: string; keyword?: string; page?: number; pageSize?: number; statuses?: string[]; startTime?: string; endTime?: string }): Promise<Order[]> => {
     const res = await requestCloud<{ list: any[] }>('adminOrders', 'list', {
       status: filters?.status,
       statuses: filters?.statuses,
-      deliveryType: filters?.deliveryType,
       keyword: filters?.keyword,
-      merchantId: filters?.merchantId,
       startTime: filters?.startTime,
       endTime: filters?.endTime,
-      page: 1,
+      page: filters?.page || 1,
       pageSize: filters?.pageSize || 50
     });
     return (res.list || []).map(o => ({
@@ -335,10 +294,9 @@ export const AdminApi = {
       })),
       totalAmount: Number(o.totalAmount) || 0,
       payAmount: Number(o.payAmount) || 0,
-      deliveryType: o.deliveryType,
+      balanceAmount: o.balanceAmount || 0,
+      refundNo: o.refundNo,
       status: o.status,
-      merchantId: o.merchantId || null,
-      merchantName: o.merchantName || '',
       isTest: Boolean(o.isTest),
       trackingNo: o.trackingNo,
       logisticsCompany: o.logisticsCompany,
@@ -346,25 +304,21 @@ export const AdminApi = {
       wxShippingSync: o.wxShippingSync,
       shippingSyncStatus: o.shippingSyncStatus,
       shippingSyncError: o.shippingSyncError,
-      pickupInfo: o.pickupInfo,
       shippingAddress: o.shippingAddress,
       createdAt: o.createdAt ? new Date(o.createdAt).toLocaleString() : '',
       paidAt: o.paidAt ? new Date(o.paidAt).toLocaleString() : ''
     }));
   },
 
-  getMerchants: async (): Promise<{ merchantId: string; name: string }[]> => {
-    const res = await requestCloud<any[]>('adminOrders', 'merchants', {});
-    return Array.isArray(res) ? res : [];
+  shipOrder: async (orderId: string, trackingNo: string, logisticsCompany?: string): Promise<void> => {
+    await requestCloud('adminOrders', 'ship', { orderId, trackingNo, logisticsCompany });
   },
 
-  shipSubOrder: async (orderId: string, trackingNo: string, logisticsCompany?: string): Promise<void> => {
-    await requestCloud('adminOrders', 'shipSubOrder', { orderId, trackingNo, logisticsCompany });
+  reviewRefund: async (orderId: string, decision: 'APPROVE' | 'REJECT', reason = '', returnReceived = false): Promise<void> => {
+    await requestCloud('adminOrders', 'reviewRefund', { orderId, decision, reason, returnReceived });
   },
 
-  reviewRefund: async (orderId: string, decision: 'APPROVE' | 'REJECT'): Promise<void> => {
-    await requestCloud('adminOrders', 'reviewRefund', { orderId, decision });
-  },
+  queryRefund: async (orderId: string): Promise<any> => requestCloud('adminOrders','queryRefund',{orderId}),
 
   executeRefund: async (orderId: string): Promise<void> => {
     await requestCloud('adminOrders', 'executeRefund', { orderId });
@@ -378,26 +332,8 @@ export const AdminApi = {
     return requestCloud('adminOrders', 'syncWithWechat', { orderId });
   },
 
-  resolveShippingConflict: async (orderId: string, resolution: 'USE_WECHAT' | 'USE_LOCAL'): Promise<any> => {
-    return requestCloud('adminOrders', 'resolveShippingConflict', { orderId, resolution });
-  },
-
   queryWxShipping: async (orderId: string): Promise<any> => {
     return requestCloud('adminOrders', 'queryWxShipping', { orderId });
-  },
-
-  preparePickup: async (orderId: string): Promise<void> => {
-    await requestCloud('adminOrders', 'preparePickup', { orderId });
-  },
-
-  completePickup: async (orderId: string): Promise<{ success: boolean; message: string }> => {
-    await requestCloud('adminOrders', 'completePickup', { orderId });
-    return { success: true, message: '自提订单交付完成！' };
-  },
-
-  verifyPickupCode: async (orderId: string, inputCode?: string): Promise<{ success: boolean; message: string }> => {
-    await requestCloud('adminOrders', 'completePickup', { orderId });
-    return { success: true, message: '自提订单交付完成！' };
   },
 
   testPayOrder: async (orderId: string): Promise<void> => {
@@ -536,13 +472,11 @@ export const AdminApi = {
     return list.map((a: any) => ({
       id: a._id || a.id,
       username: a.username,
-      name: a.role === 'MERCHANT' ? (a.name || '') : (a.name || (a.username === 'superadmin' ? '系统超级管理员' : a.username)),
+      name: a.name || a.username,
       phone: a.phone || '',
       address: a.address || '',
       role: a.role,
       permissions: a.permissions || [],
-      merchantId: a.merchantId || null,
-      subMchIdMask: a.subMchIdMask || '',
       status: a.status || 'ACTIVE',
       lastLoginAt: a.lastLoginAt ? new Date(a.lastLoginAt).toLocaleString() : '',
       createdAt: a.createdAt ? new Date(a.createdAt).toLocaleString() : ''
@@ -550,32 +484,12 @@ export const AdminApi = {
   },
 
   saveAdmin: async (admin: Partial<AdminUser>): Promise<any> => {
-    const res = await requestCloud<{ adminId: string }>('adminUsers', 'create', admin);
-    return { ...admin, id: res.adminId };
-  },
-
-  setSubMchId: async (subMchId: string, adminId?: string): Promise<{ subMchIdMask: string }> => {
-    return requestCloud<{ subMchIdMask: string }>('adminUsers', 'setSubMchId', { subMchId, adminId });
-  },
-
-  updateMerchantProfile: async (params: { name?: string; address?: string; phone?: string }): Promise<{ name: string; address: string; phone: string }> => {
-    return requestCloud<{ name: string; address: string; phone: string }>('adminUsers', 'updateProfile', params);
+    const res = await requestCloud<{ id: string }>('adminUsers', 'create', admin);
+    return { ...admin, id: res.id };
   },
 
   toggleAdminStatus: async (adminId: string, status: 'ACTIVE' | 'DISABLED'): Promise<void> => {
     await requestCloud('adminUsers', 'toggleStatus', { adminId, status });
-  },
-
-  suspendMerchant: async (adminId: string): Promise<{ suspendedProductCount: number }> => {
-    return requestCloud<{ suspendedProductCount: number }>('adminUsers', 'suspendMerchant', { adminId });
-  },
-
-  resumeMerchant: async (adminId: string): Promise<void> => {
-    await requestCloud('adminUsers', 'resumeMerchant', { adminId });
-  },
-
-  deleteMerchant: async (adminId: string): Promise<void> => {
-    await requestCloud('adminUsers', 'deleteMerchant', { adminId });
   },
 
   // ---------------- 审计日志 ----------------
@@ -595,41 +509,6 @@ export const AdminApi = {
       detail: JSON.stringify(l.after || l.before || l.detail || ''),
       createdAt: l.createdAt ? new Date(l.createdAt).toLocaleString() : ''
     }));
-  },
-
-  // ---------------- 自提门店管理 ----------------
-  getPickupPoints: async (): Promise<any[]> => {
-    try {
-      const res = await requestCloud<any[]>('pickupPoints', 'adminList', {});
-      return (Array.isArray(res) ? res : []).map(p => ({
-        id: p._id || p.id,
-        _id: p._id || p.id,
-        name: p.name,
-        address: p.address,
-        hours: p.hours || '09:00-22:00',
-        phone: p.phone || '',
-        status: p.status || 'ACTIVE'
-      }));
-    } catch {
-      const res = await requestCloud<any[]>('pickupPoints', 'list', {});
-      return (Array.isArray(res) ? res : []).map(p => ({
-        id: p._id || p.id,
-        _id: p._id || p.id,
-        name: p.name,
-        address: p.address,
-        hours: p.hours || '09:00-22:00',
-        phone: p.phone || '',
-        status: p.status || 'ACTIVE'
-      }));
-    }
-  },
-
-  savePickupPoint: async (point: any): Promise<any> => {
-    return await requestCloud('pickupPoints', 'save', point);
-  },
-
-  deletePickupPoint: async (id: string): Promise<any> => {
-    return await requestCloud('pickupPoints', 'delete', { id });
   },
 
   // ---------------- 卡密管理 (购物额度) ----------------

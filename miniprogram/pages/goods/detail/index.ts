@@ -1,9 +1,9 @@
+import { report } from '../../../services/compliance';
 import { ProductItem } from '../../../models/product';
 import { ProductService } from '../../../services/product.service';
 import { CartService, CartItemModel } from '../../../services/cart.service';
 import { OrderService } from '../../../services/order.service';
 import { AddressService } from '../../../services/address.service';
-import { PickupService, PickupPoint } from '../../../services/pickup.service';
 
 Page({
   data: {
@@ -23,13 +23,10 @@ Page({
     selectedSkuText: '点击选择 颜色 / 规格',
     selectedColor: null as any,
     selectedSize: null as any,
-    selectedQuantity: 1,
-    deliveryType: 'express', // 'express' | 'store_pickup'
-    pickupPoints: [] as PickupPoint[],
-    selectedPickupPoint: null as PickupPoint | null
-  },
+    selectedQuantity: 1,},
 
   onLoad(options: any) {
+    report('product_view', { product_id: String(options.id || '').slice(0,100) });
     const id = String(options.id || '').trim();
     if (!id) {
       wx.showToast({ title: '商品参数缺失，请返回重试', icon: 'none' });
@@ -93,33 +90,6 @@ Page({
     });
   },
 
-  onSelectDelivery(e: any) {
-    const type = e.currentTarget.dataset.type;
-    this.setData({ deliveryType: type });
-    if (type === 'store_pickup' && this.data.pickupPoints.length === 0) {
-      this.loadPickupPoints();
-    }
-  },
-
-  async loadPickupPoints(): Promise<PickupPoint[]> {
-    try {
-      const points = (await PickupService.list()).filter(point => point.status !== 'DISABLED');
-      this.setData({ pickupPoints: points, selectedPickupPoint: points[0] || null });
-      if (!points.length) wx.showToast({ title: '暂无可用自提点', icon: 'none' });
-      return points;
-    } catch (err) {
-      console.warn('[detail] load pickup points failed:', err);
-      wx.showToast({ title: '自提点加载失败，请重试', icon: 'none' });
-      return [];
-    }
-  },
-
-  onSelectPickupPoint(e: any) {
-    const index = Number(e.currentTarget.dataset.index);
-    const point = this.data.pickupPoints[index];
-    if (point) this.setData({ selectedPickupPoint: point });
-  },
-
   onOpenSku(e: any) {
     const type = e.currentTarget.dataset.type || 'both';
     this.directAction(type);
@@ -163,10 +133,8 @@ Page({
         selected: true
       };
       wx.setStorageSync('sneaker_checkout_items', [checkoutItem]);
-      const deliveryParam = this.data.deliveryType === 'store_pickup' ? 'PICKUP' : 'DELIVERY';
-      const pointParam = this.data.selectedPickupPoint ? (this.data.selectedPickupPoint.id || this.data.selectedPickupPoint._id) : '';
       wx.navigateTo({
-        url: `/pages/checkout/index?deliveryType=${deliveryParam}&pickupPointId=${pointParam || ''}`
+        url: '/pages/checkout/index'
       });
     }
   },
@@ -226,10 +194,8 @@ Page({
         selected: true
       };
       wx.setStorageSync('sneaker_checkout_items', [checkoutItem]);
-      const deliveryParam = this.data.deliveryType === 'store_pickup' ? 'PICKUP' : 'DELIVERY';
-      const pointParam = this.data.selectedPickupPoint ? (this.data.selectedPickupPoint.id || (this.data.selectedPickupPoint as any)._id) : '';
       wx.navigateTo({
-        url: `/pages/checkout/index?deliveryType=${deliveryParam}&pickupPointId=${pointParam || ''}`
+        url: '/pages/checkout/index'
       });
     }
   },
@@ -267,15 +233,6 @@ Page({
 
   onStopProp() {
     // 阻止点击内容区域事件冒泡导致关闭弹窗
-  },
-
-  onContactService() {
-    wx.showModal({
-      title: '在线商品顾问',
-      content: '专属顾问已在线，正在为您接入...',
-      showCancel: false,
-      confirmText: '知道了'
-    });
   },
 
   onShareAppMessage() {

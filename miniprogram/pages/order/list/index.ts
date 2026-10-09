@@ -10,13 +10,11 @@ const TABS = [
   { key: 'COMPLETED', label: '已完成' }
 ];
 const STATUS_LABEL: Record<string, string> = {
-  PENDING_PAYMENT: '待付款', PAID: '待发货', SHIPPED: '运输中', WAITING_PICKUP: '待发货',
-  READY_FOR_PICKUP: '待收货', COMPLETED: '已完成', CANCELLED: '已取消', REFUNDING: '退款处理中', REFUNDED: '已退款',
-  REFUND_PENDING: '退款中'
+  CLOSING: '关单核实中', REFUND_PENDING: '退款待审核', PENDING_PAYMENT: '待付款', PAID: '待发货', SHIPPED: '运输中', COMPLETED: '已完成', CANCELLED: '已取消', REFUNDING: '退款处理中', REFUNDED: '已退款'
 };
 
 Page({
-  data: { tabs: TABS, activeTab: 'ALL', orders: [] as OrderModel[], loading: false },
+  data: { tabs: TABS, activeTab: 'ALL', orders: [] as OrderModel[], loading: false, page: 0, hasMore: true },
 
   onLoad(options: any) {
     const tab = options.status && TABS.some(item => item.key === options.status) ? options.status : 'ALL';
@@ -25,10 +23,16 @@ Page({
 
   onShow() { this.loadOrders(); },
 
-  async loadOrders() {
+  onReachBottom() { if (!this.data.loading && this.data.hasMore) this.loadOrders(true); },
+
+  async loadOrders(append = false) {
+    if (this.data.loading) return;
+    const page = append ? this.data.page + 1 : 1;
+    const activeTab = this.data.activeTab;
     this.setData({ loading: true });
     try {
-      const result = await OrderService.getList({ page: 1, pageSize: 50, status: this.data.activeTab === 'ALL' ? undefined : this.data.activeTab });
+      const result = await OrderService.getList({ page, pageSize: 50, status: activeTab === 'ALL' ? undefined : activeTab });
+      if (activeTab !== this.data.activeTab) return;
       const orders = (result.list || []).map(order => {
         let statusLabel = STATUS_LABEL[order.status] || order.status;
         // 已完成但未评价 → 显示「待评价」，与「待评价」tab 语义一致
@@ -45,11 +49,12 @@ Page({
           }))
         };
       });
-      this.setData({ orders });
+      const merged = append ? [...this.data.orders, ...orders] : orders;
+      this.setData({ orders: merged, page, hasMore: merged.length < result.total });
     } catch (err: any) {
       wx.showToast({ title: err?.message || '订单加载失败', icon: 'none' });
-      this.setData({ orders: [] });
-    } finally { this.setData({ loading: false }); }
+      if (!append) this.setData({ orders: [] });
+    } finally { this.setData({ loading: false }); if (activeTab !== this.data.activeTab) this.loadOrders(); }
   },
 
   onTabChange(e: any) { this.setData({ activeTab: e.currentTarget.dataset.key }, () => this.loadOrders()); },

@@ -46,33 +46,16 @@ export const Layout: React.FC = () => {
     navigate('/login');
   };
 
-  const isMerchant = user?.role === 'MERCHANT';
-  const navItems = isMerchant
-    ? [
-        { label: '运营大盘', path: '/', icon: LayoutDashboard },
-        { label: '商品管理', path: '/products', icon: ShoppingBag },
-        { label: '商品审核工单', path: '/audit', icon: ClipboardCheck },
-        { label: '订单管理', path: '/orders', icon: ClipboardList },
-        { label: '商户设置', path: '/merchant-settings', icon: Store }
-      ]
-    : [
-        { label: '运营大盘', path: '/', icon: LayoutDashboard },
-        { label: '商品管理', path: '/products', icon: ShoppingBag },
-        ...(user?.role === 'SUPER_ADMIN'
-          ? [{ label: '商品审核工单', path: '/audit', icon: ClipboardCheck }]
-          : []),
-        { label: '订单管理', path: '/orders', icon: ClipboardList },
-        { label: '类目中心', path: '/categories', icon: Layers },
-        { label: '轮播营销', path: '/banners', icon: ImageIcon },
-        ...(user?.role === 'SUPER_ADMIN'
-          ? [
-              { label: '管理员权限', path: '/admins', icon: ShieldCheck },
-              { label: '卡密管理', path: '/card-keys', icon: KeyRound },
-              { label: '广告管理', path: '/ads', icon: Clapperboard }
-            ]
-          : []),
-        { label: '审计日志', path: '/logs', icon: FileText }
-      ];
+  const navItems = [
+    { label: '运营大盘', path: '/', icon: LayoutDashboard },
+    { label: '商品管理', path: '/products', icon: ShoppingBag },
+    { label: '订单管理', path: '/orders', icon: ClipboardList },
+    { label: '类目中心', path: '/categories', icon: Layers },
+    { label: '轮播营销', path: '/banners', icon: ImageIcon },
+    { label: '管理员', path: '/admins', icon: ShieldCheck },
+    { label: '卡密管理', path: '/card-keys', icon: KeyRound },
+    { label: '审计日志', path: '/logs', icon: FileText }
+  ];
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#F8FAFC' }}>
@@ -185,7 +168,7 @@ export const Layout: React.FC = () => {
                   {user?.name || '管理员'}
                 </div>
                 <div style={{ fontSize: '11px', color: '#64748B' }}>
-                  {user?.role === 'SUPER_ADMIN' ? '超级管理员' : user?.role === 'MERCHANT' ? '商家' : '运营人员'}
+                  {'超级管理员'}
                 </div>
               </div>
             </div>
